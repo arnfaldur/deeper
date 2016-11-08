@@ -1,11 +1,9 @@
 package main
 
-import (
-	"fmt"
-)
-
+// import (
+// 	"github.com/veandco/go-sdl2/sdl"
+// )
 
 func main() {
-	display()
-	fmt.Println("Hello World!")
+	startRenderLoop()
 }
