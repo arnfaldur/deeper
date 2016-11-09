@@ -12,10 +12,12 @@ const (
 func startRenderLoop() {
 	sdl.Init(sdl.INIT_EVERYTHING)
 	//	gamestate := MAINMENU
-	running := true
 	var fpsManager gfx.FPSmanager
+	var window *sdl.Window
+	var renderer *sdl.Renderer
+	var err error
 
-	window, err := sdl.CreateWindow("Go deeper", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+	window, err = sdl.CreateWindow("Go deeper", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		800, 600, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
@@ -25,20 +27,25 @@ func startRenderLoop() {
 	gfx.InitFramerate(&fpsManager)
 	gfx.SetFramerate(&fpsManager, 60)
 
-	surface, err := window.GetSurface()
+	// surface, err := window.GetSurface()
+	renderer, err = sdl.CreateRenderer(window, -1, 0)
 	if err != nil {
 		panic(err)
 	}
+	defer renderer.Destroy()
 
-	var i int32 = 0
+	running := true
 	for running {
 		running = processInputs()
-		surface.FillRect(&sdl.Rect{0, 0, 800, 600}, 0xff000000)
 		rect := sdl.Rect{0, 0, 200, 200}
-		surface.FillRect(&rect, 0xffff0000)
-		surface.FillRect(&sdl.Rect{2 * i, i, 400, 400}, 0xff00ff00)
-		window.UpdateSurface()
-		i++
+
+		renderer.Clear()
+		renderer.SetDrawColor(0,0,0,0)
+		renderer.FillRect(&sdl.Rect{0,0,800,600})
+		renderer.SetDrawColor(0xff,0,0,0xff)
+		renderer.DrawRect(&rect)
+		renderer.Present()
+
 		gfx.FramerateDelay(&fpsManager)
 	}
 
