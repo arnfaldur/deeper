@@ -6,50 +6,59 @@ import (
 )
 
 const (
-	MAINMENU = iota
+	MAINMENU      = iota
+	SCREEN_WIDTH  = 800
+	SCREEN_HEIGHT = 600
+	FPS           = 60
 )
 
-func startRenderLoop() {
+var fpsManager gfx.FPSmanager
+var window *sdl.Window
+var renderer *sdl.Renderer
+var err error
+
+func getRenderer() *sdl.Renderer {
+	return renderer
+}
+
+func getWindow() *sdl.Window {
+	return window
+}
+
+func initDisplay() {
+
 	sdl.Init(sdl.INIT_EVERYTHING)
-	//	gamestate := MAINMENU
-	var fpsManager gfx.FPSmanager
-	var window *sdl.Window
-	var renderer *sdl.Renderer
-	var err error
 
 	window, err = sdl.CreateWindow("Go deeper", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		800, 600, sdl.WINDOW_SHOWN)
+		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
 	}
-	defer window.Destroy()
+	//defer window.Destroy()
 
 	gfx.InitFramerate(&fpsManager)
-	gfx.SetFramerate(&fpsManager, 60)
+	gfx.SetFramerate(&fpsManager, FPS)
 
-	// surface, err := window.GetSurface()
 	renderer, err = sdl.CreateRenderer(window, -1, 0)
 	if err != nil {
 		panic(err)
 	}
-	defer renderer.Destroy()
 
-	running := true
-	for running {
-		running = processInputs()
-		rect := sdl.Rect{0, 0, 200, 200}
+	//defer renderer.Destroy()
+}
 
-		renderer.Clear()
-		renderer.SetDrawColor(0,0,0,0)
-		renderer.FillRect(&sdl.Rect{0,0,800,600})
-		renderer.SetDrawColor(0xff,0,0,0xff)
-		renderer.DrawRect(&rect)
-		renderer.Present()
+func destroyDisplay() {
+	window.Destroy()
+	renderer.Destroy()
+}
 
-		gfx.FramerateDelay(&fpsManager)
-	}
+func clearFrame() {
+	renderer.Clear()
+}
 
-	sdl.Quit()
+func presentFrame() {
+	renderer.Present()
+	gfx.FramerateDelay(&fpsManager)
 }
 
 func processInputs() bool {
