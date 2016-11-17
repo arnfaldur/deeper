@@ -123,11 +123,13 @@ func processInputs() bool {
 func renderGame() {
 	xoffset := ((SCREEN_WIDTH % (TILE_SIZE * 2)) - TILE_SIZE) / 2
 	yoffset := ((SCREEN_HEIGHT % (TILE_SIZE * 2)) - TILE_SIZE) / 2
-	for i := 0; i < SCREEN_HEIGHT/TILE_SIZE+1; i++ {
-		for j := 0; j < SCREEN_WIDTH/TILE_SIZE+1; j++ {
+	for i := -1; i < SCREEN_HEIGHT/TILE_SIZE+1; i++ {
+		for j := -1; j < SCREEN_WIDTH/TILE_SIZE+1; j++ {
 			drawTile(textures[0], j*TILE_SIZE+xoffset, i*TILE_SIZE+yoffset)
+
 		}
 	}
+	drawTile(textures[1], 2*TILE_SIZE+xoffset, 2*TILE_SIZE+yoffset)
 }
 
 func drawTile(tile *sdl.Texture, x, y int) {
@@ -138,7 +140,9 @@ func drawTile(tile *sdl.Texture, x, y int) {
 }
 
 func loadTextures() {
-	assets := []string{"./assets/ShittyTile.png"}
+	assets := []string{
+		"../src/github.com/soyman/deeper/assets/ShittyTile.png",
+		"../src/github.com/soyman/deeper/assets/ShittyGuy.png"}
 	for i, e := range assets {
 		image, err := img.Load(e)
 		if err != nil {
