@@ -1,19 +1,10 @@
 package main
 
-type TILEID int
-
-var IS_SOLID = map[TILEID]bool{
+var IS_SOLID = map[ID]bool{
 	STONE_WALL:  true,
 	STONE_FLOOR: false,
 }
 
-//TileIDS
-const (
-	STONE_WALL TILEID = iota
-	STONE_FLOOR
-)
-
 type Tile struct {
-	tileID TILEID
-	itemID int
+	tileID, itemID ID
 }

@@ -42,11 +42,12 @@ type Entity struct {
 
 type Player struct {
 	Entity
+	id ID
 }
 
 type NPC struct {
 	Entity
-	id int
+	id ID
 }
 
 func (n NPC) update() {
@@ -115,5 +116,5 @@ func (p *Player) update() {
 }
 
 func dummyNPC(xpos, ypos int) NPC {
-	return NPC{Entity{x: xpos, y: ypos, name: "dummy", maxHealth: 10, currHealth: 10}, 0}
+	return NPC{Entity{x: xpos, y: ypos, name: "dummy", maxHealth: 10, currHealth: 10}, DUMMY}
 }

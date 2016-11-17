@@ -22,7 +22,11 @@ func temp_populatemap() {
 	fmt.Println("STONE_FLOOR: %v", STONE_FLOOR)
 	for i := 0; i < MAPSIZE; i++ {
 		for j := 0; j < MAPSIZE; j++ {
-			themap[i][j] = Tile{STONE_FLOOR, 0}
+			if i != 0 && j != 0 && i != MAPSIZE-1 && j != MAPSIZE-1 {
+				themap[i][j] = Tile{tileID: STONE_FLOOR}
+			} else {
+				themap[i][j] = Tile{tileID: STONE_WALL}
+			}
 		}
 	}
 }
@@ -73,9 +77,8 @@ func termGameLoop() {
 
 	running := true
 
-	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}}
+	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}, PLAYER}
 	temp_populatemap()
-
 	term_rendermap()
 
 	for running {
