@@ -6,8 +6,29 @@ import (
 )
 
 func main() {
-	fmt.Println("All is right with the world.")
 
+	fmt.Println("Welcome to Deeper!")
+	fmt.Println("Would you like terminal mode or graphical mode? t/g")
+	var ans string
+	fmt.Scan(&ans)
+
+	if ans == "t" {
+		termGameLoop()
+	} else if ans == "g" {
+		sdlGameLoop()
+	}
+}
+
+func termGameLoop() {
+
+	running := true
+
+	for running {
+		running = processInputs()
+	}
+}
+
+func sdlGameLoop() {
 	defer destroyDisplay()
 	initDisplay()
 
