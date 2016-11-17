@@ -31,8 +31,9 @@ func termGameLoop() {
 }
 
 func sdlGameLoop() {
-	defer destroyDisplay()
 	initDisplay()
+	defer destroyDisplay()
+	loadTextures()
 
 	running := true
 
@@ -40,10 +41,12 @@ func sdlGameLoop() {
 		running = processInputs()
 
 		clearFrame()
+		renderGame()
 		presentFrame()
 
 	}
 
+	unloadTextures()
 	sdl.Quit()
 }
 
