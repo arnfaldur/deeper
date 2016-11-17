@@ -5,6 +5,8 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+var themap [64][64]Tile
+
 func main() {
 
 	fmt.Println("Welcome to Deeper!")

@@ -20,13 +20,25 @@ type Actor interface {
 	update()
 }
 
-type NPC struct {
-	id                    int
+type Entity struct {
 	name                  string
 	maxHealth, currHealth int
 	attributes            [6]int
 }
 
+type Player struct {
+	this Entity
+}
+
+type NPC struct {
+	id   int
+	this Entity
+}
+
+func (n NPC) update(area [][]int, others []NPC) {
+
+}
+
 func dummyNPC() NPC {
-	return NPC{id: 0, name: "dummy", maxHealth: 10, currhealth: 10}
+	return NPC{id: 0, this: Entity{name: "dummy", maxHealth: 10, currHealth: 10}}
 }
