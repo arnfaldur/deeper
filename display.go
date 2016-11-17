@@ -139,7 +139,7 @@ func renderGame() {
 				int((float64(j)-0.5)*scale), int(scale), int(scale))
 		}
 	}
-	drawTile(textures[1], int((5-0.5)*scale), int((5-0.5)*scale), int(scale), int(scale))
+	drawTile(textures[2], int((5-0.5)*scale), int((5-0.5)*scale), int(scale), int(scale))
 }
 
 func drawTile(tile *sdl.Texture, x, y, xscale, yscale int) {
@@ -152,6 +152,7 @@ func drawTile(tile *sdl.Texture, x, y, xscale, yscale int) {
 func loadTextures() {
 	assets := []string{
 		"../src/github.com/soyman/deeper/assets/ShittyTile.png",
+		"../src/github.com/soyman/deeper/assets/ShittyBeholder.png",
 		"../src/github.com/soyman/deeper/assets/ShittyGuy.png"}
 	for i, e := range assets {
 		image, err := img.Load(e)
