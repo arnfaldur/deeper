@@ -7,6 +7,18 @@ import (
 
 var themap [64][64]Tile
 
+func temp_populatemap() {
+	for i := 0; i < 64; i++ {
+		for j := 0; j < 64; j++ {
+			themap[i][j] = Tile{0, 0}
+		}
+	}
+}
+
+func temp_rendermap() {
+
+}
+
 func main() {
 
 	fmt.Println("Welcome to Deeper!")
@@ -26,7 +38,8 @@ func termGameLoop() {
 	running := true
 
 	for running {
-		running = processInputs()
+		var input string
+
 	}
 }
 
