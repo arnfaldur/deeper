@@ -27,7 +27,8 @@ var (
 
 const (
 	FPS       = 60
-	TILE_SIZE = 64
+	TILE_SIZE = 1 << 6
+	MAX_TILES = 1 << 4
 )
 
 var fpsManager gfx.FPSmanager
@@ -121,20 +122,29 @@ func processInputs() bool {
 }
 
 func renderGame() {
-	xoffset := ((SCREEN_WIDTH % (TILE_SIZE * 2)) - TILE_SIZE) / 2
-	yoffset := ((SCREEN_HEIGHT % (TILE_SIZE * 2)) - TILE_SIZE) / 2
-	for i := -1; i < SCREEN_HEIGHT/TILE_SIZE+1; i++ {
-		for j := -1; j < SCREEN_WIDTH/TILE_SIZE+1; j++ {
-			drawTile(textures[0], j*TILE_SIZE+xoffset, i*TILE_SIZE+yoffset)
+	// xoffset := ((SCREEN_WIDTH % (TILE_SIZE * 2)) - TILE_SIZE) / 2
+	// yoffset := ((SCREEN_HEIGHT % (TILE_SIZE * 2)) - TILE_SIZE) / 2
+	// for i := -1; i < SCREEN_HEIGHT/TILE_SIZE+1; i++ {
+	// 	for j := -1; j < SCREEN_WIDTH/TILE_SIZE+1; j++ {
+	// 		drawTile(textures[0], j*TILE_SIZE+xoffset, i*TILE_SIZE+yoffset)
 
+	// 	}
+	// }
+	// drawTile(textures[1], 2*TILE_SIZE+xoffset, 2*TILE_SIZE+yoffset)
+	scale := float64(SCREEN_HEIGHT / MAX_TILES)
+	for i := 0; i < MAX_TILES+1; i++ {
+		for j := 0; j < MAX_TILES+1; j++ {
+			drawTile(textures[0],
+				int((float64(i)-0.5)*scale),
+				int((float64(j)-0.5)*scale), int(scale), int(scale))
 		}
 	}
-	drawTile(textures[1], 2*TILE_SIZE+xoffset, 2*TILE_SIZE+yoffset)
+	drawTile(textures[1], int((5-0.5)*scale), int((5-0.5)*scale), int(scale), int(scale))
 }
 
-func drawTile(tile *sdl.Texture, x, y int) {
-	src := sdl.Rect{0, 0, 64, 64}
-	dst := sdl.Rect{int32(x), int32(y), 64, 64}
+func drawTile(tile *sdl.Texture, x, y, xscale, yscale int) {
+	src := sdl.Rect{0, 0, int32(TILE_SIZE), int32(TILE_SIZE)}
+	dst := sdl.Rect{int32(x), int32(y), int32(xscale), int32(yscale)}
 	renderer.Copy(tile, &src, &dst)
 
 }
