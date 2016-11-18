@@ -58,7 +58,7 @@ func (n NPC) isAtPos(xpos, ypos int) bool {
 	return (n.x == xpos) && (n.y == ypos)
 }
 
-func (p *Player) termupdate(floor *[MAPSIZE][MAPSIZE]Tile, others *[]NPC, action int) {
+func (p *Player) termupdate(floor *Mapt, others *[]NPC, action int) {
 	xpos := p.x
 	ypos := p.y
 
@@ -89,7 +89,7 @@ func (p *Player) attack(n *NPC) {
 	n.currHealth -= p.damage
 }
 
-func (p *Player) move(xpos int, ypos int, floor *[MAPSIZE][MAPSIZE]Tile, others *[]NPC) {
+func (p *Player) move(xpos int, ypos int, floor *Mapt, others *[]NPC) {
 
 	var t = (*floor)[xpos][ypos]
 

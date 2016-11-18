@@ -121,7 +121,7 @@ func processInputs() bool {
 	return true
 }
 
-func renderGame() {
+func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 	// xoffset := ((SCREEN_WIDTH % (TILE_SIZE * 2)) - TILE_SIZE) / 2
 	// yoffset := ((SCREEN_HEIGHT % (TILE_SIZE * 2)) - TILE_SIZE) / 2
 	// for i := -1; i < SCREEN_HEIGHT/TILE_SIZE+1; i++ {
@@ -131,20 +131,25 @@ func renderGame() {
 	// 	}
 	// }
 	// drawTile(textures[1], 2*TILE_SIZE+xoffset, 2*TILE_SIZE+yoffset)
-	scale := float64(SCREEN_HEIGHT / MAX_TILES)
-	for i := 0; i < MAX_TILES+1; i++ {
-		for j := 0; j < MAX_TILES+1; j++ {
-			drawTile(textures[0],
-				int((float64(i)-0.5)*scale),
-				int((float64(j)-0.5)*scale), int(scale), int(scale))
+
+	for i := 0; i < MAX_TILES; i++ {
+		for j := 0; j < MAX_TILES; j++ {
+			//drawTile(textures[(*themap)[i][j].tileID.number], j, i)
+			drawTile(textures[0], j, i)
 		}
 	}
-	drawTile(textures[2], int((5-0.5)*scale), int((5-0.5)*scale), int(scale), int(scale))
+	for i := 0; i < len((*actors)); i++ {
+
+		drawTile(textures[2], (*actors)[i].x, (*actors)[i].y)
+	}
+	drawTile(textures[1], (*hilbert).x, (*hilbert).y)
 }
 
-func drawTile(tile *sdl.Texture, x, y, xscale, yscale int) {
+func drawTile(tile *sdl.Texture, x, y int) {
+	scale := float64(SCREEN_HEIGHT / MAX_TILES)
+
 	src := sdl.Rect{0, 0, int32(TILE_SIZE), int32(TILE_SIZE)}
-	dst := sdl.Rect{int32(x), int32(y), int32(xscale), int32(yscale)}
+	dst := sdl.Rect{int32(float64(x) * scale), int32(float64(y) * scale), int32(scale), int32(scale)}
 	renderer.Copy(tile, &src, &dst)
 
 }
@@ -152,8 +157,8 @@ func drawTile(tile *sdl.Texture, x, y, xscale, yscale int) {
 func loadTextures() {
 	assets := []string{
 		"../src/github.com/soyman/deeper/assets/ShittyTile.png",
-		"../src/github.com/soyman/deeper/assets/ShittyBeholder.png",
-		"../src/github.com/soyman/deeper/assets/ShittyGuy.png"}
+		"../src/github.com/soyman/deeper/assets/ShittyGuy.png",
+		"../src/github.com/soyman/deeper/assets/ShittyBeholder.png"}
 	for i, e := range assets {
 		image, err := img.Load(e)
 		if err != nil {

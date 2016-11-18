@@ -9,8 +9,10 @@ const (
 	MAPSIZE = 16
 )
 
+type Mapt [MAPSIZE][MAPSIZE]Tile
+
 var renderables []*Actor
-var themap [MAPSIZE][MAPSIZE]Tile
+var themap Mapt
 var hilbert Player
 var actors []NPC
 
@@ -56,7 +58,6 @@ func term_rendermap() {
 		}
 		fmt.Print("\n")
 	}
-
 }
 
 func main() {
@@ -120,15 +121,56 @@ func sdlGameLoop() {
 
 	running := true
 
+	//Start hack:
+
+	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}, PLAYER}
+	temp_populatemap()
+
+	for running {
+		running = processInputs()
+
+		var input string
+		fmt.Scan(&input)
+
+		switch input {
+		case "w":
+			hilbert.termupdate(&themap, &actors, UP)
+		case "s":
+			hilbert.termupdate(&themap, &actors, DOWN)
+		case "a":
+			hilbert.termupdate(&themap, &actors, LEFT)
+		case "d":
+			hilbert.termupdate(&themap, &actors, RIGHT)
+		case "e":
+			var xpos, ypos int
+			fmt.Scan(&xpos)
+			fmt.Scan(&ypos)
+			temp_addDummy(xpos, ypos)
+		case "x":
+			running = false
+		}
+
+		for i := 0; i < len(actors); i++ {
+			if actors[i].currHealth <= 0 {
+				actors = append(actors[:i], actors[i+1:]...)
+			}
+		}
+		clearFrame()
+		renderMap(&themap, &actors, &hilbert)
+		presentFrame()
+		term_rendermap()
+	}
+	//End hack;
+	/*
 	for running {
 		running = processInputs()
 
 		clearFrame()
-		renderGame()
+		renderMap()
 		presentFrame()
 
 	}
-
+    */
 	unloadTextures()
 	sdl.Quit()
 }
