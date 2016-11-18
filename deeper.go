@@ -83,6 +83,7 @@ func termGameLoop() {
 	term_rendermap()
 
 	for running {
+		//running = processInputs()
 		var input string
 		fmt.Scan(&input)
 
@@ -127,27 +128,21 @@ func sdlGameLoop() {
 	temp_populatemap()
 
 	for running {
-		running = processInputs()
+		update_key_state()
+		running = (KPR[41] == 0)
 
-		var input string
-		fmt.Scan(&input)
+		fmt.Println("ESCAPE: ", sdl.SCANCODE_ESCAPE)
+		fmt.Println("UP: ", sdl.SCANCODE_UP)
+		fmt.Println("LEFT: ", sdl.SCANCODE_LEFT)
 
-		switch input {
-		case "w":
+		if KPR[sdl.SCANCODE_UP] != 0 {
 			hilbert.termupdate(&themap, &actors, UP)
-		case "s":
-			hilbert.termupdate(&themap, &actors, DOWN)
-		case "a":
+			fmt.Println("UP PRESSED!")
+		}
+
+		if KPR[sdl.SCANCODE_LEFT] != 0 {
 			hilbert.termupdate(&themap, &actors, LEFT)
-		case "d":
-			hilbert.termupdate(&themap, &actors, RIGHT)
-		case "e":
-			var xpos, ypos int
-			fmt.Scan(&xpos)
-			fmt.Scan(&ypos)
-			temp_addDummy(xpos, ypos)
-		case "x":
-			running = false
+			fmt.Println("DOWN PRESSED!")
 		}
 
 		for i := 0; i < len(actors); i++ {
@@ -155,22 +150,23 @@ func sdlGameLoop() {
 				actors = append(actors[:i], actors[i+1:]...)
 			}
 		}
+
 		clearFrame()
 		renderMap(&themap, &actors, &hilbert)
 		presentFrame()
-		term_rendermap()
+		//term_rendermap()
 	}
 	//End hack;
 	/*
-	for running {
-		running = processInputs()
+		for running {
+			running = processInputs()
 
-		clearFrame()
-		renderMap()
-		presentFrame()
+			clearFrame()
+			renderMap()
+			presentFrame()
 
-	}
-    */
+		}
+	*/
 	unloadTextures()
 	sdl.Quit()
 }

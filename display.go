@@ -7,6 +7,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl_image"
 	"github.com/veandco/go-sdl2/sdl_ttf"
 	"os"
+	"runtime"
 )
 
 type Point struct {
@@ -19,6 +20,8 @@ type Textures map[int]*sdl.Texture
 const (
 	MAINMENU = iota
 )
+
+const ()
 
 var (
 	SCREEN_WIDTH  = 1600
@@ -52,12 +55,15 @@ func initDisplay() error {
 
 	sdl.Init(sdl.INIT_EVERYTHING)
 
+	//Demon magic that fixes unresponsive bug on OS X
+	runtime.LockOSThread()
+
 	if err := ttf.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize TTF: %s\n", err)
 	}
 
 	window, err = sdl.CreateWindow("Go deeper", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_SHOWN)
+		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create window: %s\n", err)
 		return err
@@ -118,6 +124,9 @@ func processInputs() bool {
 
 		}
 	}
+
+	fmt.Println("I HAVE PROCESSED INPUTS!")
+
 	return true
 }
 
@@ -131,6 +140,8 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 	// 	}
 	// }
 	// drawTile(textures[1], 2*TILE_SIZE+xoffset, 2*TILE_SIZE+yoffset)
+
+	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
 
 	for i := 0; i < MAX_TILES; i++ {
 		for j := 0; j < MAX_TILES; j++ {
