@@ -21,14 +21,14 @@ const (
 )
 
 var (
-	SCREEN_WIDTH  = 400
-	SCREEN_HEIGHT = 300
+	SCREEN_WIDTH  = 1600
+	SCREEN_HEIGHT = 1200
 )
 
 const (
 	FPS       = 60
-	TILE_SIZE = 1 << 6
-	MAX_TILES = 1 << 4
+	TILE_SIZE = 1 << 5
+	MAX_TILES = 1 << 3
 )
 
 var fpsManager gfx.FPSmanager
@@ -134,15 +134,15 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	for i := 0; i < MAX_TILES; i++ {
 		for j := 0; j < MAX_TILES; j++ {
-			//drawTile(textures[(*themap)[i][j].tileID.number], j, i)
-			drawTile(textures[0], j, i)
+			drawTile(textures[(*themap)[i][j].tileID.number], j, i)
+			//drawTile(textures[0], j, i)
 		}
 	}
 	for i := 0; i < len((*actors)); i++ {
 
-		drawTile(textures[2], (*actors)[i].x, (*actors)[i].y)
+		drawTile(textures[3], (*actors)[i].x, (*actors)[i].y)
 	}
-	drawTile(textures[1], (*hilbert).x, (*hilbert).y)
+	drawTile(textures[2], (*hilbert).x, (*hilbert).y)
 }
 
 func drawTile(tile *sdl.Texture, x, y int) {
@@ -156,6 +156,10 @@ func drawTile(tile *sdl.Texture, x, y int) {
 
 func loadTextures() {
 	assets := []string{
+		"../src/github.com/soyman/deeper/assets/STONE_WALL.png",
+		"../src/github.com/soyman/deeper/assets/STONE_FLOOR.png",
+		"../src/github.com/soyman/deeper/assets/PLAYER.png",
+		"../src/github.com/soyman/deeper/assets/DUMMY.png",
 		"../src/github.com/soyman/deeper/assets/ShittyTile.png",
 		"../src/github.com/soyman/deeper/assets/ShittyGuy.png",
 		"../src/github.com/soyman/deeper/assets/ShittyBeholder.png"}
