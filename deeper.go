@@ -124,25 +124,31 @@ func sdlGameLoop() {
 
 	//Start hack:
 
-	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}, PLAYER}
+	hilbert = Player{Entity{x: 3, y: 3, damage: 5}, PLAYER}
 	temp_populatemap()
 
 	for running {
-		update_key_state()
-		running = (KPR[41] == 0)
+		//update_key_state()
+		running = !get_key_state(sdl.SCANCODE_ESCAPE)
 
-		fmt.Println("ESCAPE: ", sdl.SCANCODE_ESCAPE)
-		fmt.Println("UP: ", sdl.SCANCODE_UP)
-		fmt.Println("LEFT: ", sdl.SCANCODE_LEFT)
+		//fmt.Println("ESCAPE: ", sdl.SCANCODE_ESCAPE)
+		//fmt.Println("UP: ", sdl.SCANCODE_UP)
+		//fmt.Println("LEFT: ", sdl.SCANCODE_LEFT)
 
-		if KPR[sdl.SCANCODE_UP] != 0 {
+		if get_key_state(sdl.SCANCODE_UP) {
 			hilbert.termupdate(&themap, &actors, UP)
-			fmt.Println("UP PRESSED!")
 		}
 
-		if KPR[sdl.SCANCODE_LEFT] != 0 {
+		if get_key_state(sdl.SCANCODE_DOWN) {
+			hilbert.termupdate(&themap, &actors, DOWN)
+		}
+
+		if get_key_state(sdl.SCANCODE_LEFT) {
 			hilbert.termupdate(&themap, &actors, LEFT)
-			fmt.Println("DOWN PRESSED!")
+		}
+
+		if get_key_state(sdl.SCANCODE_RIGHT) {
+			hilbert.termupdate(&themap, &actors, RIGHT)
 		}
 
 		for i := 0; i < len(actors); i++ {

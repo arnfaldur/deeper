@@ -22,9 +22,17 @@ func init_key_state() {
 	INPUT_INIT = true
 }
 
+func get_key_state(key int) bool {
+	sdl.PumpEvents()
+	temp := sdl.GetKeyboardState()
+	defer KPR = temp
+	return temp[key] != 0 && KPR[key] == 0
+}
+
 func update_key_state() {
 
 	if !INPUT_INIT {
+		fmt.Println("input was not initialized!")
 		init_key_state()
 		return
 	}
@@ -50,7 +58,7 @@ func update_key_state() {
 			KUP[i] = 0
 		}
 
-		KPR[i] = temp[i]
+		//KPR[i] = temp[i]
 	}
 
 	//fmt.Println(temp)
