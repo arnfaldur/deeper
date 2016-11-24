@@ -10,7 +10,9 @@ var (
 )
 
 var (
-	KPR, KDN, KUP []uint8
+	KPR = make([]uint8, 512, 512)
+	KDN = make([]uint8, 512, 512)
+	KUP = make([]uint8, 512, 512)
 )
 
 func init_key_state() {
@@ -25,17 +27,18 @@ func init_key_state() {
 func get_key_state(key int) bool {
 	sdl.PumpEvents()
 	temp := sdl.GetKeyboardState()
-	defer KPR = temp
-	return temp[key] != 0 && KPR[key] == 0
+	//temp2 := KPR
+	copy(KPR, temp)
+	return temp[key] != 0 //&& temp2[key] == 0
 }
 
 func update_key_state() {
 
-	if !INPUT_INIT {
+	/*if !INPUT_INIT {
 		fmt.Println("input was not initialized!")
-		init_key_state()
+		//init_key_state()
 		return
-	}
+	}*/
 
 	sdl.PumpEvents()
 	temp := sdl.GetKeyboardState()

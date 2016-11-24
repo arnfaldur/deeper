@@ -31,7 +31,7 @@ var (
 const (
 	FPS       = 60
 	TILE_SIZE = 1 << 5
-	MAX_TILES = 1 << 3
+	MAX_TILES = 1 << 4
 )
 
 var fpsManager gfx.FPSmanager
@@ -143,9 +143,15 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
 
-	for i := 0; i < MAX_TILES; i++ {
-		for j := 0; j < MAX_TILES; j++ {
-			drawTile(textures[(*themap)[i][j].tileID.number], j, i)
+	px := (*hilbert).x
+	py := (*hilbert).y
+
+	for i := py - MAX_TILES/2; i < py+MAX_TILES/2; i++ {
+		for j := px - MAX_TILES/2; j < px+MAX_TILES/2; j++ {
+
+			if i >= 0 && i < len(*themap) && j >= 0 && j < len(*themap) {
+				drawTile(textures[(*themap)[i][j].tileID.number], j+MAX_TILES/2-px-1, i-py+MAX_TILES/2-1)
+			}
 			//drawTile(textures[0], j, i)
 		}
 	}
@@ -153,7 +159,7 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 
 		drawTile(textures[3], (*actors)[i].x, (*actors)[i].y)
 	}
-	drawTile(textures[2], (*hilbert).x, (*hilbert).y)
+	drawTile(textures[2], MAX_TILES/2-1, MAX_TILES/2-1)
 }
 
 func drawTile(tile *sdl.Texture, x, y int) {
