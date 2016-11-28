@@ -68,3 +68,22 @@ func update_key_state() {
 	//fmt.Println(KUP)
 	//fmt.Println(KDN)
 }
+
+func processInputs() bool {
+	var event sdl.Event
+	for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		switch event.(type) {
+		//switch t := event.(type) {
+		case *sdl.QuitEvent:
+			return false
+		case *sdl.MouseButtonEvent:
+		case *sdl.KeyDownEvent:
+		case *sdl.KeyUpEvent:
+
+		}
+	}
+
+	fmt.Println("I HAVE PROCESSED INPUTS!")
+
+	return true
+}

@@ -91,7 +91,7 @@ func (p *Player) attack(n *NPC) {
 
 func (p *Player) move(xpos int, ypos int, floor *Mapt, others *[]NPC) {
 
-	var t = (*floor)[xpos][ypos]
+	var t = (*floor)[ypos][xpos]
 
 	fmt.Println("IS SOLID", IS_SOLID[t.tileID])
 
