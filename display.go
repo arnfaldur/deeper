@@ -108,28 +108,6 @@ func presentFrame() {
 	gfx.FramerateDelay(&fpsManager)
 }
 
-func processInputs() bool {
-
-	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
-
-	var event sdl.Event
-	for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-		switch event.(type) {
-		//switch t := event.(type) {
-		case *sdl.QuitEvent:
-			return false
-		case *sdl.MouseButtonEvent:
-		case *sdl.KeyDownEvent:
-		case *sdl.KeyUpEvent:
-
-		}
-	}
-
-	fmt.Println("I HAVE PROCESSED INPUTS!")
-
-	return true
-}
-
 func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 	// xoffset := ((SCREEN_WIDTH % (TILE_SIZE * 2)) - TILE_SIZE) / 2
 	// yoffset := ((SCREEN_HEIGHT % (TILE_SIZE * 2)) - TILE_SIZE) / 2

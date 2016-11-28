@@ -33,8 +33,8 @@ func temp_populatemap() {
 	fmt.Printf("STONE_FLOOR: %v\n", STONE_FLOOR)
 	for i := 0; i < MAPSIZE; i++ {
 		for j := 0; j < MAPSIZE; j++ {
-			//true at edges and random points, for flavour
-			if i == 0 || j == 0 || i == MAPSIZE-1 || j == MAPSIZE-1 || rand.Float64() > 0.75 {
+			//true at edges and random points, for flavour, RNG is deterministic unless seeded.
+			if i == 0 || j == 0 || i == MAPSIZE-1 || j == MAPSIZE-1 || rand.Float64() > 0.8 {
 				themap[i][j] = Tile{tileID: STONE_WALL}
 			} else {
 				themap[i][j] = Tile{tileID: STONE_FLOOR}
