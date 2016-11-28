@@ -9,6 +9,14 @@ const (
 	MAPSIZE = 16
 )
 
+type object struct {
+	t_id string
+}
+
+type tile struct {
+	t_id string
+}
+
 type Mapt [MAPSIZE][MAPSIZE]Tile
 
 var renderables []*Actor
@@ -74,47 +82,6 @@ func main() {
 	}
 }
 
-func termGameLoop() {
-
-	running := true
-
-	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}, PLAYER}
-	temp_populatemap()
-	term_rendermap()
-
-	for running {
-		//running = processInputs()
-		var input string
-		fmt.Scan(&input)
-
-		switch input {
-		case "w":
-			hilbert.termupdate(&themap, &actors, UP)
-		case "s":
-			hilbert.termupdate(&themap, &actors, DOWN)
-		case "a":
-			hilbert.termupdate(&themap, &actors, LEFT)
-		case "d":
-			hilbert.termupdate(&themap, &actors, RIGHT)
-		case "e":
-			var xpos, ypos int
-			fmt.Scan(&xpos)
-			fmt.Scan(&ypos)
-			temp_addDummy(xpos, ypos)
-		case "x":
-			running = false
-		}
-
-		for i := 0; i < len(actors); i++ {
-			if actors[i].currHealth <= 0 {
-				actors = append(actors[:i], actors[i+1:]...)
-			}
-		}
-
-		term_rendermap()
-	}
-}
-
 func sdlGameLoop() {
 	initDisplay()
 	defer destroyDisplay()
@@ -177,10 +144,43 @@ func sdlGameLoop() {
 	sdl.Quit()
 }
 
-type object struct {
-	t_id string
-}
+func termGameLoop() {
 
-type tile struct {
-	t_id string
+	running := true
+
+	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}, PLAYER}
+	temp_populatemap()
+	term_rendermap()
+
+	for running {
+		//running = processInputs()
+		var input string
+		fmt.Scan(&input)
+
+		switch input {
+		case "w":
+			hilbert.termupdate(&themap, &actors, UP)
+		case "s":
+			hilbert.termupdate(&themap, &actors, DOWN)
+		case "a":
+			hilbert.termupdate(&themap, &actors, LEFT)
+		case "d":
+			hilbert.termupdate(&themap, &actors, RIGHT)
+		case "e":
+			var xpos, ypos int
+			fmt.Scan(&xpos)
+			fmt.Scan(&ypos)
+			temp_addDummy(xpos, ypos)
+		case "x":
+			running = false
+		}
+
+		for i := 0; i < len(actors); i++ {
+			if actors[i].currHealth <= 0 {
+				actors = append(actors[:i], actors[i+1:]...)
+			}
+		}
+
+		term_rendermap()
+	}
 }
