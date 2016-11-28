@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 const (
-	MAPSIZE = 16
+	MAPSIZE = 64
 )
 
 type object struct {
@@ -29,13 +30,14 @@ func temp_addDummy(xpos, ypos int) {
 }
 
 func temp_populatemap() {
-	fmt.Println("STONE_FLOOR: %v", STONE_FLOOR)
+	fmt.Printf("STONE_FLOOR: %v\n", STONE_FLOOR)
 	for i := 0; i < MAPSIZE; i++ {
 		for j := 0; j < MAPSIZE; j++ {
-			if i != 0 && j != 0 && i != MAPSIZE-1 && j != MAPSIZE-1 {
-				themap[i][j] = Tile{tileID: STONE_FLOOR}
-			} else {
+			//true at edges and random points, for flavour
+			if i == 0 || j == 0 || i == MAPSIZE-1 || j == MAPSIZE-1 || rand.Float64() > 0.75 {
 				themap[i][j] = Tile{tileID: STONE_WALL}
+			} else {
+				themap[i][j] = Tile{tileID: STONE_FLOOR}
 			}
 		}
 	}

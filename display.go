@@ -31,7 +31,7 @@ var (
 const (
 	FPS       = 60
 	TILE_SIZE = 1 << 5
-	MAX_TILES = 1 << 4
+	MAX_TILES = 1 << 4 // 16 supreme
 )
 
 var fpsManager gfx.FPSmanager
@@ -146,8 +146,8 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 	px := (*hilbert).x
 	py := (*hilbert).y
 
-	for i := py - MAX_TILES/2; i < py+MAX_TILES/2; i++ {
-		for j := px - MAX_TILES/2; j < px+MAX_TILES/2; j++ {
+	for i := py - MAX_TILES/2; i <= py+MAX_TILES/2; i++ {
+		for j := px - MAX_TILES/2; j <= px+MAX_TILES/2; j++ {
 
 			if i >= 0 && i < len(*themap) && j >= 0 && j < len(*themap) {
 				drawTile(textures[(*themap)[i][j].tileID.number], j+MAX_TILES/2-px-1, i-py+MAX_TILES/2-1)
@@ -165,8 +165,11 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 func drawTile(tile *sdl.Texture, x, y int) {
 	scale := float64(SCREEN_HEIGHT / MAX_TILES)
 
+	//source rectangle of texture, should currently be the same size as the picture
 	src := sdl.Rect{0, 0, int32(TILE_SIZE), int32(TILE_SIZE)}
+	//Destination rectangle, scaled so that x and y are integers from 0 - 16
 	dst := sdl.Rect{int32(float64(x) * scale), int32(float64(y) * scale), int32(scale), int32(scale)}
+	//Draw tile to the renderer
 	renderer.Copy(tile, &src, &dst)
 
 }
