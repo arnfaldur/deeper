@@ -135,7 +135,7 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 	}
 	for i := 0; i < len((*actors)); i++ {
 
-		drawTile(textures[3], (*actors)[i].x, (*actors)[i].y)
+		drawTile(textures[(*actors)[i].id.number+3], (*actors)[i].x-px + (MAX_TILES/2-1), (*actors)[i].y-py + (MAX_TILES/2-1))
 	}
 	drawTile(textures[2], MAX_TILES/2-1, MAX_TILES/2-1)
 }
