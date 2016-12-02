@@ -115,6 +115,10 @@ func (p *Player) update() {
 
 }
 
+func testEnemyNPC(xpos, ypos, id int) NPC {
+	return NPC{Entity{x: xpos, y: ypos, name: "TestEnemy", maxHealth: 10, currHealth: 10}, makeActorID(id)}
+}
+
 func dummyNPC(xpos, ypos int) NPC {
 	return NPC{Entity{x: xpos, y: ypos, name: "dummy", maxHealth: 10, currHealth: 10}, DUMMY}
 }

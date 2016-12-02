@@ -22,3 +22,7 @@ var (
 	PLAYER ID = ID{ACTORID, 0, 0}
 	DUMMY  ID = ID{ACTORID, 1, 0}
 )
+
+func makeActorID(id int) ID {
+	return ID{ACTORID, id, 0}
+}
