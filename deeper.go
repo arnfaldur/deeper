@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"github.com/veandco/go-sdl2/sdl"
+	"math/rand"
 )
 
 const (
@@ -39,7 +39,7 @@ func temp_populatemap() {
 				themap[i][j] = Tile{tileID: STONE_WALL}
 			} else {
 				if randomN > 0.5 {
-					actors = append(actors, testEnemyNPC(i,j, rand.Intn(10)))
+					actors = append(actors, testEnemyNPC(i, j, rand.Intn(10)))
 				}
 				themap[i][j] = Tile{tileID: STONE_FLOOR}
 			}
@@ -100,6 +100,10 @@ func sdlGameLoop() {
 	hilbert = Player{Entity{x: 3, y: 3, damage: 5}, PLAYER}
 	temp_populatemap()
 
+	//End hack
+
+	var stepDelay int = 0
+
 	for running {
 		//update_key_state()
 		running = !get_key_state(sdl.SCANCODE_ESCAPE)
@@ -107,33 +111,37 @@ func sdlGameLoop() {
 		//fmt.Println("ESCAPE: ", sdl.SCANCODE_ESCAPE)
 		//fmt.Println("UP: ", sdl.SCANCODE_UP)
 		//fmt.Println("LEFT: ", sdl.SCANCODE_LEFT)
-
-		if get_key_state(sdl.SCANCODE_UP) {
-			hilbert.termupdate(&themap, &actors, UP)
-		}
-
-		if get_key_state(sdl.SCANCODE_DOWN) {
-			hilbert.termupdate(&themap, &actors, DOWN)
-		}
-
-		if get_key_state(sdl.SCANCODE_LEFT) {
-			hilbert.termupdate(&themap, &actors, LEFT)
-		}
-
-		if get_key_state(sdl.SCANCODE_RIGHT) {
-			hilbert.termupdate(&themap, &actors, RIGHT)
-		}
-
-		for i := 0; i < len(actors); i++ {
-			if actors[i].currHealth <= 0 {
-				actors = append(actors[:i], actors[i+1:]...)
+		if stepDelay == 20 {
+			if get_key_state(sdl.SCANCODE_UP) {
+				hilbert.termupdate(&themap, &actors, UP)
 			}
-		}
 
-		clearFrame()
-		renderMap(&themap, &actors, &hilbert)
-		presentFrame()
-		//term_rendermap()
+			if get_key_state(sdl.SCANCODE_DOWN) {
+				hilbert.termupdate(&themap, &actors, DOWN)
+			}
+
+			if get_key_state(sdl.SCANCODE_LEFT) {
+				hilbert.termupdate(&themap, &actors, LEFT)
+			}
+
+			if get_key_state(sdl.SCANCODE_RIGHT) {
+				hilbert.termupdate(&themap, &actors, RIGHT)
+			}
+
+			for i := 0; i < len(actors); i++ {
+				if actors[i].currHealth <= 0 {
+					actors = append(actors[:i], actors[i+1:]...)
+				}
+			}
+
+			clearFrame()
+			renderMap(&themap, &actors, &hilbert)
+			presentFrame()
+			//term_rendermap()
+			stepDelay = 0
+		} else {
+			stepDelay++
+		}
 	}
 	//End hack;
 	/*
