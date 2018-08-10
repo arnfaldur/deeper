@@ -28,7 +28,7 @@ var themap Mapt
 var hilbert Player
 var actors []NPC
 
-func temp_addDummy(xpos, ypos int) {
+func tempAdddummy(xpos, ypos int) {
 	actors = append(actors, dummyNPC(xpos, ypos))
 }
 
@@ -106,7 +106,7 @@ func sdlGameLoop() {
 	//var stepDelay int = 0
 
 	for running {
-		var startTime time.Time = time.Now()
+		var startTime = time.Now()
 
 		// Input handling
 
@@ -199,7 +199,7 @@ func termGameLoop() {
 			var xpos, ypos int
 			fmt.Scan(&xpos)
 			fmt.Scan(&ypos)
-			temp_addDummy(xpos, ypos)
+			tempAdddummy(xpos, ypos)
 		case "x":
 			running = false
 		}

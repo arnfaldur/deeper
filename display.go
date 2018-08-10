@@ -21,8 +21,6 @@ const (
 	MAINMENU = iota
 )
 
-const ()
-
 var (
 	SCREEN_WIDTH  int32 = 800
 	SCREEN_HEIGHT int32 = 600
@@ -41,7 +39,7 @@ var window *sdl.Window
 var renderer *sdl.Renderer
 var texture *sdl.Texture
 var err error
-var textures Textures = make(Textures)
+var textures = make(Textures)
 
 func getRenderer() *sdl.Renderer {
 	return renderer
@@ -133,7 +131,7 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 			//drawTile(textures[0], j, i)
 		}
 	}
-	for i := 0; i < len((*actors)); i++ {
+	for i := 0; i < len(*actors); i++ {
 		if (*actors)[i].x <= px+MAX_TILES/2 && (*actors)[i].y <= py+MAX_TILES/2 {
 			drawTile(textures[(*actors)[i].id.number+3], (*actors)[i].x-px+(MAX_TILES/2-1), (*actors)[i].y-py+(MAX_TILES/2-1))
 		}
@@ -145,9 +143,9 @@ func drawTile(tile *sdl.Texture, x, y int) {
 	scale := float64(SCREEN_HEIGHT / MAX_TILES)
 
 	//source rectangle of texture, should currently be the same size as the picture
-	src := sdl.Rect{0, 0, int32(TILE_SIZE), int32(TILE_SIZE)}
+	src := sdl.Rect{W: int32(TILE_SIZE), H: int32(TILE_SIZE)}
 	//Destination rectangle, scaled so that x and y are integers from 0 - 16
-	dst := sdl.Rect{int32(float64(x) * scale), int32(float64(y) * scale), int32(scale), int32(scale)}
+	dst := sdl.Rect{X: int32(float64(x) * scale), Y: int32(float64(y) * scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
 	renderer.Copy(tile, &src, &dst)
 

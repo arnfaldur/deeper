@@ -14,7 +14,7 @@ const (
 //Tile IDS
 var (
 	STONE_WALL  ID = ID{TILEID, 0, 0}
-	STONE_FLOOR ID = ID{TILEID, 1, 0}
+	STONE_FLOOR    = ID{TILEID, 1, 0}
 )
 
 //Actor IDS

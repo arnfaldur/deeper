@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	INPUT_INIT bool = false
+	INPUT_INIT = false
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 	KUP = make([]uint8, 512, 512)
 )
 
-func init_key_state() {
+func initKeyState() {
 	KPR = sdl.GetKeyboardState()
 	KDN = KPR
 	KUP = KPR
