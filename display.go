@@ -128,14 +128,15 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 		for j := px - MAX_TILES/2; j <= px+MAX_TILES/2; j++ {
 
 			if i >= 0 && i < len(*themap) && j >= 0 && j < len((*themap)[0]) {
-				drawTile(textures[(*themap)[i][j].tileID.number], j+MAX_TILES/2-px-1, i-py+MAX_TILES/2-1)
+				drawTile(textures[(*themap)[i][j].tileID.number], j-px+MAX_TILES/2-1, i-py+MAX_TILES/2-1)
 			}
 			//drawTile(textures[0], j, i)
 		}
 	}
 	for i := 0; i < len((*actors)); i++ {
-
-		drawTile(textures[(*actors)[i].id.number+3], (*actors)[i].x-px+(MAX_TILES/2-1), (*actors)[i].y-py+(MAX_TILES/2-1))
+		if (*actors)[i].x <= px+MAX_TILES/2 && (*actors)[i].y <= py+MAX_TILES/2 {
+			drawTile(textures[(*actors)[i].id.number+3], (*actors)[i].x-px+(MAX_TILES/2-1), (*actors)[i].y-py+(MAX_TILES/2-1))
+		}
 	}
 	drawTile(textures[2], MAX_TILES/2-1, MAX_TILES/2-1)
 }

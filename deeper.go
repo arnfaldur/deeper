@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	MAPSIZE     int           = 64
-	DURPERFRAME time.Duration = 16666666
+	DEBUGLOGGING               = false
+	MAPSIZE      int           = 64
+	DURPERFRAME  time.Duration = 16666666 * 3
 )
 
 type object struct {
@@ -97,19 +98,17 @@ func sdlGameLoop() {
 
 	running := true
 	var event sdl.Event
-	//Start hack:
+	var pressedKeys [512]bool
 
 	hilbert = Player{Entity{x: 3, y: 3, damage: 5}, PLAYER}
 	temp_populatemap()
-
-	//End hack
 
 	//var stepDelay int = 0
 
 	for running {
 		var startTime time.Time = time.Now()
-		//update_key_state()
-		running = !get_key_state(sdl.SCANCODE_ESCAPE)
+
+		// Input handling
 
 		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch t := event.(type) {
@@ -119,52 +118,57 @@ func sdlGameLoop() {
 			case *sdl.MouseButtonEvent:
 			case *sdl.MouseWheelEvent:
 			case *sdl.KeyboardEvent:
-				if t.State == sdl.PRESSED {
-					if t.Keysym.Sym == sdl.K_UP {
-						hilbert.termupdate(&themap, &actors, UP)
-					}
-					if t.Keysym.Sym == sdl.K_DOWN {
-						hilbert.termupdate(&themap, &actors, DOWN)
-					}
-					if t.Keysym.Sym == sdl.K_LEFT {
-						hilbert.termupdate(&themap, &actors, LEFT)
-					}
-					if t.Keysym.Sym == sdl.K_RIGHT {
-						hilbert.termupdate(&themap, &actors, RIGHT)
-					}
+				if t.Type == sdl.KEYDOWN {
+					pressedKeys[t.Keysym.Scancode] = true
+				} else {
+					pressedKeys[t.Keysym.Scancode] = false
 				}
 			case *sdl.JoyAxisEvent:
 			case *sdl.JoyBallEvent:
 			case *sdl.JoyButtonEvent:
 			case *sdl.JoyHatEvent:
 			default:
-				fmt.Printf("Some event\n")
 			}
 
-			for i := 0; i < len(actors); i++ {
-				if actors[i].currHealth <= 0 {
-					actors = append(actors[:i], actors[i+1:]...)
-				}
-			}
-
-			clearFrame()
-			renderMap(&themap, &actors, &hilbert)
-			presentFrame()
 		}
-		fmt.Println(time.Until(startTime.Add(DURPERFRAME)))
+
+		// Game Logic
+
+		if pressedKeys[sdl.SCANCODE_ESCAPE] {
+			running = false
+		}
+		if pressedKeys[sdl.SCANCODE_UP] {
+			hilbert.termupdate(&themap, &actors, UP)
+		}
+		if pressedKeys[sdl.SCANCODE_DOWN] {
+			hilbert.termupdate(&themap, &actors, DOWN)
+		}
+		if pressedKeys[sdl.SCANCODE_LEFT] {
+			hilbert.termupdate(&themap, &actors, LEFT)
+		}
+		if pressedKeys[sdl.SCANCODE_RIGHT] {
+			hilbert.termupdate(&themap, &actors, RIGHT)
+		}
+
+		// Rendering
+
+		for i := 0; i < len(actors); i++ {
+			if actors[i].currHealth <= 0 {
+				actors[len(actors)-1], actors[i] = actors[i], actors[len(actors)-1]
+				actors = actors[:len(actors)-1]
+				i--
+			}
+		}
+
+		clearFrame()
+		renderMap(&themap, &actors, &hilbert)
+		presentFrame()
+
+		// FPS limiter
+
 		time.Sleep(time.Until(startTime.Add(DURPERFRAME)))
 	}
-	//End hack;
-	/*
-		for running {
-			running = processInputs()
 
-			clearFrame()
-			renderMap()
-			presentFrame()
-
-		}
-	*/
 	unloadTextures()
 	sdl.Quit()
 }

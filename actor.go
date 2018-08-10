@@ -62,12 +62,6 @@ func (p *Player) termupdate(floor *Mapt, others *[]NPC, action int) {
 	xpos := p.x
 	ypos := p.y
 
-	fmt.Println("Action: ", action)
-	fmt.Println("UP: ", UP)
-	fmt.Println("DOWN: ", DOWN)
-	fmt.Println("LEFT: ", LEFT)
-	fmt.Println("RIGHT: ", RIGHT)
-
 	switch action {
 	case UP:
 		ypos -= 1
@@ -79,8 +73,21 @@ func (p *Player) termupdate(floor *Mapt, others *[]NPC, action int) {
 		xpos += 1
 	}
 
-	fmt.Println("xpos", xpos)
-	fmt.Println("ypos", ypos)
+	if DEBUGLOGGING {
+		fmt.Print("Action: ")
+		switch action {
+		case UP:
+			fmt.Println("UP")
+		case LEFT:
+			fmt.Println("LEFT")
+		case DOWN:
+			fmt.Println("DOWN")
+		case RIGHT:
+			fmt.Println("RIGHT")
+		}
+		fmt.Println("xpos", xpos)
+		fmt.Println("ypos", ypos)
+	}
 
 	p.move(xpos, ypos, floor, others)
 }
@@ -92,9 +99,9 @@ func (p *Player) attack(n *NPC) {
 func (p *Player) move(xpos int, ypos int, floor *Mapt, others *[]NPC) {
 
 	var t = (*floor)[ypos][xpos]
-
-	fmt.Println("IS SOLID", IS_SOLID[t.tileID])
-
+	if DEBUGLOGGING {
+		fmt.Println("IS SOLID", IS_SOLID[t.tileID])
+	}
 	if !IS_SOLID[t.tileID] {
 
 		for i := 0; i < len(*others); i++ {
@@ -106,8 +113,9 @@ func (p *Player) move(xpos int, ypos int, floor *Mapt, others *[]NPC) {
 
 		p.x = xpos
 		p.y = ypos
-
-		fmt.Println("xpos,ypos: ", xpos, ypos)
+		if DEBUGLOGGING {
+			fmt.Println("xpos,ypos: ", xpos, ypos)
+		}
 	}
 }
 
