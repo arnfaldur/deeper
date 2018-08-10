@@ -129,7 +129,7 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 	drawTile(textures[2], MAX_TILES/2-0.5, MAX_TILES/2-0.5)
 }
 
-func drawTile(tile *sdl.Texture, x, y float64) {
+func drawTile(texture *sdl.Texture, x, y float64) {
 	scale := float64(SCREEN_HEIGHT / MAX_TILES)
 
 	//source rectangle of texture, should currently be the same size as the picture
@@ -137,7 +137,7 @@ func drawTile(tile *sdl.Texture, x, y float64) {
 	//Destination rectangle, scaled so that x and y are integers from 0 - 16
 	dst := sdl.Rect{X: int32(x * scale), Y: int32(y * scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
-	renderer.Copy(tile, &src, &dst)
+	renderer.Copy(texture, &src, &dst)
 
 }
 
