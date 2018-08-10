@@ -110,8 +110,7 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
 
-	px := real((*hilbert).pos)
-	py := imag((*hilbert).pos)
+	px, py := parts((*hilbert).pos)
 
 	for i := int(py) - MAX_TILES/2; i <= int(py+MAX_TILES/2+0.5); i++ {
 		for j := int(px) - MAX_TILES/2; j <= int(px+MAX_TILES/2+0.5); j++ {
