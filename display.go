@@ -106,27 +106,28 @@ func presentFrame() {
 	gfx.FramerateDelay(&fpsManager)
 }
 
-func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
+func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
 
 	px := real((*hilbert).pos)
 	py := imag((*hilbert).pos)
 
-	for i := int(py) - MAX_TILES/2; i <= int(py+MAX_TILES/2+2); i++ {
-		for j := int(px) - MAX_TILES/2; j <= int(px+MAX_TILES/2+2); j++ {
+	for i := int(py) - MAX_TILES/2; i <= int(py+MAX_TILES/2+0.5); i++ {
+		for j := int(px) - MAX_TILES/2; j <= int(px+MAX_TILES/2+0.5); j++ {
 
-			if i >= 0 && i < len(*themap) && j >= 0 && j < len((*themap)[0]) {
-				drawTile(textures[(*themap)[i][j].tileID.number], float64(j)-px+MAX_TILES/2-1, float64(i)-py+MAX_TILES/2-1)
+			if i >= 0 && i < len(*theMap) && j >= 0 && j < len((*theMap)[0]) {
+				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px+MAX_TILES/2, float64(i)-py+MAX_TILES/2)
 			}
 		}
 	}
 	for _, npc := range *actors {
-		if real(npc.pos) <= px+MAX_TILES/2+2 && imag(npc.pos) <= py+MAX_TILES/2+2 {
-			drawTile(textures[npc.id.number+3], real(npc.pos)-px+(MAX_TILES/2-1), imag(npc.pos)-py+(MAX_TILES/2-1))
+		if real(npc.pos) <= px+MAX_TILES/2+0.5 && imag(npc.pos) <= py+MAX_TILES/2+0.5 {
+			drawTile(textures[npc.id.number+3], real(npc.pos)-px+(MAX_TILES/2), imag(npc.pos)-py+(MAX_TILES/2))
 		}
 	}
-	drawTile(textures[2], MAX_TILES/2-0.5, MAX_TILES/2-0.5)
+	drawTile(textures[2], MAX_TILES/2, MAX_TILES/2)
+
 }
 
 func drawTile(texture *sdl.Texture, x, y float64) {
@@ -135,7 +136,7 @@ func drawTile(texture *sdl.Texture, x, y float64) {
 	//source rectangle of texture, should currently be the same size as the picture
 	src := sdl.Rect{W: int32(TILE_SIZE), H: int32(TILE_SIZE)}
 	//Destination rectangle, scaled so that x and y are integers from 0 - 16
-	dst := sdl.Rect{X: int32(x * scale), Y: int32(y * scale), W: int32(scale), H: int32(scale)}
+	dst := sdl.Rect{X: int32((x - 0.5) * scale), Y: int32((y - 0.5) * scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
 	renderer.Copy(texture, &src, &dst)
 
@@ -158,7 +159,8 @@ func loadTextures() {
 		"assets/enemies/TestEnemy9.png",
 		"assets/ShittyTile.png",
 		"assets/ShittyGuy.png",
-		"assets/ShittyBeholder.png"}
+		"assets/ShittyBeholder.png",
+		"assets/STONE_WALL_RED.png"}
 	for i, e := range assets {
 		image, err := img.Load(e)
 		if err != nil {

@@ -31,8 +31,11 @@ const (
 )
 
 type Entity struct {
-	pos  complex128
-	name string
+	pos    complex128
+	name   string
+	vel    complex128
+	size   float64
+	weight float64
 }
 
 type Character struct {
@@ -41,8 +44,6 @@ type Character struct {
 	maxHealth, currHealth int
 	attributes            [7]int
 	damage                int
-	vel                   complex128
-	size                  float64
 }
 
 type Player struct {
@@ -110,9 +111,8 @@ func (p *Character) move(xpos, ypos int, floor *Mapt, others *[]NPC) {
 		fmt.Println("IS SOLID", IS_SOLID[t.tileID])
 	}
 	if !IS_SOLID[t.tileID] {
-
-		for i := 0; i < len(*others); i++ {
-			if (*others)[i].isAtPos(xpos, ypos) {
+		for _, o := range *others {
+			if o.isAtPos(xpos, ypos) {
 				//p.attack(&(*others)[i])
 				break
 			}
@@ -131,16 +131,26 @@ func (p *Player) update(theMap *Mapt, actors *[]NPC, moveDirection complex128) {
 	p.vel = approach(p.vel, moveDirection/5)
 	newPos := p.pos + p.vel
 
-	px := real(newPos)
-	py := imag(newPos)
+	px, py := parts(p.pos)
 
-	pxf, pxc := int(px), int(px+1)
-	pyf, pyc := int(py), int(py+1)
+	pxf, pxc := int(px-1), int(px+1)
+	pyf, pyc := int(py-1), int(py+1)
 
-	for y := pyf; y < pyc; y++ {
-		for x := pxf; x < pxc; x++ {
+	for _, a := range *actors {
+		if cmplx.Abs(newPos-a.pos) < (p.size+a.size)/2 {
+
+		}
+	}
+
+	for y := pyf; y <= pyc; y++ {
+		for x := pxf; x <= pxc; x++ {
 			if IS_SOLID[theMap[y][x].tileID] {
 
+				if cmplx.Abs(newPos-complex(float64(x), float64(y))) < (p.size+1)/2 {
+					//p.vel = 0+0i
+					//newPos = p.pos
+				}
+				//drawTile(textures[16], float64(x)-px+MAX_TILES/2, float64(y)-py+MAX_TILES/2)
 			}
 		}
 	}
@@ -149,7 +159,7 @@ func (p *Player) update(theMap *Mapt, actors *[]NPC, moveDirection complex128) {
 }
 
 func testEnemyNPC(pos complex128, id int) NPC {
-	return NPC{Character{Entity: Entity{pos: pos, name: "TestEnemy"}, id: makeActorID(id), size: 0.8, maxHealth: 10, currHealth: 10}, true}
+	return NPC{Character{Entity: Entity{pos: pos, name: "TestEnemy", size: 0.8}, id: makeActorID(id), maxHealth: 10, currHealth: 10}, true}
 }
 
 func dummyNPC(x, y int) NPC {

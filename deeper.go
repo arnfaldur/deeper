@@ -2,6 +2,7 @@ package main
 
 import (
 	//"fmt"
+	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
 	"math/rand"
 	"time"
@@ -59,7 +60,7 @@ func main() {
 	var event sdl.Event
 	var pressedKeys [512]bool
 
-	hilbert = Player{Character{Entity: Entity{pos: 3 + 3i}, damage: 5, size: 0.8, id: PLAYER}}
+	hilbert = Player{Character{Entity: Entity{pos: 3 + 3i, size: 0.8}, damage: 5, id: PLAYER}}
 	temp_populatemap()
 
 	//var stepDelay int = 0
@@ -121,6 +122,8 @@ func main() {
 				i--
 			}
 		}
+
+		fmt.Println(hilbert.pos)
 
 		// Rendering
 
