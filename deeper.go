@@ -9,7 +9,7 @@ import (
 
 const (
 	MAPSIZE     int           = 64
-	DURPERFRAME time.Duration = 16666666
+	DURPERFRAME time.Duration = 16666667
 )
 
 type object struct {
@@ -40,7 +40,7 @@ func temp_populatemap() {
 			if i == 0 || j == 0 || i == MAPSIZE-1 || j == MAPSIZE-1 || randomN > 0.8 {
 				themap[i][j] = Tile{tileID: STONE_WALL}
 			} else {
-				if randomN > 0.5 {
+				if randomN > 0.25 {
 					actors = append(actors, testEnemyNPC(i, j, rand.Intn(10)))
 				}
 				themap[i][j] = Tile{tileID: STONE_FLOOR}

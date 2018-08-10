@@ -154,22 +154,22 @@ func drawTile(tile *sdl.Texture, x, y int) {
 
 func loadTextures() {
 	assets := []string{
-		"../src/github.com/arnfaldur/deeper/assets/STONE_WALL.png",
-		"../src/github.com/arnfaldur/deeper/assets/STONE_FLOOR.png",
-		"../src/github.com/arnfaldur/deeper/assets/PLAYER.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy0.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy1.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy2.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy3.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy4.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy5.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy6.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy7.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy8.png",
-		"../src/github.com/arnfaldur/deeper/assets/enemies/TestEnemy9.png",
-		"../src/github.com/arnfaldur/deeper/assets/ShittyTile.png",
-		"../src/github.com/arnfaldur/deeper/assets/ShittyGuy.png",
-		"../src/github.com/arnfaldur/deeper/assets/ShittyBeholder.png"}
+		"assets/STONE_WALL.png",
+		"assets/STONE_FLOOR.png",
+		"assets/PLAYER.png",
+		"assets/enemies/TestEnemy0.png",
+		"assets/enemies/TestEnemy1.png",
+		"assets/enemies/TestEnemy2.png",
+		"assets/enemies/TestEnemy3.png",
+		"assets/enemies/TestEnemy4.png",
+		"assets/enemies/TestEnemy5.png",
+		"assets/enemies/TestEnemy6.png",
+		"assets/enemies/TestEnemy7.png",
+		"assets/enemies/TestEnemy8.png",
+		"assets/enemies/TestEnemy9.png",
+		"assets/ShittyTile.png",
+		"assets/ShittyGuy.png",
+		"assets/ShittyBeholder.png"}
 	for i, e := range assets {
 		image, err := img.Load(e)
 		if err != nil {
