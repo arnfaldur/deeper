@@ -13,3 +13,7 @@ func div(c complex128, f float64) complex128 {
 func cmplxNorm(c complex128) complex128 {
 	return c / complex(cmplx.Abs(c), 0)
 }
+
+func cmul(c complex128, f float64) complex128 {
+	return c * complex(f, 0)
+}

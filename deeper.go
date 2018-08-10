@@ -51,7 +51,6 @@ func temp_populatemap() {
 }
 
 func main() {
-
 	initDisplay()
 	defer destroyDisplay()
 	loadTextures()
@@ -62,7 +61,7 @@ func main() {
 	var event sdl.Event
 	var pressedKeys [512]bool
 
-	hilbert = Player{Character{Entity: Entity{pos: 3 + 3i, size: 0.8}, damage: 5, id: PLAYER}}
+	hilbert = Player{Character{Entity: Entity{id: PLAYER, pos: 3 + 3i, size: 0.8}, damage: 5}}
 	temp_populatemap()
 
 	//var stepDelay int = 0
@@ -121,12 +120,9 @@ func main() {
 
 		hilbert.update(&themap, &actors, moveDirection)
 
-		for i := range actors {
-			actors[i].update(&hilbert)
+		for i := 0; i < len(actors); i++ {
 			if actors[i].currHealth <= 0 {
-				actors[len(actors)-1], actors[i] = actors[i], actors[len(actors)-1]
-				actors = actors[:len(actors)-1]
-				i--
+				actors = append(actors[:i], actors[i+1:]...)
 			}
 		}
 
