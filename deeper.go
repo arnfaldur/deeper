@@ -119,17 +119,19 @@ func sdlGameLoop() {
 			case *sdl.MouseButtonEvent:
 			case *sdl.MouseWheelEvent:
 			case *sdl.KeyboardEvent:
-				if t.Keysym.Sym == sdl.K_UP {
-					hilbert.termupdate(&themap, &actors, UP)
-				}
-				if t.Keysym.Sym == sdl.K_DOWN {
-					hilbert.termupdate(&themap, &actors, DOWN)
-				}
-				if t.Keysym.Sym == sdl.K_LEFT {
-					hilbert.termupdate(&themap, &actors, LEFT)
-				}
-				if t.Keysym.Sym == sdl.K_RIGHT {
-					hilbert.termupdate(&themap, &actors, RIGHT)
+				if t.State == sdl.PRESSED {
+					if t.Keysym.Sym == sdl.K_UP {
+						hilbert.termupdate(&themap, &actors, UP)
+					}
+					if t.Keysym.Sym == sdl.K_DOWN {
+						hilbert.termupdate(&themap, &actors, DOWN)
+					}
+					if t.Keysym.Sym == sdl.K_LEFT {
+						hilbert.termupdate(&themap, &actors, LEFT)
+					}
+					if t.Keysym.Sym == sdl.K_RIGHT {
+						hilbert.termupdate(&themap, &actors, RIGHT)
+					}
 				}
 			case *sdl.JoyAxisEvent:
 			case *sdl.JoyBallEvent:

@@ -24,8 +24,8 @@ const (
 const ()
 
 var (
-	SCREEN_WIDTH  int32 = 1600
-	SCREEN_HEIGHT int32 = 1200
+	SCREEN_WIDTH  int32 = 800
+	SCREEN_HEIGHT int32 = 600
 )
 
 const (
