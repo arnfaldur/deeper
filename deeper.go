@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/veandco/go-sdl2/sdl"
 	"math/rand"
 	"time"
