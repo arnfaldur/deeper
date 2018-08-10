@@ -9,7 +9,7 @@ import (
 
 const (
 	MAPSIZE     int           = 64
-	DURPERFRAME time.Duration = 16666667
+	DURPERFRAME time.Duration = 16666666
 )
 
 type object struct {
@@ -33,17 +33,17 @@ func temp_addDummy(xpos, ypos int) {
 
 func temp_populatemap() {
 	fmt.Printf("STONE_FLOOR: %v\n", STONE_FLOOR)
-	for i := 0; i < MAPSIZE; i++ {
-		for j := 0; j < MAPSIZE; j++ {
+	for y := 0; y < MAPSIZE; y++ {
+		for x := 0; x < MAPSIZE; x++ {
 			//true at edges and random points, for flavour, RNG is deterministic unless seeded.
 			randomN := rand.Float64()
-			if i == 0 || j == 0 || i == MAPSIZE-1 || j == MAPSIZE-1 || randomN > 0.8 {
-				themap[i][j] = Tile{tileID: STONE_WALL}
+			if y == 0 || x == 0 || y == MAPSIZE-1 || x == MAPSIZE-1 || randomN > 0.8 {
+				themap[y][x] = Tile{tileID: STONE_WALL}
 			} else {
-				if randomN > 0.25 {
-					actors = append(actors, testEnemyNPC(i, j, rand.Intn(10)))
+				if randomN > 0.3 {
+					actors = append(actors, testEnemyNPC(x, y, rand.Intn(10)))
 				}
-				themap[i][j] = Tile{tileID: STONE_FLOOR}
+				themap[y][x] = Tile{tileID: STONE_FLOOR}
 			}
 		}
 	}
@@ -88,8 +88,8 @@ func main() {
 	} else if ans == "g" {
 		sdlGameLoop()
 	}
+	fmt.Println("GG!")
 }
-
 func sdlGameLoop() {
 	initDisplay()
 	defer destroyDisplay()
@@ -151,6 +151,7 @@ func sdlGameLoop() {
 			renderMap(&themap, &actors, &hilbert)
 			presentFrame()
 		}
+		fmt.Println(time.Until(startTime.Add(DURPERFRAME)))
 		time.Sleep(time.Until(startTime.Add(DURPERFRAME)))
 	}
 	//End hack;
