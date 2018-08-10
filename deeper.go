@@ -23,7 +23,7 @@ type tile struct {
 
 type Mapt [MAPSIZE][MAPSIZE]Tile
 
-var renderables []*Actor
+//var renderables []*Actor
 var themap Mapt
 var hilbert Player
 var actors []NPC
@@ -59,7 +59,7 @@ func main() {
 	var event sdl.Event
 	var pressedKeys [512]bool
 
-	hilbert = Player{Character{Entity: Entity{pos: 3 + 3i}, damage: 5, size: 0.8}, PLAYER}
+	hilbert = Player{Character{Entity: Entity{pos: 3 + 3i}, damage: 5, size: 0.8, id: PLAYER}}
 	temp_populatemap()
 
 	//var stepDelay int = 0
@@ -113,7 +113,8 @@ func main() {
 
 		hilbert.update(&themap, &actors, moveDirection)
 
-		for i := 0; i < len(actors); i++ {
+		for i := range actors {
+			actors[i].update(&hilbert)
 			if actors[i].currHealth <= 0 {
 				actors[len(actors)-1], actors[i] = actors[i], actors[len(actors)-1]
 				actors = actors[:len(actors)-1]

@@ -121,9 +121,9 @@ func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
 			}
 		}
 	}
-	for i := 0; i < len(*actors); i++ {
-		if (real((*actors)[i].pos)) <= px+MAX_TILES/2+2 && (imag((*actors)[i].pos)) <= py+MAX_TILES/2+2 {
-			drawTile(textures[(*actors)[i].id.number+3], real((*actors)[i].pos)-px+(MAX_TILES/2-1), imag((*actors)[i].pos)-py+(MAX_TILES/2-1))
+	for _, npc := range *actors {
+		if real(npc.pos) <= px+MAX_TILES/2+2 && imag(npc.pos) <= py+MAX_TILES/2+2 {
+			drawTile(textures[npc.id.number+3], real(npc.pos)-px+(MAX_TILES/2-1), imag(npc.pos)-py+(MAX_TILES/2-1))
 		}
 	}
 	drawTile(textures[2], MAX_TILES/2-0.5, MAX_TILES/2-0.5)

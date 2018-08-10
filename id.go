@@ -13,14 +13,14 @@ const (
 
 //Tile IDS
 var (
-	STONE_WALL  ID = ID{TILEID, 0, 0}
-	STONE_FLOOR    = ID{TILEID, 1, 0}
+	STONE_WALL  = ID{TILEID, 0, 0}
+	STONE_FLOOR = ID{TILEID, 1, 0}
 )
 
 //Actor IDS
 var (
-	PLAYER ID = ID{ACTORID, 0, 0}
-	DUMMY  ID = ID{ACTORID, 1, 0}
+	PLAYER = ID{ACTORID, 0, 0}
+	DUMMY  = ID{ACTORID, 1, 0}
 )
 
 func makeActorID(id int) ID {

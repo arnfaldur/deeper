@@ -30,10 +30,6 @@ const (
 	SPD
 )
 
-type Actor interface {
-	process()
-}
-
 type Entity struct {
 	pos  complex128
 	name string
@@ -41,6 +37,7 @@ type Entity struct {
 
 type Character struct {
 	Entity
+	id                    ID
 	maxHealth, currHealth int
 	attributes            [7]int
 	damage                int
@@ -50,16 +47,18 @@ type Character struct {
 
 type Player struct {
 	Character
-	id ID
 }
 
 type NPC struct {
 	Character
-	id ID
+	aggro bool
 }
 
-func (n NPC) update() {
-
+func (n *NPC) update(p *Player) {
+	if n.aggro {
+		diff := p.pos - n.pos
+		n.pos += diff / complex(cmplx.Abs(diff), 0) * 0.03
+	}
 }
 
 func (n NPC) isAtPos(xpos, ypos int) bool {
@@ -150,11 +149,11 @@ func (p *Player) update(theMap *Mapt, actors *[]NPC, moveDirection complex128) {
 }
 
 func testEnemyNPC(pos complex128, id int) NPC {
-	return NPC{Character{Entity: Entity{pos: pos, name: "TestEnemy"}, size: 0.8, maxHealth: 10, currHealth: 10}, makeActorID(id)}
+	return NPC{Character{Entity: Entity{pos: pos, name: "TestEnemy"}, id: makeActorID(id), size: 0.8, maxHealth: 10, currHealth: 10}, true}
 }
 
 func dummyNPC(x, y int) NPC {
-	return NPC{Character{Entity: Entity{pos: complex(float64(x), float64(y)), name: "dummy"}, maxHealth: 10, currHealth: 10}, DUMMY}
+	return NPC{Character{Entity: Entity{pos: complex(float64(x), float64(y)), name: "dummy"}, id: DUMMY, maxHealth: 10, currHealth: 10}, true}
 }
 
 func approach(vel, target complex128) complex128 {
