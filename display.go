@@ -107,45 +107,35 @@ func presentFrame() {
 }
 
 func renderMap(themap *Mapt, actors *[]NPC, hilbert *Player) {
-	// xoffset := ((SCREEN_WIDTH % (TILE_SIZE * 2)) - TILE_SIZE) / 2
-	// yoffset := ((SCREEN_HEIGHT % (TILE_SIZE * 2)) - TILE_SIZE) / 2
-	// for i := -1; i < SCREEN_HEIGHT/TILE_SIZE+1; i++ {
-	// 	for j := -1; j < SCREEN_WIDTH/TILE_SIZE+1; j++ {
-	// 		drawTile(textures[0], j*TILE_SIZE+xoffset, i*TILE_SIZE+yoffset)
-
-	// 	}
-	// }
-	// drawTile(textures[1], 2*TILE_SIZE+xoffset, 2*TILE_SIZE+yoffset)
 
 	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
 
-	px := (*hilbert).x
-	py := (*hilbert).y
+	px := real((*hilbert).pos)
+	py := imag((*hilbert).pos)
 
-	for i := py - MAX_TILES/2; i <= py+MAX_TILES/2; i++ {
-		for j := px - MAX_TILES/2; j <= px+MAX_TILES/2; j++ {
+	for i := int(py) - MAX_TILES/2; i <= int(py+MAX_TILES/2+2); i++ {
+		for j := int(px) - MAX_TILES/2; j <= int(px+MAX_TILES/2+2); j++ {
 
 			if i >= 0 && i < len(*themap) && j >= 0 && j < len((*themap)[0]) {
-				drawTile(textures[(*themap)[i][j].tileID.number], j-px+MAX_TILES/2-1, i-py+MAX_TILES/2-1)
+				drawTile(textures[(*themap)[i][j].tileID.number], float64(j)-px+MAX_TILES/2-1, float64(i)-py+MAX_TILES/2-1)
 			}
-			//drawTile(textures[0], j, i)
 		}
 	}
 	for i := 0; i < len(*actors); i++ {
-		if (*actors)[i].x <= px+MAX_TILES/2 && (*actors)[i].y <= py+MAX_TILES/2 {
-			drawTile(textures[(*actors)[i].id.number+3], (*actors)[i].x-px+(MAX_TILES/2-1), (*actors)[i].y-py+(MAX_TILES/2-1))
+		if (real((*actors)[i].pos)) <= px+MAX_TILES/2+2 && (imag((*actors)[i].pos)) <= py+MAX_TILES/2+2 {
+			drawTile(textures[(*actors)[i].id.number+3], real((*actors)[i].pos)-px+(MAX_TILES/2-1), imag((*actors)[i].pos)-py+(MAX_TILES/2-1))
 		}
 	}
-	drawTile(textures[2], MAX_TILES/2-1, MAX_TILES/2-1)
+	drawTile(textures[2], MAX_TILES/2-0.5, MAX_TILES/2-0.5)
 }
 
-func drawTile(tile *sdl.Texture, x, y int) {
+func drawTile(tile *sdl.Texture, x, y float64) {
 	scale := float64(SCREEN_HEIGHT / MAX_TILES)
 
 	//source rectangle of texture, should currently be the same size as the picture
 	src := sdl.Rect{W: int32(TILE_SIZE), H: int32(TILE_SIZE)}
 	//Destination rectangle, scaled so that x and y are integers from 0 - 16
-	dst := sdl.Rect{X: int32(float64(x) * scale), Y: int32(float64(y) * scale), W: int32(scale), H: int32(scale)}
+	dst := sdl.Rect{X: int32(x * scale), Y: int32(y * scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
 	renderer.Copy(tile, &src, &dst)
 

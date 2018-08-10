@@ -10,7 +10,7 @@ import (
 const (
 	DEBUGLOGGING               = false
 	MAPSIZE      int           = 64
-	DURPERFRAME  time.Duration = 16666666 * 3
+	DURPERFRAME  time.Duration = 16666666 * 1
 )
 
 type object struct {
@@ -33,7 +33,7 @@ func tempAdddummy(xpos, ypos int) {
 }
 
 func temp_populatemap() {
-	fmt.Printf("STONE_FLOOR: %v\n", STONE_FLOOR)
+	//fmt.Printf("STONE_FLOOR: %v\n", STONE_FLOOR)
 	for y := 0; y < MAPSIZE; y++ {
 		for x := 0; x < MAPSIZE; x++ {
 			//true at edges and random points, for flavour, RNG is deterministic unless seeded.
@@ -41,8 +41,8 @@ func temp_populatemap() {
 			if y == 0 || x == 0 || y == MAPSIZE-1 || x == MAPSIZE-1 || randomN > 0.8 {
 				themap[y][x] = Tile{tileID: STONE_WALL}
 			} else {
-				if randomN > 0.3 {
-					actors = append(actors, testEnemyNPC(x, y, rand.Intn(10)))
+				if randomN > 0.6 {
+					actors = append(actors, testEnemyNPC(complex(float64(x), float64(y)), rand.Intn(10)))
 				}
 				themap[y][x] = Tile{tileID: STONE_FLOOR}
 			}
@@ -50,47 +50,48 @@ func temp_populatemap() {
 	}
 }
 
-func term_rendermap() {
-	var printmap [MAPSIZE][MAPSIZE]string
-	for i := 0; i < MAPSIZE; i++ {
-		for j := 0; j < MAPSIZE; j++ {
-			switch themap[i][j].tileID {
-			case STONE_WALL:
-				printmap[i][j] = "#"
-			case STONE_FLOOR:
-				printmap[i][j] = "_"
-			default:
-				printmap[i][j] = "?"
-			}
-		}
-	}
-	for i := 0; i < len(actors); i++ {
-		printmap[actors[i].x][actors[i].y] = "*"
-	}
-	printmap[hilbert.x][hilbert.y] = "@"
-
-	for i := 0; i < MAPSIZE; i++ {
-		for j := 0; j < MAPSIZE; j++ {
-			fmt.Print(printmap[j][i])
-		}
-		fmt.Print("\n")
-	}
-}
+//func term_rendermap() {
+//	var printmap [MAPSIZE][MAPSIZE]string
+//	for i := 0; i < MAPSIZE; i++ {
+//		for j := 0; j < MAPSIZE; j++ {
+//			switch themap[i][j].tileID {
+//			case STONE_WALL:
+//				printmap[i][j] = "#"
+//			case STONE_FLOOR:
+//				printmap[i][j] = "_"
+//			default:
+//				printmap[i][j] = "?"
+//			}
+//		}
+//	}
+//	for i := 0; i < len(actors); i++ {
+//		printmap[actors[i].x][actors[i].y] = "*"
+//	}
+//	printmap[hilbert.x][hilbert.y] = "@"
+//
+//	for i := 0; i < MAPSIZE; i++ {
+//		for j := 0; j < MAPSIZE; j++ {
+//			fmt.Print(printmap[j][i])
+//		}
+//		fmt.Print("\n")
+//	}
+//}
 
 func main() {
 
 	fmt.Println("Welcome to Deeper!")
-	fmt.Println("Would you like terminal mode or graphical mode? t/g")
-	var ans string
-	fmt.Scan(&ans)
-
-	if ans == "t" {
-		termGameLoop()
-	} else if ans == "g" {
-		sdlGameLoop()
-	}
+	//fmt.Println("Would you like terminal mode or graphical mode? t/g")
+	//var ans string
+	//fmt.Scan(&ans)
+	//
+	//if ans == "t" {
+	//	termGameLoop()
+	//} else if ans == "g" {
+	sdlGameLoop()
+	//}
 	fmt.Println("GG!")
 }
+
 func sdlGameLoop() {
 	initDisplay()
 	defer destroyDisplay()
@@ -100,7 +101,7 @@ func sdlGameLoop() {
 	var event sdl.Event
 	var pressedKeys [512]bool
 
-	hilbert = Player{Entity{x: 3, y: 3, damage: 5}, PLAYER}
+	hilbert = Player{Character{Entity: Entity{pos: 3 + 3i}, damage: 5, size: 0.8}, PLAYER}
 	temp_populatemap()
 
 	//var stepDelay int = 0
@@ -134,23 +135,25 @@ func sdlGameLoop() {
 
 		// Game Logic
 
+		var moveDirection complex128
+
 		if pressedKeys[sdl.SCANCODE_ESCAPE] {
 			running = false
 		}
 		if pressedKeys[sdl.SCANCODE_UP] {
-			hilbert.termupdate(&themap, &actors, UP)
+			moveDirection -= 0 + 1i
 		}
 		if pressedKeys[sdl.SCANCODE_DOWN] {
-			hilbert.termupdate(&themap, &actors, DOWN)
+			moveDirection += 0 + 1i
 		}
 		if pressedKeys[sdl.SCANCODE_LEFT] {
-			hilbert.termupdate(&themap, &actors, LEFT)
+			moveDirection -= 1 + 0i
 		}
 		if pressedKeys[sdl.SCANCODE_RIGHT] {
-			hilbert.termupdate(&themap, &actors, RIGHT)
+			moveDirection += 1 + 0i
 		}
 
-		// Rendering
+		hilbert.update(&themap, &actors, moveDirection)
 
 		for i := 0; i < len(actors); i++ {
 			if actors[i].currHealth <= 0 {
@@ -159,6 +162,8 @@ func sdlGameLoop() {
 				i--
 			}
 		}
+
+		// Rendering
 
 		clearFrame()
 		renderMap(&themap, &actors, &hilbert)
@@ -177,9 +182,9 @@ func termGameLoop() {
 
 	running := true
 
-	hilbert = Player{Entity{x: MAPSIZE / 2, y: MAPSIZE / 2, damage: 5}, PLAYER}
+	hilbert = Player{Character{Entity: Entity{pos: complex(float64(MAPSIZE/2), float64(MAPSIZE/2))}, damage: 5, size: 0.8}, PLAYER}
 	temp_populatemap()
-	term_rendermap()
+	//term_rendermap()
 
 	for running {
 		//running = processInputs()
@@ -210,6 +215,6 @@ func termGameLoop() {
 			}
 		}
 
-		term_rendermap()
+		//term_rendermap()
 	}
 }

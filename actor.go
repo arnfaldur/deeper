@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/cmplx"
 )
 
 //Direction
@@ -26,6 +27,7 @@ const (
 	INT
 	WIS
 	CHA
+	SPD
 )
 
 type Actor interface {
@@ -33,20 +35,26 @@ type Actor interface {
 }
 
 type Entity struct {
-	x, y                  int
-	name                  string
+	pos  complex128
+	name string
+}
+
+type Character struct {
+	Entity
 	maxHealth, currHealth int
-	attributes            [6]int
+	attributes            [7]int
 	damage                int
+	vel                   complex128
+	size                  float64
 }
 
 type Player struct {
-	Entity
+	Character
 	id ID
 }
 
 type NPC struct {
-	Entity
+	Character
 	id ID
 }
 
@@ -55,12 +63,12 @@ func (n NPC) update() {
 }
 
 func (n NPC) isAtPos(xpos, ypos int) bool {
-	return (n.x == xpos) && (n.y == ypos)
+	return (int(real(n.pos)) == xpos) && (int(imag(n.pos)) == ypos)
 }
 
 func (p *Player) termupdate(floor *Mapt, others *[]NPC, action int) {
-	xpos := p.x
-	ypos := p.y
+	xpos := int(real(p.pos))
+	ypos := int(imag(p.pos))
 
 	switch action {
 	case UP:
@@ -92,11 +100,11 @@ func (p *Player) termupdate(floor *Mapt, others *[]NPC, action int) {
 	p.move(xpos, ypos, floor, others)
 }
 
-func (p *Player) attack(n *NPC) {
-	n.currHealth -= p.damage
+func (a *Character) attack(v *Character) {
+	v.currHealth -= a.damage
 }
 
-func (p *Player) move(xpos int, ypos int, floor *Mapt, others *[]NPC) {
+func (p *Character) move(xpos, ypos int, floor *Mapt, others *[]NPC) {
 
 	var t = (*floor)[ypos][xpos]
 	if DEBUGLOGGING {
@@ -106,27 +114,49 @@ func (p *Player) move(xpos int, ypos int, floor *Mapt, others *[]NPC) {
 
 		for i := 0; i < len(*others); i++ {
 			if (*others)[i].isAtPos(xpos, ypos) {
-				p.attack(&(*others)[i])
-				return
+				//p.attack(&(*others)[i])
+				break
 			}
 		}
-
-		p.x = xpos
-		p.y = ypos
+		p.pos = complex(float64(xpos), float64(ypos))
 		if DEBUGLOGGING {
 			fmt.Println("xpos,ypos: ", xpos, ypos)
 		}
 	}
 }
 
-func (p *Player) update() {
+func (p *Player) update(theMap *Mapt, actors *[]NPC, moveDirection complex128) {
+	if cmplx.Abs(moveDirection) > 1 {
+		moveDirection = moveDirection / complex(cmplx.Abs(moveDirection), 0)
+	}
+	p.vel = approach(p.vel, moveDirection/5)
+	newPos := p.pos + p.vel
 
+	px := real(newPos)
+	py := imag(newPos)
+
+	pxf, pxc := int(px), int(px+1)
+	pyf, pyc := int(py), int(py+1)
+
+	for y := pyf; y < pyc; y++ {
+		for x := pxf; x < pxc; x++ {
+			if IS_SOLID[theMap[y][x].tileID] {
+
+			}
+		}
+	}
+
+	p.pos = newPos
 }
 
-func testEnemyNPC(xpos, ypos, id int) NPC {
-	return NPC{Entity{x: xpos, y: ypos, name: "TestEnemy", maxHealth: 10, currHealth: 10}, makeActorID(id)}
+func testEnemyNPC(pos complex128, id int) NPC {
+	return NPC{Character{Entity: Entity{pos: pos, name: "TestEnemy"}, size: 0.8, maxHealth: 10, currHealth: 10}, makeActorID(id)}
 }
 
-func dummyNPC(xpos, ypos int) NPC {
-	return NPC{Entity{x: xpos, y: ypos, name: "dummy", maxHealth: 10, currHealth: 10}, DUMMY}
+func dummyNPC(x, y int) NPC {
+	return NPC{Character{Entity: Entity{pos: complex(float64(x), float64(y)), name: "dummy"}, maxHealth: 10, currHealth: 10}, DUMMY}
+}
+
+func approach(vel, target complex128) complex128 {
+	return (vel*4 + target) / 5
 }
