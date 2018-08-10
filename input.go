@@ -77,8 +77,7 @@ func processInputs() bool {
 		case *sdl.QuitEvent:
 			return false
 		case *sdl.MouseButtonEvent:
-		case *sdl.KeyDownEvent:
-		case *sdl.KeyUpEvent:
+		case *sdl.KeyboardEvent:
 
 		}
 	}

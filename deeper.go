@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
 	"math/rand"
+	"time"
 )
 
 const (
-	MAPSIZE = 64
+	MAPSIZE     int           = 64
+	DURPERFRAME time.Duration = 16666666
 )
 
 type object struct {
@@ -94,7 +96,7 @@ func sdlGameLoop() {
 	loadTextures()
 
 	running := true
-
+	var event sdl.Event
 	//Start hack:
 
 	hilbert = Player{Entity{x: 3, y: 3, damage: 5}, PLAYER}
@@ -102,30 +104,39 @@ func sdlGameLoop() {
 
 	//End hack
 
-	var stepDelay int = 0
+	//var stepDelay int = 0
 
 	for running {
+		var startTime time.Time = time.Now()
 		//update_key_state()
 		running = !get_key_state(sdl.SCANCODE_ESCAPE)
 
-		//fmt.Println("ESCAPE: ", sdl.SCANCODE_ESCAPE)
-		//fmt.Println("UP: ", sdl.SCANCODE_UP)
-		//fmt.Println("LEFT: ", sdl.SCANCODE_LEFT)
-		if stepDelay == 20 {
-			if get_key_state(sdl.SCANCODE_UP) {
-				hilbert.termupdate(&themap, &actors, UP)
-			}
-
-			if get_key_state(sdl.SCANCODE_DOWN) {
-				hilbert.termupdate(&themap, &actors, DOWN)
-			}
-
-			if get_key_state(sdl.SCANCODE_LEFT) {
-				hilbert.termupdate(&themap, &actors, LEFT)
-			}
-
-			if get_key_state(sdl.SCANCODE_RIGHT) {
-				hilbert.termupdate(&themap, &actors, RIGHT)
+		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			switch t := event.(type) {
+			case *sdl.QuitEvent:
+				running = false
+			case *sdl.MouseMotionEvent:
+			case *sdl.MouseButtonEvent:
+			case *sdl.MouseWheelEvent:
+			case *sdl.KeyboardEvent:
+				if t.Keysym.Sym == sdl.K_UP {
+					hilbert.termupdate(&themap, &actors, UP)
+				}
+				if t.Keysym.Sym == sdl.K_DOWN {
+					hilbert.termupdate(&themap, &actors, DOWN)
+				}
+				if t.Keysym.Sym == sdl.K_LEFT {
+					hilbert.termupdate(&themap, &actors, LEFT)
+				}
+				if t.Keysym.Sym == sdl.K_RIGHT {
+					hilbert.termupdate(&themap, &actors, RIGHT)
+				}
+			case *sdl.JoyAxisEvent:
+			case *sdl.JoyBallEvent:
+			case *sdl.JoyButtonEvent:
+			case *sdl.JoyHatEvent:
+			default:
+				fmt.Printf("Some event\n")
 			}
 
 			for i := 0; i < len(actors); i++ {
@@ -137,11 +148,8 @@ func sdlGameLoop() {
 			clearFrame()
 			renderMap(&themap, &actors, &hilbert)
 			presentFrame()
-			//term_rendermap()
-			stepDelay = 0
-		} else {
-			stepDelay++
 		}
+		time.Sleep(time.Until(startTime.Add(DURPERFRAME)))
 	}
 	//End hack;
 	/*
