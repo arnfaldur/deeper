@@ -159,7 +159,8 @@ func loadTextures() {
 		"assets/ShittyTile.png",
 		"assets/ShittyGuy.png",
 		"assets/ShittyBeholder.png",
-		"assets/STONE_WALL_RED.png"}
+		"assets/STONE_WALL_RED.png",
+	}
 	for i, e := range assets {
 		image, err := img.Load(e)
 		if err != nil {

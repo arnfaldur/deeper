@@ -57,8 +57,7 @@ type NPC struct {
 
 func (n *NPC) update(p *Player) {
 	if n.aggro {
-		diff := p.pos - n.pos
-		n.pos += diff / complex(cmplx.Abs(diff), 0) * 0.03
+		n.pos += cmplxNorm(p.pos-n.pos) * 0.03
 	}
 }
 

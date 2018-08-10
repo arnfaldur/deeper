@@ -1,0 +1,7 @@
+#
+#   Testing file io
+#
+
+tester1 strength 1.0 versions 3
+tester2 dir 0.5 1 strength 0.3
+tester3 strength 0.8 versions 8 dir 0.2 0.2

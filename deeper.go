@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
 	"math/rand"
@@ -52,9 +51,12 @@ func temp_populatemap() {
 }
 
 func main() {
+
 	initDisplay()
 	defer destroyDisplay()
 	loadTextures()
+	//testing
+	loadTesters()
 
 	running := true
 	var event sdl.Event
@@ -67,6 +69,11 @@ func main() {
 
 	for running {
 		var startTime = time.Now()
+
+		loadTesters()
+		if time.Now().Sub(startTime).Nanoseconds() > time.Millisecond.Nanoseconds()*10 {
+			fmt.Println("Hotloader hang!")
+		}
 
 		// Input handling
 
@@ -122,8 +129,6 @@ func main() {
 				i--
 			}
 		}
-
-		fmt.Println(hilbert.pos)
 
 		// Rendering
 
