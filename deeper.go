@@ -50,49 +50,7 @@ func temp_populatemap() {
 	}
 }
 
-//func term_rendermap() {
-//	var printmap [MAPSIZE][MAPSIZE]string
-//	for i := 0; i < MAPSIZE; i++ {
-//		for j := 0; j < MAPSIZE; j++ {
-//			switch themap[i][j].tileID {
-//			case STONE_WALL:
-//				printmap[i][j] = "#"
-//			case STONE_FLOOR:
-//				printmap[i][j] = "_"
-//			default:
-//				printmap[i][j] = "?"
-//			}
-//		}
-//	}
-//	for i := 0; i < len(actors); i++ {
-//		printmap[actors[i].x][actors[i].y] = "*"
-//	}
-//	printmap[hilbert.x][hilbert.y] = "@"
-//
-//	for i := 0; i < MAPSIZE; i++ {
-//		for j := 0; j < MAPSIZE; j++ {
-//			fmt.Print(printmap[j][i])
-//		}
-//		fmt.Print("\n")
-//	}
-//}
-
 func main() {
-
-	fmt.Println("Welcome to Deeper!")
-	//fmt.Println("Would you like terminal mode or graphical mode? t/g")
-	//var ans string
-	//fmt.Scan(&ans)
-	//
-	//if ans == "t" {
-	//	termGameLoop()
-	//} else if ans == "g" {
-	sdlGameLoop()
-	//}
-	fmt.Println("GG!")
-}
-
-func sdlGameLoop() {
 	initDisplay()
 	defer destroyDisplay()
 	loadTextures()
@@ -176,45 +134,4 @@ func sdlGameLoop() {
 
 	unloadTextures()
 	sdl.Quit()
-}
-
-func termGameLoop() {
-
-	running := true
-
-	hilbert = Player{Character{Entity: Entity{pos: complex(float64(MAPSIZE/2), float64(MAPSIZE/2))}, damage: 5, size: 0.8}, PLAYER}
-	temp_populatemap()
-	//term_rendermap()
-
-	for running {
-		//running = processInputs()
-		var input string
-		fmt.Scan(&input)
-
-		switch input {
-		case "w":
-			hilbert.termupdate(&themap, &actors, UP)
-		case "s":
-			hilbert.termupdate(&themap, &actors, DOWN)
-		case "a":
-			hilbert.termupdate(&themap, &actors, LEFT)
-		case "d":
-			hilbert.termupdate(&themap, &actors, RIGHT)
-		case "e":
-			var xpos, ypos int
-			fmt.Scan(&xpos)
-			fmt.Scan(&ypos)
-			tempAdddummy(xpos, ypos)
-		case "x":
-			running = false
-		}
-
-		for i := 0; i < len(actors); i++ {
-			if actors[i].currHealth <= 0 {
-				actors = append(actors[:i], actors[i+1:]...)
-			}
-		}
-
-		//term_rendermap()
-	}
 }
