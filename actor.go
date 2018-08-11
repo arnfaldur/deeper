@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"math/cmplx"
 )
 
@@ -70,14 +71,40 @@ func (ents *Entities) upd() {
 	return
 }
 
+func (e *Entity) tileCollide(theMap *Mapt) {
+	px, py := parts(e.pos)
+
+	pxf, pxr, pxc, pyf, pyr, pyc := int(px), int(px+0.5), int(px+1), int(py), int(py+0.5), int(py+1)
+
+	toWall := e.size/2 + 0.5
+	if IS_SOLID[theMap[pyf][pxr].tileID] && toWall >= py-float64(pyf) {
+		e.vel = complex(real(e.vel), math.Max(0, imag(e.vel)))
+		e.pos = complex(real(e.pos), float64(pyf)+toWall)
+	} else if IS_SOLID[theMap[pyc][pxr].tileID] && toWall >= py-float64(pyc) {
+		e.vel = complex(real(e.vel), math.Min(0, imag(e.vel)))
+		e.pos = complex(real(e.pos), float64(pyc)-toWall)
+	}
+	if IS_SOLID[theMap[pyr][pxf].tileID] && toWall >= px-float64(pxf) {
+		e.vel = complex(math.Max(0, real(e.vel)), imag(e.vel))
+		e.pos = complex(float64(pxf)+toWall, imag(e.pos))
+	} else if IS_SOLID[theMap[pyr][pxc].tileID] && toWall >= px-float64(pxc) {
+		e.vel = complex(math.Min(0, real(e.vel)), imag(e.vel))
+		e.pos = complex(float64(pxc)-toWall, imag(e.pos))
+	}
+}
+
 func (p *Player) update(theMap *Mapt, entities *[]NPC, moveDirection complex128) {
 	if cmplx.Abs(moveDirection) > 1 {
-		moveDirection = moveDirection / complex(cmplx.Abs(moveDirection), 0)
+		moveDirection = cmplxNorm(moveDirection)
 	}
 	p.vel = approach(p.vel, moveDirection/5)
 	p.pos += p.vel
 	for i := range *entities {
 		(*entities)[i].pos += (*entities)[i].vel
+	}
+	p.tileCollide(theMap)
+	for i := range *entities {
+		(*entities)[i].tileCollide(theMap)
 	}
 	for i, e := range *entities {
 		colDir := p.pos - e.pos
@@ -104,6 +131,7 @@ func (p *Player) update(theMap *Mapt, entities *[]NPC, moveDirection complex128)
 			}
 		}
 	}
+
 }
 
 //func (p *Player) update(theMap *Mapt, actors *[]NPC, moveDirection complex128) {
