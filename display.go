@@ -132,10 +132,10 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	px, py := parts((*hilbert).pos)
 
-	tile_radius := ds.maxTiles / 2
+	halfTileWidth := ds.maxTiles / 2
 
-	for i := int(py - tile_radius); i <= int(py+0.5+tile_radius); i++ {
-		for j := int(px - tile_radius); j <= int(px+0.5+tile_radius); j++ {
+	for i := int(py - halfTileWidth); i <= int(py+0.5+halfTileWidth); i++ {
+		for j := int(px - halfTileWidth); j <= int(px+0.5+halfTileWidth); j++ {
 
 			if i >= 0 && i < len(*theMap) && j >= 0 && j < len((*theMap)[0]) {
 				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px, float64(i)-py)
@@ -143,7 +143,7 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 		}
 	}
 	for _, npc := range *actors {
-		if real(npc.pos) <= px+tile_radius+0.5 && imag(npc.pos) <= py+tile_radius+0.5 {
+		if real(npc.pos) <= px+halfTileWidth+0.5 && imag(npc.pos) <= py+halfTileWidth+0.5 {
 			drawTile(textures[npc.id.number+3], real(npc.pos)-px, imag(npc.pos)-py)
 		}
 	}
