@@ -42,7 +42,7 @@ func temp_populatemap() {
 				themap[y][x] = Tile{tileID: STONE_WALL}
 			} else {
 				if randomN > 0.6 {
-					//actors = append(actors, testEnemyNPC(complex(float64(x), float64(y)), rand.Intn(10)))
+					actors = append(actors, testEnemyNPC(complex(float64(x), float64(y)), rand.Intn(10)))
 				}
 				themap[y][x] = Tile{tileID: STONE_FLOOR}
 			}

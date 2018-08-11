@@ -132,10 +132,11 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	px, py := parts((*hilbert).pos)
 
-	halfTileWidth := ds.maxTiles / 2
+	tilesToTop := ds.maxTiles / 2
+	tilesToSide := tilesToTop / float64(WINDOW_HEIGHT) * float64(WINDOW_WIDTH)
 
-	for i := int(py - halfTileWidth); i <= int(py+0.5+halfTileWidth); i++ {
-		for j := int(px - halfTileWidth); j <= int(px+0.5+halfTileWidth); j++ {
+	for i := int(py - tilesToTop); i <= int(py+1+tilesToTop); i++ {
+		for j := int(px - tilesToSide); j <= int(px+1+tilesToSide); j++ {
 
 			if i >= 0 && i < len(*theMap) && j >= 0 && j < len((*theMap)[0]) {
 				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px, float64(i)-py)
@@ -143,7 +144,7 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 		}
 	}
 	for _, npc := range *actors {
-		if real(npc.pos) <= px+halfTileWidth+0.5 && imag(npc.pos) <= py+halfTileWidth+0.5 {
+		if real(npc.pos) <= px+tilesToSide+1 && imag(npc.pos) <= py+tilesToTop+1 {
 			drawTile(textures[npc.id.number+3], real(npc.pos)-px, imag(npc.pos)-py)
 		}
 	}
@@ -156,7 +157,7 @@ func drawTile(texture *sdl.Texture, x, y float64) {
 	//source rectangle of texture, should currently be the same size as the picture
 	src := sdl.Rect{W: int32(ds.tileSize), H: int32(ds.tileSize)}
 	//Destination rectangle, scaled so that x and y are integers from 0 - 16
-	dst := sdl.Rect{X: WINDOW_WIDTH/2 + int32((x-0.5)*scale), Y: WINDOW_HEIGHT/2 + int32((y-0.5)*scale), W: int32(scale), H: int32(scale)}
+	dst := sdl.Rect{X: int32(float64(WINDOW_WIDTH)/2 + (x-0.5)*scale), Y: int32(float64(WINDOW_HEIGHT)/2 + (y-0.5)*scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
 	renderer.Copy(texture, &src, &dst)
 
