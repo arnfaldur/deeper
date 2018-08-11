@@ -28,6 +28,8 @@ var themap Mapt
 var hilbert Player
 var actors []NPC
 
+var time_dilation = 0.0
+
 func tempAdddummy(xpos, ypos int) {
 	actors = append(actors, dummyNPC(xpos, ypos))
 }
@@ -54,8 +56,6 @@ func main() {
 	initDisplay()
 	defer destroyDisplay()
 	loadTextures()
-	//testing
-	loadTesters()
 
 	running := true
 	var event sdl.Event
@@ -69,7 +69,6 @@ func main() {
 	for running {
 		var startTime = time.Now()
 
-		loadTesters()
 		if time.Now().Sub(startTime).Nanoseconds() > time.Millisecond.Nanoseconds()*10 {
 			fmt.Println("Hotloader hang!")
 		}
@@ -101,6 +100,20 @@ func main() {
 		// Game Logic
 
 		var moveDirection complex128
+
+		inputarr := [5]int{sdl.SCANCODE_UP, sdl.SCANCODE_DOWN, sdl.SCANCODE_LEFT, sdl.SCANCODE_RIGHT, sdl.SCANCODE_Q}
+
+		keypressed := false
+		for _, index := range inputarr {
+			if pressedKeys[index] {
+				keypressed = true
+			}
+		}
+		if keypressed {
+			time_dilation = (4*time_dilation + 1) / 5
+		} else {
+			time_dilation = (4 * time_dilation) / 5
+		}
 
 		if pressedKeys[sdl.SCANCODE_ESCAPE] {
 			running = false

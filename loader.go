@@ -44,7 +44,9 @@ func getUncommentedLines(file []byte) []string {
 
 func alreadyLoaded(filepath string) (time.Time, bool) {
 	info, err := os.Stat(filepath)
-	check(err)
+	if err != nil {
+		return info.ModTime(), false
+	}
 
 	if val, ok := loadedAtTime[filepath]; ok {
 		if val.Equal(info.ModTime()) {

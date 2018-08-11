@@ -136,7 +136,7 @@ func (p *Player) update(theMap *Mapt, npcs *[]NPC, moveDirection complex128) {
 	if cmplx.Abs(moveDirection) > 1 {
 		moveDirection = cmplxNorm(moveDirection)
 	}
-	p.vel = approach(p.vel, moveDirection/5)
+	p.vel = approach(p.vel, moveDirection/5) * complex(time_dilation, 0)
 	p.pos += p.vel
 	for i := range *npcs {
 		(*npcs)[i].pos += (*npcs)[i].vel
@@ -145,7 +145,7 @@ func (p *Player) update(theMap *Mapt, npcs *[]NPC, moveDirection complex128) {
 	for i, e := range *npcs {
 		if e.aggro {
 			diff := p.pos - e.pos
-			(*npcs)[i].vel = approach(e.vel, diff/complex(cmplx.Abs(diff), 0)/10)
+			(*npcs)[i].vel = approach(e.vel, diff/complex(cmplx.Abs(diff), 0)/10) * complex(time_dilation, 0)
 		}
 		e.npcCollide(npcs)
 	}

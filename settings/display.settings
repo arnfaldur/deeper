@@ -5,7 +5,7 @@
 screenwidth 800
 screenheight 600
 fps 60
+tilesize 32
 
 #hotloaded settings
-tilesize 64
 maxtiles 16
