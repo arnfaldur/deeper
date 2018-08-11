@@ -112,8 +112,10 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 
 	px, py := parts((*hilbert).pos)
 
-	for i := int(py - MAX_TILES/2); i <= int(py+MAX_TILES/2+1); i++ {
-		for j := int(px - MAX_TILES/2); j <= int(px+MAX_TILES/2+1); j++ {
+	tile_radius := ds.maxTiles / 2
+
+	for i := int(py - tile_radius); i <= int(py+0.5+tile_radius); i++ {
+		for j := int(px - tile_radius); j <= int(px+0.5+tile_radius); j++ {
 
 			if i >= 0 && i < len(*theMap) && j >= 0 && j < len((*theMap)[0]) {
 				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px+MAX_TILES/2, float64(i)-py+MAX_TILES/2)
@@ -138,12 +140,7 @@ func drawTile(texture *sdl.Texture, x, y float64) {
 	dst := sdl.Rect{X: int32((x - 0.5) * scale), Y: int32((y - 0.5) * scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
 	renderer.Copy(texture, &src, &dst)
-}
 
-func debugPoint(x, y float64) {
-	scale := float64(SCREEN_HEIGHT / MAX_TILES)
-	renderer.SetDrawColor(0xff, 0xff, 0xff, 0xff)
-	renderer.DrawPoint(int32((x-0.5)*scale), int32((y-0.5)*scale))
 }
 
 func loadTextures() {

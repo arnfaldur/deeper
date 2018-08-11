@@ -55,6 +55,64 @@ func alreadyLoaded(filepath string) (time.Time, bool) {
 	return info.ModTime(), false
 }
 
+func loadDisplaySettings() (DisplaySettings, bool) {
+	const filepath = "settings/display.settings"
+
+	timeLoaded, loaded := alreadyLoaded(filepath)
+
+	if loaded {
+		return DisplaySettings{}, false
+	}
+
+	file, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return DisplaySettings{}, false
+	}
+
+	loadedAtTime[filepath] = timeLoaded
+
+	var ds DisplaySettings
+
+	fmt.Println("Loading display settings...")
+
+	lines := getUncommentedLines(file)
+
+	for _, l := range lines {
+
+		tokens := strings.Split(l, " ")
+
+		switch tokens[0] {
+		case "screenwidth":
+			temp, err := strconv.ParseInt(tokens[1], 10, 32)
+			check(err)
+			ds.screenWidth = int32(temp)
+			break
+		case "screenheight":
+			temp, err := strconv.ParseInt(tokens[1], 10, 32)
+			check(err)
+			ds.screenHeight = int32(temp)
+			break
+		case "fps":
+			temp, err := strconv.ParseInt(tokens[1], 10, 32)
+			check(err)
+			ds.FPS = uint32(temp)
+			break
+		case "tilesize":
+			temp, err := strconv.ParseInt(tokens[1], 10, 32)
+			check(err)
+			ds.tileSize = int(temp)
+			break
+		case "maxtiles":
+			temp, err := strconv.ParseFloat(tokens[1], 64)
+			check(err)
+			ds.maxTiles = temp
+			break
+		}
+	}
+
+	return ds, true
+}
+
 func loadTesters() {
 
 	const filepath = "settings/test.settings"
