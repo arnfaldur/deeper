@@ -1,7 +1,7 @@
 package main
 
 type ID struct {
-	class, number, state int
+	class, textureID, state int
 }
 
 //ID CLASSES
@@ -19,7 +19,7 @@ var (
 
 //Actor IDS
 var (
-	PLAYER = ID{ACTORID, 0, 0}
+	PLAYER = ID{ACTORID, 2, 0}
 	DUMMY  = ID{ACTORID, 1, 0}
 )
 

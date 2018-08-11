@@ -5,41 +5,19 @@ import (
 	"math/cmplx"
 )
 
-//Direction
-const (
-	UP = iota
-	DOWN
-	LEFT
-	RIGHT
-)
-
-//Damage Types
-const (
-	dtKinetic = iota
-	dtMagic
-)
-
-//Attributes
-const (
-	STR = iota
-	DEX
-	CON
-	INT
-	WIS
-	CHA
-	SPD
-)
-
-type Entityable interface {
+type Entity struct {
+	id        ID
+	pos       complex128
+	name      string
+	collision bool
+	solid     bool
+	vel       complex128
+	size      float64
+	weight    float64
 }
 
-type Entity struct {
-	id     ID
-	pos    complex128
-	name   string
-	vel    complex128
-	size   float64
-	weight float64
+func NewTile(id ID, x float64, y float64) Entity {
+	return Entity{id: id, pos: complex(x, y), collision: isSolid[id], solid: isSolid[id]}
 }
 
 type Character struct {
@@ -75,20 +53,20 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 	pxf, pxr, pxc, pyf, pyr, pyc := int(px), int(px+0.5), int(math.Nextafter(px+1, math.Inf(-1))), int(py), int(py+0.5), int(math.Nextafter(py+1, math.Inf(-1)))
 	any := false
 	toWall := e.size / 2
-	if IS_SOLID[theMap[pyf][pxr].tileID] && toWall >= math.Abs(py-0.5-float64(pyf)) {
+	if isSolid[theMap[pyf][pxr].id] && toWall >= math.Abs(py-0.5-float64(pyf)) {
 		e.vel = complex(real(e.vel), math.Max(0, imag(e.vel)))
 		e.pos = complex(real(e.pos), float64(pyf)+0.5+toWall)
 		any = true
-	} else if IS_SOLID[theMap[pyc][pxr].tileID] && toWall >= math.Abs(py+0.5-float64(pyc)) {
+	} else if isSolid[theMap[pyc][pxr].id] && toWall >= math.Abs(py+0.5-float64(pyc)) {
 		e.vel = complex(real(e.vel), math.Min(0, imag(e.vel)))
 		e.pos = complex(real(e.pos), float64(pyc)-0.5-toWall)
 		any = true
 	}
-	if IS_SOLID[theMap[pyr][pxf].tileID] && toWall >= math.Abs(px-0.5-float64(pxf)) {
+	if isSolid[theMap[pyr][pxf].id] && toWall >= math.Abs(px-0.5-float64(pxf)) {
 		e.vel = complex(math.Max(0, real(e.vel)), imag(e.vel))
 		e.pos = complex(float64(pxf)+0.5+toWall, imag(e.pos))
 		any = true
-	} else if IS_SOLID[theMap[pyr][pxc].tileID] && toWall >= math.Abs(px+0.5-float64(pxc)) {
+	} else if isSolid[theMap[pyr][pxc].id] && toWall >= math.Abs(px+0.5-float64(pxc)) {
 		e.vel = complex(math.Min(0, real(e.vel)), imag(e.vel))
 		e.pos = complex(float64(pxc)-0.5-toWall, imag(e.pos))
 		any = true
@@ -99,7 +77,7 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 		for y := 0; y < 2; y++ {
 			for x := 2; x < 4; x++ {
 				colDir := complex(fs[x]-float64(is[x]), fs[y]-float64(is[y]))
-				if IS_SOLID[theMap[is[y]][is[x]].tileID] && toWall > cmplx.Abs(colDir) {
+				if isSolid[theMap[is[y]][is[x]].id] && toWall > cmplx.Abs(colDir) {
 					colDep := toWall - cmplx.Abs(colDir)
 					e.vel += cmplx.Rect(colDep/2, cmplx.Phase(colDir))
 					e.pos += cmplx.Rect(colDep, cmplx.Phase(colDir))
@@ -119,7 +97,7 @@ func (c *Character) npcCollide(npcs *[]NPC) {
 		if c.pos != n.pos && colDep > 0 {
 			nudge := cmul(colDir, colDep)
 			//nudge := cmplx.Rect(colDep/6, cmplx.Phase(colDir))
-			println(colDep)
+			//println(colDep)
 			c.pos += nudge
 			(*npcs)[i].pos -= nudge
 			if c.id == PLAYER {
@@ -136,7 +114,7 @@ func (p *Player) update(theMap *Mapt, npcs *[]NPC, moveDirection complex128) {
 	if cmplx.Abs(moveDirection) > 1 {
 		moveDirection = cmplxNorm(moveDirection)
 	}
-	p.vel = approach(p.vel, moveDirection/5) * complex(time_dilation, 0)
+	p.vel = approach(p.vel, moveDirection/5) * complex(timeDilation, 0)
 	p.pos += p.vel
 	for i := range *npcs {
 		(*npcs)[i].pos += (*npcs)[i].vel
@@ -145,7 +123,7 @@ func (p *Player) update(theMap *Mapt, npcs *[]NPC, moveDirection complex128) {
 	for i, e := range *npcs {
 		if e.aggro {
 			diff := p.pos - e.pos
-			(*npcs)[i].vel = approach(e.vel, diff/complex(cmplx.Abs(diff), 0)/10) * complex(time_dilation, 0)
+			(*npcs)[i].vel = approach(e.vel, diff/complex(cmplx.Abs(diff), 0)/10) * complex(timeDilation, 0)
 		}
 		e.npcCollide(npcs)
 	}

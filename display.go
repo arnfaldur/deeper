@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/veandco/go-sdl2/gfx"
-	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 	"math"
@@ -11,29 +10,11 @@ import (
 	"runtime"
 )
 
-type Point struct {
-	x int
-	y int
-}
-
 type Textures map[int]*sdl.Texture
 
-const (
-	MAINMENU = iota
-)
-
-type DisplaySettings struct {
-	screenWidth  int32
-	screenHeight int32
-
-	FPS      uint32
-	tileSize int
-	maxTiles float64
-}
-
 var (
-	WINDOW_WIDTH  int32
-	WINDOW_HEIGHT int32
+	windowWidth  int32
+	windowHeight int32
 )
 
 var ds DisplaySettings
@@ -46,14 +27,6 @@ var renderer *sdl.Renderer
 var texture *sdl.Texture
 var err error
 var textures = make(Textures)
-
-func getRenderer() *sdl.Renderer {
-	return renderer
-}
-
-func getWindow() *sdl.Window {
-	return window
-}
 
 func initDisplay() error {
 
@@ -106,6 +79,63 @@ func initDisplay() error {
 	return nil
 }
 
+func renderMap() {
+
+	windowWidth, windowHeight = window.GetSize()
+
+	//Dirty hot-loading
+	temp, ok := loadDisplaySettings()
+	if ok {
+		ds = temp
+	}
+
+	px, py := parts((hilbert).pos)
+
+	tilesToTop := ds.maxTiles / 2
+	tilesToSide := tilesToTop / float64(windowHeight) * float64(windowWidth)
+
+	for i := int(py - tilesToTop); i <= int(py+1+tilesToTop); i++ {
+		for j := int(px - tilesToSide); j <= int(px+1+tilesToSide); j++ {
+
+			if i >= 0 && i < len(theMap) && j >= 0 && j < len((theMap)[0]) {
+				tile := theMap[i][j]
+				drawTile(textures[tile.id.textureID], tile.pos)
+			}
+		}
+	}
+
+	for _, npc := range actors {
+		if real(npc.pos) <= px+tilesToSide+1 && imag(npc.pos) <= py+tilesToTop+1 {
+			drawTile(textures[npc.id.textureID+3], npc.pos)
+		}
+	}
+
+	//draws hilbert
+	drawTile(textures[hilbert.id.textureID], hilbert.pos)
+}
+
+func drawTile(texture *sdl.Texture, pos complex128) {
+	scale := math.Floor(float64(windowWidth) / ds.maxTiles)
+
+	//Center coordinate system on hilbert's center
+	pos -= hilbert.pos + complex(0.5, 0.5)
+	pos = cmul(pos, scale)
+
+	x, y := parts(pos)
+
+	//source rectangle of texture, should currently be the same size as the picture
+	src := sdl.Rect{W: int32(ds.tileSize), H: int32(ds.tileSize)}
+	//Destination rectangle, scaled so that x and y are integers from 0 - 16
+	dst := sdl.Rect{
+		X: int32(x + float64(windowWidth)/2),
+		Y: int32(y + float64(windowHeight)/2),
+		W: int32(scale),
+		H: int32(scale),
+	}
+	//Draw tile to the renderer
+	renderer.Copy(texture, &src, &dst)
+}
+
 func destroyDisplay() {
 	window.Destroy()
 	renderer.Destroy()
@@ -118,86 +148,4 @@ func clearFrame() {
 func presentFrame() {
 	renderer.Present()
 	gfx.FramerateDelay(&fpsManager)
-}
-
-func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
-
-	WINDOW_WIDTH, WINDOW_HEIGHT = window.GetSize()
-
-	//Dirty hotloading
-	temp, ok := loadDisplaySettings()
-	if ok {
-		ds = temp
-	}
-
-	px, py := parts((*hilbert).pos)
-
-	tilesToTop := ds.maxTiles / 2
-	tilesToSide := tilesToTop / float64(WINDOW_HEIGHT) * float64(WINDOW_WIDTH)
-
-	for i := int(py - tilesToTop); i <= int(py+1+tilesToTop); i++ {
-		for j := int(px - tilesToSide); j <= int(px+1+tilesToSide); j++ {
-
-			if i >= 0 && i < len(*theMap) && j >= 0 && j < len((*theMap)[0]) {
-				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px, float64(i)-py)
-			}
-		}
-	}
-	for _, npc := range *actors {
-		if real(npc.pos) <= px+tilesToSide+1 && imag(npc.pos) <= py+tilesToTop+1 {
-			drawTile(textures[npc.id.number+3], real(npc.pos)-px, imag(npc.pos)-py)
-		}
-	}
-	drawTile(textures[2], 0, 0)
-}
-
-func drawTile(texture *sdl.Texture, x, y float64) {
-	scale := math.Floor(float64(WINDOW_WIDTH) / ds.maxTiles)
-
-	//source rectangle of texture, should currently be the same size as the picture
-	src := sdl.Rect{W: int32(ds.tileSize), H: int32(ds.tileSize)}
-	//Destination rectangle, scaled so that x and y are integers from 0 - 16
-	dst := sdl.Rect{X: int32(float64(WINDOW_WIDTH)/2 + (x-0.5)*scale), Y: int32(float64(WINDOW_HEIGHT)/2 + (y-0.5)*scale), W: int32(scale), H: int32(scale)}
-	//Draw tile to the renderer
-	renderer.Copy(texture, &src, &dst)
-
-}
-
-func loadTextures() {
-	assets := []string{
-		"assets/STONE_WALL.png",
-		"assets/STONE_FLOOR.png",
-		"assets/PLAYER.png",
-		"assets/enemies/TestEnemy0.png",
-		"assets/enemies/TestEnemy1.png",
-		"assets/enemies/TestEnemy2.png",
-		"assets/enemies/TestEnemy3.png",
-		"assets/enemies/TestEnemy4.png",
-		"assets/enemies/TestEnemy5.png",
-		"assets/enemies/TestEnemy6.png",
-		"assets/enemies/TestEnemy7.png",
-		"assets/enemies/TestEnemy8.png",
-		"assets/enemies/TestEnemy9.png",
-		"assets/ShittyTile.png",
-		"assets/ShittyGuy.png",
-		"assets/ShittyBeholder.png",
-		"assets/STONE_WALL_RED.png",
-	}
-	for i, e := range assets {
-		image, err := img.Load(e)
-		if err != nil {
-			panic(err)
-		}
-		textures[i], err = renderer.CreateTextureFromSurface(image)
-		if err != nil {
-			panic(err)
-		}
-		image.Free()
-	}
-}
-
-func unloadTextures() {
-	for _, v := range textures {
-		v.Destroy()
-	}
 }

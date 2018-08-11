@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/veandco/go-sdl2/img"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -10,60 +11,23 @@ import (
 	"time"
 )
 
+type DisplaySettings struct {
+	screenWidth  int32
+	screenHeight int32
+
+	FPS      uint32
+	tileSize int
+	maxTiles float64
+}
+
 var loadedAtTime = make(map[string]time.Time)
-
-type Tester struct {
-	name     string
-	strength float64
-	versions int64
-	dir      complex128
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
-func getUncommentedLines(file []byte) []string {
-	var lines []string
-
-	//TODO make this not windows-specific
-	for _, bs := range bytes.Split(file, []byte("\r\n")) {
-		if len(bs) < 1 {
-			continue
-		}
-		if bs[0] == byte('#') {
-			continue
-		}
-		lines = append(lines, string(bs))
-	}
-
-	return lines
-}
-
-func alreadyLoaded(filepath string) (time.Time, bool) {
-	info, err := os.Stat(filepath)
-	if err != nil {
-		return info.ModTime(), false
-	}
-
-	if val, ok := loadedAtTime[filepath]; ok {
-		if val.Equal(info.ModTime()) {
-			return val, true
-		}
-		fmt.Println("hotloaded: ", filepath)
-		return info.ModTime(), false
-	}
-	return info.ModTime(), false
-}
 
 func loadDisplaySettings() (DisplaySettings, bool) {
 	const filepath = "settings/display.settings"
 
-	timeLoaded, loaded := alreadyLoaded(filepath)
+	timeLoaded, noChange := alreadyLoaded(filepath)
 
-	if loaded {
+	if noChange {
 		return DisplaySettings{}, false
 	}
 
@@ -76,7 +40,9 @@ func loadDisplaySettings() (DisplaySettings, bool) {
 
 	var ds DisplaySettings
 
-	fmt.Println("Loading display settings...")
+	if DEBUGLOGGING {
+		fmt.Println("Loading display settings...")
+	}
 
 	lines := getUncommentedLines(file)
 
@@ -116,63 +82,80 @@ func loadDisplaySettings() (DisplaySettings, bool) {
 	return ds, true
 }
 
-func loadTesters() {
-
-	const filepath = "settings/test.settings"
-
-	timeLoaded, loaded := alreadyLoaded(filepath)
-
-	if loaded {
-		return
+func loadTextures() {
+	assets := []string{
+		"assets/STONE_WALL.png",
+		"assets/STONE_FLOOR.png",
+		"assets/PLAYER.png",
+		"assets/enemies/TestEnemy0.png",
+		"assets/enemies/TestEnemy1.png",
+		"assets/enemies/TestEnemy2.png",
+		"assets/enemies/TestEnemy3.png",
+		"assets/enemies/TestEnemy4.png",
+		"assets/enemies/TestEnemy5.png",
+		"assets/enemies/TestEnemy6.png",
+		"assets/enemies/TestEnemy7.png",
+		"assets/enemies/TestEnemy8.png",
+		"assets/enemies/TestEnemy9.png",
+		"assets/ShittyTile.png",
+		"assets/ShittyGuy.png",
+		"assets/ShittyBeholder.png",
+		"assets/STONE_WALL_RED.png",
 	}
-
-	file, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		return
-	}
-
-	loadedAtTime[filepath] = timeLoaded
-
-	var testers []Tester
-
-	fmt.Println("Loading testers")
-
-	lines := getUncommentedLines(file)
-
-	for _, l := range lines {
-
-		tokens := strings.Split(l, " ")
-
-		t := Tester{name: tokens[0]}
-		tokens = tokens[1:]
-
-		for i := 0; i < len(tokens); i++ {
-			switch tokens[i] {
-			case "strength":
-				t.strength, err = strconv.ParseFloat(tokens[i+1], 64)
-				check(err)
-				i += 1
-				break
-			case "versions":
-				t.versions, err = strconv.ParseInt(tokens[i+1], 10, 64)
-				i += 1
-				break
-			case "dir":
-				dirreal, err := strconv.ParseFloat(tokens[i+1], 64)
-				check(err)
-				dirimag, err := strconv.ParseFloat(tokens[i+2], 64)
-				check(err)
-				t.dir = complex(dirreal, dirimag)
-				i += 2
-				break
-			}
+	for i, e := range assets {
+		image, err := img.Load(e)
+		if err != nil {
+			panic(err)
 		}
+		textures[i], err = renderer.CreateTextureFromSurface(image)
+		if err != nil {
+			panic(err)
+		}
+		image.Free()
+	}
+}
 
-		testers = append(testers, t)
+func unloadTextures() {
+	for _, v := range textures {
+		v.Destroy()
+	}
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
+func getUncommentedLines(file []byte) []string {
+	var lines []string
+
+	//TODO make this not windows-specific
+	for _, bs := range bytes.Split(file, []byte("\r\n")) {
+		if len(bs) < 1 {
+			continue
+		}
+		if bs[0] == byte('#') {
+			continue
+		}
+		lines = append(lines, string(bs))
 	}
 
-	for _, tester := range testers {
-		fmt.Printf("%+v\n", tester)
+	return lines
+}
+
+func alreadyLoaded(filepath string) (time.Time, bool) {
+	info, err := os.Stat(filepath)
+	if err != nil {
+		return info.ModTime(), false
 	}
-	//return testers
+
+	if val, ok := loadedAtTime[filepath]; ok {
+		if val.Equal(info.ModTime()) {
+			return val, true
+		}
+		fmt.Println("hotloaded: ", filepath)
+		return info.ModTime(), false
+	}
+	return info.ModTime(), false
 }

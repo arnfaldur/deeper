@@ -7,46 +7,40 @@ import (
 	"time"
 )
 
-const (
-	DEBUGLOGGING               = false
-	MAPSIZE      int           = 64
-	DURPERFRAME  time.Duration = 16666666 * 1
+var (
+	DEBUGLOGGING = false
+	HOTLOADING   = true
 )
 
-type object struct {
-	t_id string
-}
+const (
+	MAPSIZE     int           = 64
+	DURPERFRAME time.Duration = 16666666 * 1
+)
 
-type tile struct {
-	t_id string
-}
+type Mapt [MAPSIZE][MAPSIZE]Entity
 
-type Mapt [MAPSIZE][MAPSIZE]Tile
-
-//var renderables []*Actor
-var themap Mapt
+var theMap Mapt
 var hilbert Player
 var actors []NPC
+var environment []*Entity
 
-var time_dilation = 0.0
+var timeDilation = 0.0
 
-func tempAdddummy(xpos, ypos int) {
-	actors = append(actors, dummyNPC(xpos, ypos))
-}
-
-func temp_populatemap() {
+func populateMap() {
 	//fmt.Printf("STONE_FLOOR: %v\n", STONE_FLOOR)
 	for y := 0; y < MAPSIZE; y++ {
 		for x := 0; x < MAPSIZE; x++ {
 			//true at edges and random points, for flavour, RNG is deterministic unless seeded.
 			randomN := rand.Float64()
 			if y == 0 || x == 0 || y == MAPSIZE-1 || x == MAPSIZE-1 || randomN > 0.8 {
-				themap[y][x] = Tile{tileID: STONE_WALL}
+				theMap[y][x] = NewTile(STONE_WALL, float64(x), float64(y))
+				environment = append(environment, &theMap[y][x])
 			} else {
 				if randomN > 0.6 {
 					actors = append(actors, testEnemyNPC(complex(float64(x), float64(y)), rand.Intn(10)))
 				}
-				themap[y][x] = Tile{tileID: STONE_FLOOR}
+				theMap[y][x] = NewTile(STONE_FLOOR, float64(x), float64(y))
+				environment = append(environment, &theMap[y][x])
 			}
 		}
 	}
@@ -62,7 +56,7 @@ func main() {
 	var pressedKeys [512]bool
 
 	hilbert = Player{Character{Entity: Entity{id: PLAYER, pos: 3 + 3i, size: 0.8}, damage: 5}}
-	temp_populatemap()
+	populateMap()
 
 	//var stepDelay int = 0
 
@@ -99,20 +93,21 @@ func main() {
 
 		// Game Logic
 
+		//TODO: clean this up, move it somewhere more sensible
 		var moveDirection complex128
 
-		inputarr := [5]int{sdl.SCANCODE_UP, sdl.SCANCODE_DOWN, sdl.SCANCODE_LEFT, sdl.SCANCODE_RIGHT, sdl.SCANCODE_Q}
+		inputArr := [5]int{sdl.SCANCODE_UP, sdl.SCANCODE_DOWN, sdl.SCANCODE_LEFT, sdl.SCANCODE_RIGHT, sdl.SCANCODE_Q}
 
-		keypressed := false
-		for _, index := range inputarr {
+		keyPressed := false
+		for _, index := range inputArr {
 			if pressedKeys[index] {
-				keypressed = true
+				keyPressed = true
 			}
 		}
-		if keypressed {
-			time_dilation = (4*time_dilation + 1) / 5
+		if keyPressed {
+			timeDilation = (4*timeDilation + 1) / 5
 		} else {
-			time_dilation = (4 * time_dilation) / 5
+			timeDilation = (4 * timeDilation) / 5
 		}
 
 		if pressedKeys[sdl.SCANCODE_ESCAPE] {
@@ -131,7 +126,7 @@ func main() {
 			moveDirection += 1 + 0i
 		}
 
-		hilbert.update(&themap, &actors, moveDirection)
+		hilbert.update(&theMap, &actors, moveDirection)
 
 		for i := 0; i < len(actors); i++ {
 			if actors[i].currHealth <= 0 {
@@ -142,7 +137,7 @@ func main() {
 		// Rendering
 
 		clearFrame()
-		renderMap(&themap, &actors, &hilbert)
+		renderMap()
 		presentFrame()
 
 		// FPS limiter
