@@ -6,6 +6,7 @@ import (
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
+	"math"
 	"os"
 	"runtime"
 )
@@ -21,16 +22,21 @@ const (
 	MAINMENU = iota
 )
 
+type DisplaySettings struct {
+	screenWidth  int32
+	screenHeight int32
+
+	FPS      uint32
+	tileSize int
+	maxTiles float64
+}
+
 var (
-	SCREEN_WIDTH  int32 = 800
-	SCREEN_HEIGHT int32 = 600
+	WINDOW_WIDTH  int32
+	WINDOW_HEIGHT int32
 )
 
-const (
-	FPS       = 60
-	TILE_SIZE = 1 << 5
-	MAX_TILES = 1 << 4 // 16 supreme
-)
+var ds DisplaySettings
 
 var fpsManager gfx.FPSmanager
 
@@ -51,6 +57,14 @@ func getWindow() *sdl.Window {
 
 func initDisplay() error {
 
+	temp, ok := loadDisplaySettings()
+
+	if ok {
+		ds = temp
+	} else {
+		fmt.Println("Display initialization failed: could not load display settings")
+	}
+
 	sdl.Init(sdl.INIT_EVERYTHING)
 
 	//Demon magic that fixes unresponsive bug on OS X
@@ -61,7 +75,7 @@ func initDisplay() error {
 	}
 
 	window, err = sdl.CreateWindow("Go deeper", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
+		ds.screenWidth, ds.screenHeight, sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create window: %s\n", err)
 		return err
@@ -81,7 +95,7 @@ func initDisplay() error {
 	//}
 
 	gfx.InitFramerate(&fpsManager)
-	gfx.SetFramerate(&fpsManager, FPS)
+	gfx.SetFramerate(&fpsManager, ds.FPS)
 
 	renderer, err = sdl.CreateRenderer(window, -1, 0)
 	if err != nil {
@@ -108,34 +122,41 @@ func presentFrame() {
 
 func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 
-	SCREEN_WIDTH, SCREEN_HEIGHT = window.GetSize()
+	WINDOW_WIDTH, WINDOW_HEIGHT = window.GetSize()
+
+	//Dirty hotloading
+	temp, ok := loadDisplaySettings()
+	if ok {
+		ds = temp
+	}
 
 	px, py := parts((*hilbert).pos)
 
-	for i := int(py) - MAX_TILES/2; i <= int(py+MAX_TILES/2+0.5); i++ {
-		for j := int(px) - MAX_TILES/2; j <= int(px+MAX_TILES/2+0.5); j++ {
+	tile_radius := ds.maxTiles / 2
+
+	for i := int(py - tile_radius); i <= int(py+0.5+tile_radius); i++ {
+		for j := int(px - tile_radius); j <= int(px+0.5+tile_radius); j++ {
 
 			if i >= 0 && i < len(*theMap) && j >= 0 && j < len((*theMap)[0]) {
-				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px+MAX_TILES/2, float64(i)-py+MAX_TILES/2)
+				drawTile(textures[(*theMap)[i][j].tileID.number], float64(j)-px, float64(i)-py)
 			}
 		}
 	}
 	for _, npc := range *actors {
-		if real(npc.pos) <= px+MAX_TILES/2+0.5 && imag(npc.pos) <= py+MAX_TILES/2+0.5 {
-			drawTile(textures[npc.id.number+3], real(npc.pos)-px+(MAX_TILES/2), imag(npc.pos)-py+(MAX_TILES/2))
+		if real(npc.pos) <= px+tile_radius+0.5 && imag(npc.pos) <= py+tile_radius+0.5 {
+			drawTile(textures[npc.id.number+3], real(npc.pos)-px, imag(npc.pos)-py)
 		}
 	}
-	drawTile(textures[2], MAX_TILES/2, MAX_TILES/2)
-
+	drawTile(textures[2], 0, 0)
 }
 
 func drawTile(texture *sdl.Texture, x, y float64) {
-	scale := float64(SCREEN_HEIGHT / MAX_TILES)
+	scale := math.Floor(float64(WINDOW_HEIGHT) / ds.maxTiles)
 
 	//source rectangle of texture, should currently be the same size as the picture
-	src := sdl.Rect{W: int32(TILE_SIZE), H: int32(TILE_SIZE)}
+	src := sdl.Rect{W: int32(ds.tileSize), H: int32(ds.tileSize)}
 	//Destination rectangle, scaled so that x and y are integers from 0 - 16
-	dst := sdl.Rect{X: int32((x - 0.5) * scale), Y: int32((y - 0.5) * scale), W: int32(scale), H: int32(scale)}
+	dst := sdl.Rect{X: WINDOW_WIDTH/2 + int32((x-0.5)*scale), Y: WINDOW_HEIGHT/2 + int32((y-0.5)*scale), W: int32(scale), H: int32(scale)}
 	//Draw tile to the renderer
 	renderer.Copy(texture, &src, &dst)
 

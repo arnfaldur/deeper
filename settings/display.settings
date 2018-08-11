@@ -1,0 +1,11 @@
+#
+#   Display Settings (obviously)
+#
+
+screenwidth 800
+screenheight 600
+fps 60
+
+#hotloaded settings
+tilesize 64
+maxtiles 16

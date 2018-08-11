@@ -131,7 +131,7 @@ func (p *Player) update(theMap *Mapt, entities *[]NPC, moveDirection complex128)
 //					//p.vel = 0+0i
 //					//newPos = p.pos
 //				}
-//				//drawTile(textures[16], float64(x)-px+MAX_TILES/2, float64(y)-py+MAX_TILES/2)
+//				//drawTile(textures[16], float64(x)-px+maxTiles/2, float64(y)-py+maxTiles/2)
 //			}
 //		}
 //	}
