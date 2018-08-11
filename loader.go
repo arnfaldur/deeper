@@ -28,6 +28,7 @@ func check(e error) {
 func getUncommentedLines(file []byte) []string {
 	var lines []string
 
+	//TODO make this not windows-specific
 	for _, bs := range bytes.Split(file, []byte("\r\n")) {
 		if len(bs) < 1 {
 			continue

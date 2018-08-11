@@ -151,7 +151,7 @@ func renderMap(theMap *Mapt, actors *[]NPC, hilbert *Player) {
 }
 
 func drawTile(texture *sdl.Texture, x, y float64) {
-	scale := math.Floor(float64(WINDOW_HEIGHT) / ds.maxTiles)
+	scale := math.Floor(float64(WINDOW_WIDTH) / ds.maxTiles)
 
 	//source rectangle of texture, should currently be the same size as the picture
 	src := sdl.Rect{W: int32(ds.tileSize), H: int32(ds.tileSize)}
