@@ -1,11 +1,7 @@
-#
-#   Display Settings (obviously)
-#
-
-screenwidth 800
-screenheight 600
-fps 60
-tilesize 32
-
-#hotloaded settings
-maxtiles 16
+{
+    "fps": 60,
+    "screenWidth": 800,
+    "screenHeight": 600,
+    "tileSize": 32,
+    "maxTiles": 16.0
+}

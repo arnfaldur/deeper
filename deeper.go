@@ -34,13 +34,13 @@ func populateMap() {
 			//true at edges and random points, for flavour, RNG is deterministic unless seeded.
 			randomN := rand.Float64()
 			if y == 0 || x == 0 || y == MAPSIZE-1 || x == MAPSIZE-1 || randomN > 0.8 {
-				theMap[y][x] = NewTile(STONE_WALL, float64(x), float64(y))
+				theMap[y][x] = NewTile("STONE_WALL", float64(x), float64(y))
 				environment = append(environment, &theMap[y][x])
 			} else {
 				if randomN > 0.6 {
-					actors = append(actors, testEnemyNPC(complex(float64(x), float64(y)), rand.Intn(10)))
+					actors = append(actors, NewNPC("TestEnemy", float64(x), float64(y)))
 				}
-				theMap[y][x] = NewTile(STONE_FLOOR, float64(x), float64(y))
+				theMap[y][x] = NewTile("STONE_FLOOR", float64(x), float64(y))
 				environment = append(environment, &theMap[y][x])
 			}
 		}
@@ -48,15 +48,30 @@ func populateMap() {
 }
 
 func main() {
+
 	initDisplay()
 	defer destroyDisplay()
+
 	loadTextures()
+	//Textures must be loaded before loading entities for file associations
+	//TODO: Make this not a requirement?
+	loadTiles()
+	loadCharacters()
 
 	running := true
 	var event sdl.Event
 	var pressedKeys [512]bool
 
-	hilbert = Player{Character{Entity: Entity{id: PLAYER, pos: 3 + 3i, size: 0.8}, damage: 5}}
+	hilbert = Player{Character{Entity: Entity{id: ID{PLAYERID, 0, 0}, pos: 3 + 3i, Size: 0.8}, damage: 5}}
+
+	//fucking awful
+	//TODO: fix this garbage
+	for _, texture := range metaTextures {
+		if texture.name == "PLAYER" {
+			textureID[hilbert.id] = texture.textureIndex
+		}
+	}
+
 	populateMap()
 
 	//var stepDelay int = 0
@@ -97,7 +112,7 @@ func main() {
 		//TODO: clean this up, move it somewhere more sensible
 		var moveDirection complex128
 
-		inputArr := [5]int{sdl.SCANCODE_UP, sdl.SCANCODE_DOWN, sdl.SCANCODE_LEFT, sdl.SCANCODE_RIGHT, sdl.SCANCODE_Q}
+		inputArr := [...]int{sdl.SCANCODE_UP, sdl.SCANCODE_DOWN, sdl.SCANCODE_LEFT, sdl.SCANCODE_RIGHT, sdl.SCANCODE_Q}
 
 		keyPressed := false
 		for _, index := range inputArr {
@@ -133,7 +148,7 @@ func main() {
 		dealWithCollisions(&theMap, &hilbert, &actors, moveDirection)
 
 		for i := 0; i < len(actors); i++ {
-			if actors[i].currHealth <= 0 {
+			if actors[i].CurrHealth <= 0 {
 				actors = append(actors[:i], actors[i+1:]...)
 			}
 		}
@@ -144,7 +159,7 @@ func main() {
 		clearFrame()
 		renderMap()
 
-		for _, t := range vicinity(hilbert.pos, (hilbert.size+MAXCHARSIZE+sqrt2)/2) {
+		for _, t := range vicinity(hilbert.pos, (hilbert.Size+MAXCHARSIZE+sqrt2)/2) {
 			if t[0] >= 0 && t[0] < MAPSIZE && t[1] >= 0 && t[1] < MAPSIZE {
 				for i := range theMap[t[0]][t[1]].npcsOnTile {
 					drawTile(textures[16], theMap[t[0]][t[1]].npcsOnTile[i].pos)

@@ -1,23 +1,35 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/veandco/go-sdl2/img"
 	"io/ioutil"
 	"os"
-	"strconv"
-	"strings"
+	//"strconv"
+	//"strings"
+	"encoding/json"
+	"github.com/veandco/go-sdl2/img"
+	"path/filepath"
 	"time"
 )
 
+/*
+
+	Need to develop a monster/tile/asset cataloging system, use JSON?
+		-Need to be able to:
+			*add and keep track of the different kinds of monsters
+			*easily add new monsters and include new fields where needed
+			*
+
+
+*/
+
 type DisplaySettings struct {
-	screenWidth  int32
-	screenHeight int32
+	ScreenWidth  int32
+	ScreenHeight int32
 
 	FPS      uint32
-	tileSize int
-	maxTiles float64
+	TileSize int
+	MaxTiles float64
 }
 
 var loadedAtTime = make(map[string]time.Time)
@@ -26,6 +38,10 @@ func loadDisplaySettings() (DisplaySettings, bool) {
 	const filepath = "settings/display.settings"
 
 	timeLoaded, noChange := alreadyLoaded(filepath)
+
+	if DEBUGLOGGING {
+		fmt.Println("Loading display settings...")
+	}
 
 	if noChange {
 		return DisplaySettings{}, false
@@ -40,74 +56,132 @@ func loadDisplaySettings() (DisplaySettings, bool) {
 
 	var ds DisplaySettings
 
-	if DEBUGLOGGING {
-		fmt.Println("Loading display settings...")
-	}
-
-	lines := getUncommentedLines(file)
-
-	for _, l := range lines {
-
-		tokens := strings.Split(l, " ")
-
-		switch tokens[0] {
-		case "screenwidth":
-			temp, err := strconv.ParseInt(tokens[1], 10, 32)
-			check(err)
-			ds.screenWidth = int32(temp)
-			break
-		case "screenheight":
-			temp, err := strconv.ParseInt(tokens[1], 10, 32)
-			check(err)
-			ds.screenHeight = int32(temp)
-			break
-		case "fps":
-			temp, err := strconv.ParseInt(tokens[1], 10, 32)
-			check(err)
-			ds.FPS = uint32(temp)
-			break
-		case "tilesize":
-			temp, err := strconv.ParseInt(tokens[1], 10, 32)
-			check(err)
-			ds.tileSize = int(temp)
-			break
-		case "maxtiles":
-			temp, err := strconv.ParseFloat(tokens[1], 64)
-			check(err)
-			ds.maxTiles = temp
-			break
-		}
+	err = json.Unmarshal(file, &ds)
+	if err != nil {
+		return DisplaySettings{}, false
 	}
 
 	return ds, true
 }
 
-func loadTextures() {
-	assets := []string{
-		"assets/STONE_WALL.png",
-		"assets/STONE_FLOOR.png",
-		"assets/PLAYER.png",
-		"assets/enemies/TestEnemy0.png",
-		"assets/enemies/TestEnemy1.png",
-		"assets/enemies/TestEnemy2.png",
-		"assets/enemies/TestEnemy3.png",
-		"assets/enemies/TestEnemy4.png",
-		"assets/enemies/TestEnemy5.png",
-		"assets/enemies/TestEnemy6.png",
-		"assets/enemies/TestEnemy7.png",
-		"assets/enemies/TestEnemy8.png",
-		"assets/enemies/TestEnemy9.png",
-		"assets/ShittyTile.png",
-		"assets/ShittyGuy.png",
-		"assets/ShittyBeholder.png",
-		"assets/STONE_WALL_RED.png",
+type AbstractTile struct {
+	Tile
+	variations int
+}
+
+var metaTiles = make(map[string]AbstractTile)
+
+func loadTiles() {
+
+	if len(metaTextures) == 0 {
+		fmt.Fprintln(os.Stderr, "Textures must load before loading entities (Tiles)")
+		os.Exit(1)
 	}
-	for i, e := range assets {
-		image, err := img.Load(e)
+
+	const (
+		filepath = "entities/tiles.entities"
+	)
+
+	file, err := ioutil.ReadFile(filepath)
+	check(err)
+
+	var loadTiles []AbstractTile
+
+	json.Unmarshal(file, &loadTiles)
+
+	for i, tile := range loadTiles {
+		vars := 0
+		loadTiles[i].id = ID{class: TILEID, number: i}
+		for _, t := range metaTextures {
+			if len(t.name) >= len(tile.Name) && t.name[:len(tile.Name)] == tile.Name {
+				textureID[ID{class: TILEID, number: i, state: vars}] = t.textureIndex
+				vars++
+			}
+		}
+		loadTiles[i].variations = vars
+		metaTiles[tile.Name] = loadTiles[i]
+	}
+}
+
+type AbstractCharacter struct {
+	NPC
+	variations int
+}
+
+var metaCharacters = make(map[string]AbstractCharacter)
+
+func loadCharacters() {
+
+	if len(metaTextures) == 0 {
+		fmt.Fprintln(os.Stderr, "Textures must load before loading entities (Characters)")
+		os.Exit(1)
+	}
+
+	const (
+		filepath = "entities/characters.entities"
+	)
+
+	file, err := ioutil.ReadFile(filepath)
+	check(err)
+
+	var loadCharacters []AbstractCharacter
+
+	json.Unmarshal(file, &loadCharacters)
+
+	for i, char := range loadCharacters {
+		vars := 0
+		loadCharacters[i].id = ID{class: ACTORID, number: i}
+		for _, t := range metaTextures {
+			if len(t.name) >= len(char.Name) && t.name[:len(char.Name)] == char.Name {
+				textureID[ID{class: ACTORID, number: i, state: vars}] = t.textureIndex
+				vars++
+			}
+		}
+		loadCharacters[i].variations = vars
+		metaCharacters[char.Name] = loadCharacters[i]
+		fmt.Printf("%+v", loadCharacters[i])
+	}
+}
+
+type AbstractTexture struct {
+	name         string
+	path         string
+	textureIndex int
+}
+
+var metaTextures []AbstractTexture
+
+func loadTextures() {
+
+	const (
+		dir = "assets"
+	)
+
+	exts := [...]string{".png"}
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", dir, err)
+			return err
+		}
+		for _, ext := range exts {
+			if path[len(path)-len(ext):] == ext {
+				name := info.Name()[:len(info.Name())-len(ext)]
+				metaTextures = append(metaTextures, AbstractTexture{name: name, path: path})
+			}
+		}
+		return nil
+	})
+
+	check(err)
+
+	for i, e := range metaTextures {
+		image, err := img.Load(e.path)
 		if err != nil {
 			panic(err)
 		}
 		textures[i], err = renderer.CreateTextureFromSurface(image)
+		metaTextures[i].textureIndex = i
 		if err != nil {
 			panic(err)
 		}
@@ -125,23 +199,6 @@ func check(e error) {
 	if e != nil {
 		panic(e)
 	}
-}
-
-func getUncommentedLines(file []byte) []string {
-	var lines []string
-
-	//TODO make this not windows-specific
-	for _, bs := range bytes.Split(file, []byte("\r\n")) {
-		if len(bs) < 1 {
-			continue
-		}
-		if bs[0] == byte('#') {
-			continue
-		}
-		lines = append(lines, string(bs))
-	}
-
-	return lines
 }
 
 func alreadyLoaded(filepath string) (time.Time, bool) {

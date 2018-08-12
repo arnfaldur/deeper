@@ -1,13 +1,14 @@
 package main
 
 type ID struct {
-	class, textureID, state int
+	class, number, state int
 }
 
 //ID CLASSES
 const (
 	ITEMID = iota
 	ACTORID
+	PLAYERID
 	TILEID
 )
 

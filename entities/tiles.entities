@@ -1,0 +1,17 @@
+[
+    {
+        "name": "STONE_WALL",
+        "collision": true,
+        "solid": true
+    },
+    {
+        "name": "STONE_WALL_RED",
+        "collision": true,
+        "solid": true
+    },
+    {
+        "name": "STONE_FLOOR",
+        "collision": false,
+        "solid": false
+    }
+]

@@ -7,28 +7,21 @@ import (
 )
 
 type Entity struct {
-	id        ID
-	pos       complex128
-	name      string
-	collision bool
-	solid     bool
-	vel       complex128
-	size      float64
-	weight    float64
-}
-
-type Tile struct {
-	Entity
-	npcsOnTile []*NPC
-}
-
-func NewTile(id ID, x float64, y float64) Tile {
-	return Tile{Entity: Entity{id: id, pos: complex(x, y), collision: isSolid[id], solid: isSolid[id]}}
+	//Runtime computable members
+	id  ID
+	pos complex128
+	vel complex128
+	//Load-time members
+	Name      string
+	Collision bool
+	Solid     bool
+	Size      float64
+	Weight    float64
 }
 
 type Character struct {
 	Entity
-	maxHealth, currHealth int
+	MaxHealth, CurrHealth int
 	attributes            [7]int
 	damage                int
 }
@@ -39,11 +32,20 @@ type Player struct {
 
 type NPC struct {
 	Character
-	aggro bool
+	Aggro bool
+}
+
+func NewNPC(name string, x float64, y float64) NPC {
+	npc := metaCharacters[name]
+	if npc.variations > 1 {
+		npc.id.state = rand.Int() % npc.variations
+	}
+	npc.pos = complex(x, y)
+	return npc.NPC
 }
 
 func (v *Character) attackBy(a Character) {
-	v.currHealth -= a.damage
+	v.CurrHealth -= a.damage
 }
 
 func getNPCsNear(pos complex128, radius float64) []*NPC {
@@ -67,21 +69,21 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 
 	pxf, pxr, pxc, pyf, pyr, pyc := int(px), int(px+0.5), int(math.Nextafter(px+1, math.Inf(-1))), int(py), int(py+0.5), int(math.Nextafter(py+1, math.Inf(-1)))
 	any := false
-	toWall := e.size / 2
-	if isSolid[theMap[pyf][pxr].id] && toWall >= math.Abs(py-0.5-float64(pyf)) {
+	toWall := e.Size / 2
+	if theMap[pyf][pxr].Collision && toWall >= math.Abs(py-0.5-float64(pyf)) {
 		e.vel = complex(real(e.vel), math.Max(0, imag(e.vel)))
 		//e.pos = complex(real(e.pos), float64(pyf)+0.5+toWall)
 		any = true
-	} else if isSolid[theMap[pyc][pxr].id] && toWall >= math.Abs(py+0.5-float64(pyc)) {
+	} else if theMap[pyc][pxr].Collision && toWall >= math.Abs(py+0.5-float64(pyc)) {
 		e.vel = complex(real(e.vel), math.Min(0, imag(e.vel)))
 		//e.pos = complex(real(e.pos), float64(pyc)-0.5-toWall)
 		any = true
 	}
-	if isSolid[theMap[pyr][pxf].id] && toWall >= math.Abs(px-0.5-float64(pxf)) {
+	if theMap[pyr][pxf].Collision && toWall >= math.Abs(px-0.5-float64(pxf)) {
 		e.vel = complex(math.Max(0, real(e.vel)), imag(e.vel))
 		//e.pos = complex(float64(pxf)+0.5+toWall, imag(e.pos))
 		any = true
-	} else if isSolid[theMap[pyr][pxc].id] && toWall >= math.Abs(px+0.5-float64(pxc)) {
+	} else if theMap[pyr][pxc].Collision && toWall >= math.Abs(px+0.5-float64(pxc)) {
 		e.vel = complex(math.Min(0, real(e.vel)), imag(e.vel))
 		//e.pos = complex(float64(pxc)-0.5-toWall, imag(e.pos))
 		any = true
@@ -92,7 +94,7 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 		for y := 0; y < 2; y++ {
 			for x := 2; x < 4; x++ {
 				colDir := complex(fs[x]-float64(is[x]), fs[y]-float64(is[y]))
-				if isSolid[theMap[is[y]][is[x]].id] && toWall > cmplx.Abs(colDir) {
+				if theMap[is[y]][is[x]].Collision && toWall > cmplx.Abs(colDir) {
 					colDep := toWall - cmplx.Abs(colDir)
 					e.vel += cmplx.Rect(colDep/2, cmplx.Phase(colDir))
 					//e.pos += cmplx.Rect(colDep, cmplx.Phase(colDir))
@@ -105,18 +107,18 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 
 func (c *Character) npcCollide(npcs *[]NPC) {
 	netForce := 0 + 0i
-	neighbours := getNPCsNear(c.pos, (c.size+MAXCHARSIZE+sqrt2)/2)
+	neighbours := getNPCsNear(c.pos, (c.Size+MAXCHARSIZE+sqrt2)/2)
 	for i, n := range neighbours {
 		colDir := (c.pos + c.vel) - (n.pos)
-		colDep := (c.size+n.size)/2 - cmplx.Abs(colDir)
+		colDep := (c.Size+n.Size)/2 - cmplx.Abs(colDir)
 		if *c != n.Character && colDep > 0 {
 			//nudge := cmul(colDir, colDep)
 			nudge := cmplx.Rect(colDep/2, cmplx.Phase(colDir))
 			//println(colDep)
 			//c.pos += nudge
 			//(*npcs)[i].pos -= nudge
-			if c.id == PLAYER {
-				neighbours[i].currHealth -= c.damage
+			if c.id == hilbert.id {
+				neighbours[i].CurrHealth -= c.damage
 			} else {
 				netForce += nudge
 				//c.vel = c.vel + nudge
@@ -124,13 +126,12 @@ func (c *Character) npcCollide(npcs *[]NPC) {
 			}
 		}
 	}
-	c.vel += netForce
 }
 
 func (e *Entity) findCollisions(theMap Mapt) {
-	for _, t := range vicinity(e.pos, e.size+MAXCHARSIZE) {
+	for _, t := range vicinity(e.pos, e.Size+MAXCHARSIZE) {
 		for _, n := range theMap[t[0]][t[1]].npcsOnTile {
-			if cmplx.Abs(e.pos+e.vel-n.pos+n.vel) <= (e.size+n.size)/2 {
+			if cmplx.Abs(e.pos+e.vel-n.pos+n.vel) <= (e.Size+n.Size)/2 {
 
 			}
 		}
@@ -150,7 +151,7 @@ func dealWithCollisions(theMap *Mapt, p *Player, npcs *[]NPC, moveDirection comp
 	}
 	p.vel = approach(p.vel, moveDirection/5) * complex(timeDilation, 0)
 	for i, e := range *npcs {
-		if e.aggro {
+		if e.Aggro {
 			diff := p.pos - e.pos
 			(*npcs)[i].vel = cmul(approach(e.vel, cmplxNorm(diff)/10+cmplx.Rect(0.01, (rand.Float64()*math.Pi*2)-math.Pi)), timeDilation)
 		}
@@ -170,11 +171,11 @@ func dealWithCollisions(theMap *Mapt, p *Player, npcs *[]NPC, moveDirection comp
 }
 
 func testEnemyNPC(pos complex128, id int) NPC {
-	return NPC{Character{Entity: Entity{id: makeActorID(id), pos: pos, name: "TestEnemy", size: 0.8}, maxHealth: 10, currHealth: 10}, true}
+	return NPC{Character{Entity: Entity{id: makeActorID(id), pos: pos, Name: "TestEnemy", Size: 0.8}, MaxHealth: 10, CurrHealth: 10}, true}
 }
 
 func dummyNPC(x, y int) NPC {
-	return NPC{Character{Entity: Entity{id: DUMMY, pos: complex(float64(x), float64(y)), name: "dummy"}, maxHealth: 10, currHealth: 10}, true}
+	return NPC{Character{Entity: Entity{id: DUMMY, pos: complex(float64(x), float64(y)), Name: "dummy"}, MaxHealth: 10, CurrHealth: 10}, true}
 }
 
 func approach(vel, target complex128) complex128 {
