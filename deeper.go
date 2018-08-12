@@ -145,7 +145,7 @@ func main() {
 		theMap.locateNPCs(actors)
 
 		//findCollisions(theMap, hilbert, actors)
-		dealWithCollisions(&theMap, &hilbert, &actors, moveDirection)
+		dealWithCollisions(&theMap, &hilbert, actors, moveDirection)
 
 		for i := 0; i < len(actors); i++ {
 			if actors[i].CurrHealth <= 0 {

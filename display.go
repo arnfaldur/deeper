@@ -124,7 +124,7 @@ func drawTile(texture *sdl.Texture, pos complex128) {
 
 	//Center coordinate system on hilbert's center
 	pos -= hilbert.pos + 0.5 + 0.5i
-	pos = cmul(pos, scale)
+	pos = cMul(pos, scale)
 
 	x, y := parts(pos)
 

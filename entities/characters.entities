@@ -1,7 +1,7 @@
 [
     {
         "name":"TestEnemy",
-        "size": 0.8,
+        "size": 0.6,
         "maxhealth": 10,
         "currhealth": 10,
         "aggro": true

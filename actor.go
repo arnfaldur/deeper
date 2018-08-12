@@ -72,20 +72,20 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 	toWall := e.Size / 2
 	if theMap[pyf][pxr].Collision && toWall >= math.Abs(py-0.5-float64(pyf)) {
 		e.vel = complex(real(e.vel), math.Max(0, imag(e.vel)))
-		//e.pos = complex(real(e.pos), float64(pyf)+0.5+toWall)
+		e.pos = complex(real(e.pos), float64(pyf)+0.5+toWall)
 		any = true
 	} else if theMap[pyc][pxr].Collision && toWall >= math.Abs(py+0.5-float64(pyc)) {
 		e.vel = complex(real(e.vel), math.Min(0, imag(e.vel)))
-		//e.pos = complex(real(e.pos), float64(pyc)-0.5-toWall)
+		e.pos = complex(real(e.pos), float64(pyc)-0.5-toWall)
 		any = true
 	}
 	if theMap[pyr][pxf].Collision && toWall >= math.Abs(px-0.5-float64(pxf)) {
 		e.vel = complex(math.Max(0, real(e.vel)), imag(e.vel))
-		//e.pos = complex(float64(pxf)+0.5+toWall, imag(e.pos))
+		e.pos = complex(float64(pxf)+0.5+toWall, imag(e.pos))
 		any = true
 	} else if theMap[pyr][pxc].Collision && toWall >= math.Abs(px+0.5-float64(pxc)) {
 		e.vel = complex(math.Min(0, real(e.vel)), imag(e.vel))
-		//e.pos = complex(float64(pxc)-0.5-toWall, imag(e.pos))
+		e.pos = complex(float64(pxc)-0.5-toWall, imag(e.pos))
 		any = true
 	}
 	if !any {
@@ -96,8 +96,8 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 				colDir := complex(fs[x]-float64(is[x]), fs[y]-float64(is[y]))
 				if theMap[is[y]][is[x]].Collision && toWall > cmplx.Abs(colDir) {
 					colDep := toWall - cmplx.Abs(colDir)
-					e.vel += cmplx.Rect(colDep/2, cmplx.Phase(colDir))
-					//e.pos += cmplx.Rect(colDep, cmplx.Phase(colDir))
+					e.vel += cmplx.Rect(colDep, cmplx.Phase(colDir))
+					e.pos += cmplx.Rect(colDep, cmplx.Phase(colDir))
 					break
 				}
 			}
@@ -109,23 +109,19 @@ func (c *Character) npcCollide(npcs *[]NPC) {
 	netForce := 0 + 0i
 	neighbours := getNPCsNear(c.pos, (c.Size+MAXCHARSIZE+sqrt2)/2)
 	for i, n := range neighbours {
-		colDir := (c.pos + c.vel) - (n.pos)
+		colDir := (c.pos + c.vel) - (n.pos + n.vel)
 		colDep := (c.Size+n.Size)/2 - cmplx.Abs(colDir)
 		if *c != n.Character && colDep > 0 {
-			//nudge := cmul(colDir, colDep)
 			nudge := cmplx.Rect(colDep/2, cmplx.Phase(colDir))
-			//println(colDep)
-			//c.pos += nudge
-			//(*npcs)[i].pos -= nudge
-			if c.id == hilbert.id {
-				neighbours[i].CurrHealth -= c.damage
+			if *c == hilbert.Character {
+				//neighbours[i].CurrHealth -= c.damage
+				neighbours[i].vel -= cmplx.Rect(1, cmplx.Phase(colDir))
 			} else {
 				netForce += nudge
-				//c.vel = c.vel + nudge
-				//(*npcs)[i].vel = n.vel - nudge
 			}
 		}
 	}
+	c.vel += netForce
 }
 
 func (e *Entity) findCollisions(theMap Mapt) {
@@ -145,28 +141,28 @@ func findAllCollisions(theMap Mapt, p Player, npcs []NPC) {
 	}
 }
 
-func dealWithCollisions(theMap *Mapt, p *Player, npcs *[]NPC, moveDirection complex128) {
+func dealWithCollisions(theMap *Mapt, p *Player, npcs []NPC, moveDirection complex128) {
 	if cmplx.Abs(moveDirection) > 1 {
-		moveDirection = cmplxNorm(moveDirection)
+		moveDirection = cNorm(moveDirection)
 	}
-	p.vel = approach(p.vel, moveDirection/5) * complex(timeDilation, 0)
-	for i, e := range *npcs {
+	p.vel = approach(p.vel, moveDirection/5)
+	for i, e := range npcs {
 		if e.Aggro {
 			diff := p.pos - e.pos
-			(*npcs)[i].vel = cmul(approach(e.vel, cmplxNorm(diff)/10+cmplx.Rect(0.01, (rand.Float64()*math.Pi*2)-math.Pi)), timeDilation)
+			npcs[i].vel = approach(e.vel, cNorm(diff)/10)
 		}
 	}
-	p.npcCollide(npcs)
-	for i := range *npcs {
-		(*npcs)[i].npcCollide(npcs)
+	p.npcCollide(&npcs)
+	for i := range npcs {
+		npcs[i].npcCollide(&npcs)
 	}
 	p.tileCollide(theMap)
-	for i := range *npcs {
-		(*npcs)[i].tileCollide(theMap)
+	for i := range npcs {
+		npcs[i].tileCollide(theMap)
 	}
-	p.pos += p.vel
-	for i := range *npcs {
-		(*npcs)[i].pos += (*npcs)[i].vel
+	p.pos += cMul(p.vel, timeDilation)
+	for i := range npcs {
+		npcs[i].pos += cMul(npcs[i].vel, timeDilation)
 	}
 }
 
