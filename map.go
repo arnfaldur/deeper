@@ -11,7 +11,7 @@ func (m *Mapt) locateNPCs(npcs []NPC) {
 			m[i][j].npcsOnTile = nil
 		}
 	}
-	for _, n := range npcs {
-		m[int(imag(n.pos))][int(real(n.pos))].npcsOnTile = append(m[int(imag(n.pos))][int(real(n.pos))].npcsOnTile, &n)
+	for i, n := range npcs {
+		m[int(imag(n.pos)+0.5)][int(real(n.pos)+0.5)].npcsOnTile = append(m[int(imag(n.pos)+0.5)][int(real(n.pos)+0.5)].npcsOnTile, &npcs[i])
 	}
 }

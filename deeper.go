@@ -15,7 +15,7 @@ var (
 const (
 	MAPSIZE     int           = 64
 	DURPERFRAME time.Duration = 16666666 * 1
-	MAXCHARSIZE float64       = 1.6
+	MAXCHARSIZE float64       = 0.8
 )
 
 type Mapt [MAPSIZE][MAPSIZE]Tile
@@ -137,13 +137,24 @@ func main() {
 				actors = append(actors[:i], actors[i+1:]...)
 			}
 		}
+		theMap.locateNPCs(actors)
 
 		// Rendering
 
 		clearFrame()
 		renderMap()
-		//for _, e := range vicinity(hilbert.pos, hilbert.size) {
-		//	drawTile(textures[16],complex(float64(e[0]), float64(e[1])))
+
+		for _, t := range vicinity(hilbert.pos, (hilbert.size+MAXCHARSIZE+sqrt2)/2) {
+			if t[0] >= 0 && t[0] < MAPSIZE && t[1] >= 0 && t[1] < MAPSIZE {
+				for i := range theMap[t[0]][t[1]].npcsOnTile {
+					drawTile(textures[16], theMap[t[0]][t[1]].npcsOnTile[i].pos)
+				}
+			}
+		}
+		//for _, e := range vicinity(hilbert.pos, hilbert.size+MAXCHARSIZE+1.5) {
+		//	if e[0] >= 0 && e[0] < MAPSIZE && e[1] >= 0 && e[1] < MAPSIZE {
+		//		drawTile(textures[16], complex(float64(e[0]), float64(e[1])))
+		//	}
 		//}
 		presentFrame()
 
