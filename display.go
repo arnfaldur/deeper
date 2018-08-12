@@ -115,10 +115,10 @@ func renderMap() {
 }
 
 func drawTile(texture *sdl.Texture, pos complex128) {
-	scale := math.Floor(float64(windowWidth) / ds.maxTiles)
+	scale := math.Floor(float64(windowHeight) / ds.maxTiles)
 
 	//Center coordinate system on hilbert's center
-	pos -= hilbert.pos + complex(0.5, 0.5)
+	pos -= hilbert.pos + 0.5 + 0.5i
 	pos = cmul(pos, scale)
 
 	x, y := parts(pos)

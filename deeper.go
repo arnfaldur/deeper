@@ -15,14 +15,15 @@ var (
 const (
 	MAPSIZE     int           = 64
 	DURPERFRAME time.Duration = 16666666 * 1
+	MAXCHARSIZE float64       = 1.6
 )
 
-type Mapt [MAPSIZE][MAPSIZE]Entity
+type Mapt [MAPSIZE][MAPSIZE]Tile
 
 var theMap Mapt
 var hilbert Player
 var actors []NPC
-var environment []*Entity
+var environment []*Tile
 
 var timeDilation = 0.0
 
@@ -126,7 +127,10 @@ func main() {
 			moveDirection += 1 + 0i
 		}
 
-		hilbert.update(&theMap, &actors, moveDirection)
+		theMap.locateNPCs(actors)
+
+		//findCollisions(theMap, hilbert, actors)
+		dealWithCollisions(&theMap, &hilbert, &actors, moveDirection)
 
 		for i := 0; i < len(actors); i++ {
 			if actors[i].currHealth <= 0 {
@@ -138,10 +142,14 @@ func main() {
 
 		clearFrame()
 		renderMap()
+		//for _, e := range vicinity(hilbert.pos, hilbert.size) {
+		//	drawTile(textures[16],complex(float64(e[0]), float64(e[1])))
+		//}
 		presentFrame()
 
 		// FPS limiter
 
+		//gfx.FramerateDelay(&fpsManager)
 		time.Sleep(time.Until(startTime.Add(DURPERFRAME)))
 	}
 

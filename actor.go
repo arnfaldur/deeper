@@ -16,8 +16,13 @@ type Entity struct {
 	weight    float64
 }
 
-func NewTile(id ID, x float64, y float64) Entity {
-	return Entity{id: id, pos: complex(x, y), collision: isSolid[id], solid: isSolid[id]}
+type Tile struct {
+	Entity
+	npcsOnTile []*NPC
+}
+
+func NewTile(id ID, x float64, y float64) Tile {
+	return Tile{Entity: Entity{id: id, pos: complex(x, y), collision: isSolid[id], solid: isSolid[id]}}
 }
 
 type Character struct {
@@ -34,9 +39,6 @@ type Player struct {
 type NPC struct {
 	Character
 	aggro bool
-}
-
-func (n *NPC) update(p *Player) {
 }
 
 func (v *Character) attackBy(a Character) {
@@ -95,22 +97,39 @@ func (c *Character) npcCollide(npcs *[]NPC) {
 		colDir := c.pos - n.pos
 		colDep := (c.size+n.size)/2 - cmplx.Abs(colDir)
 		if c.pos != n.pos && colDep > 0 {
-			nudge := cmul(colDir, colDep)
-			//nudge := cmplx.Rect(colDep/6, cmplx.Phase(colDir))
+			//nudge := cmul(colDir, colDep)
+			nudge := cmplx.Rect(colDep, cmplx.Phase(colDir))
 			//println(colDep)
-			c.pos += nudge
-			(*npcs)[i].pos -= nudge
+			//c.pos += nudge
+			//(*npcs)[i].pos -= nudge
 			if c.id == PLAYER {
 				(*npcs)[i].currHealth -= c.damage
 			} else {
-				c.vel = (c.vel+n.vel)/2 + nudge
-				(*npcs)[i].vel = (c.vel+n.vel)/2 - nudge
+				c.vel = c.vel + nudge
+				(*npcs)[i].vel = n.vel - nudge
 			}
 		}
 	}
 }
 
-func (p *Player) update(theMap *Mapt, npcs *[]NPC, moveDirection complex128) {
+func (e *Entity) findCollisions(theMap Mapt) {
+	for _, t := range vicinity(e.pos, e.size+MAXCHARSIZE) {
+		for _, n := range theMap[t[0]][t[1]].npcsOnTile {
+			if cmplx.Abs(e.pos+e.vel-n.pos+n.vel) <= (e.size+n.size)/2 {
+
+			}
+		}
+	}
+}
+
+func findAllCollisions(theMap Mapt, p Player, npcs []NPC) {
+	p.findCollisions(theMap)
+	for _, n := range npcs {
+		n.findCollisions(theMap)
+	}
+}
+
+func dealWithCollisions(theMap *Mapt, p *Player, npcs *[]NPC, moveDirection complex128) {
 	if cmplx.Abs(moveDirection) > 1 {
 		moveDirection = cmplxNorm(moveDirection)
 	}
@@ -123,7 +142,7 @@ func (p *Player) update(theMap *Mapt, npcs *[]NPC, moveDirection complex128) {
 	for i, e := range *npcs {
 		if e.aggro {
 			diff := p.pos - e.pos
-			(*npcs)[i].vel = approach(e.vel, diff/complex(cmplx.Abs(diff), 0)/10) * complex(timeDilation, 0)
+			(*npcs)[i].vel = cmul(approach(e.vel, diff/complex(cmplx.Abs(diff), 0)/10), timeDilation)
 		}
 		e.npcCollide(npcs)
 	}
