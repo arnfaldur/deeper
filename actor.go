@@ -36,7 +36,7 @@ type NPC struct {
 }
 
 func NewNPC(name string, x float64, y float64) NPC {
-	npc := metaCharacters[name]
+	npc := AssMan.metaCharacters[name]
 	if npc.variations > 1 {
 		npc.id.state = rand.Int() % npc.variations
 	}

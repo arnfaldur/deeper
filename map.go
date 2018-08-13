@@ -26,7 +26,7 @@ type Tile struct {
 }
 
 func NewTile(name string, x float64, y float64) Tile {
-	tile := metaTiles[name]
+	tile := AssMan.metaTiles[name]
 	if tile.variations > 1 {
 		tile.id.state = rand.Int() % tile.variations
 	}

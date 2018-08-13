@@ -3,5 +3,5 @@
     "screenWidth": 800,
     "screenHeight": 600,
     "tileSize": 32,
-    "maxTiles": 16.0
+    "maxTiles": 10.0
 }
