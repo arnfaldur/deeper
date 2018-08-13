@@ -70,6 +70,18 @@ func (e *Entity) tileCollide(theMap *Mapt) {
 	pxf, pxr, pxc, pyf, pyr, pyc := int(px), int(px+0.5), int(math.Nextafter(px+1, math.Inf(-1))), int(py), int(py+0.5), int(math.Nextafter(py+1, math.Inf(-1)))
 	any := false
 	toWall := e.Size / 2
+
+	//fs := [6]float64{py - 0.5, py, py + 0.5, px - 0.5, px, px + 0.5}
+	//is := [6]int{pyf, pyr, pyc, pxf, pxr, pxc}
+	//for _, i := range [4][2]int{{0,4},{2,4},{1,3},{1,5}} {
+	//	colDir := complex(fs[i[1]]-float64(is[i[1]]), fs[i[0]]-float64(is[i[0]]))
+	//	if theMap[is[i[0]]][is[i[1]]].Collision && toWall > cmplx.Abs(colDir) {
+	//		colDep := toWall - cmplx.Abs(colDir)
+	//		e.vel += cmplx.Rect(colDep, cmplx.Phase(colDir))
+	//		e.pos += cmplx.Rect(colDep, cmplx.Phase(colDir))
+	//	}
+	//}
+
 	if theMap[pyf][pxr].Collision && toWall >= math.Abs(py-0.5-float64(pyf)) {
 		e.vel = complex(real(e.vel), math.Max(0, imag(e.vel)))
 		e.pos = complex(real(e.pos), float64(pyf)+0.5+toWall)
@@ -116,9 +128,9 @@ func (c *Character) npcCollide(npcs *[]NPC) {
 			if *c == hilbert.Character {
 				//neighbours[i].CurrHealth -= c.damage
 				neighbours[i].vel -= cmplx.Rect(1, cmplx.Phase(colDir))
-			} else {
-				netForce += nudge
 			}
+			netForce += nudge
+
 		}
 	}
 	c.vel += netForce
