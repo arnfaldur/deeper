@@ -73,6 +73,7 @@ func main() {
 	}
 
 	populateMap()
+	var interactions []Interaction
 
 	//var stepDelay int = 0
 
@@ -144,7 +145,7 @@ func main() {
 
 		theMap.locateNPCs(actors)
 
-		//findCollisions(theMap, hilbert, actors)
+		findAllCollisions(theMap, hilbert, actors, interactions)
 		dealWithCollisions(&theMap, &hilbert, actors, moveDirection)
 
 		for i := 0; i < len(actors); i++ {
