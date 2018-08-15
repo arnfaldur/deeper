@@ -8,20 +8,10 @@ import (
 	//"strings"
 	"encoding/json"
 	"github.com/veandco/go-sdl2/img"
+	"github.com/veandco/go-sdl2/sdl"
 	"path/filepath"
 	"time"
 )
-
-/*
-
-	Need to develop a monster/tile/asset cataloging system, use JSON?
-		-Need to be able to:
-			*add and keep track of the different kinds of monsters
-			*easily add new monsters and include new fields where needed
-			*
-
-
-*/
 
 type DisplaySettings struct {
 	ScreenWidth  int32
@@ -32,12 +22,57 @@ type DisplaySettings struct {
 	MaxTiles float64
 }
 
-var loadedAtTime = make(map[string]time.Time)
+type AbstractTexture struct {
+	name         string
+	path         string
+	textureIndex int
+}
 
-func loadDisplaySettings() (DisplaySettings, bool) {
+type AbstractTile struct {
+	Tile
+	variations int
+}
+
+type AbstractCharacter struct {
+	NPC
+	variations int
+}
+
+type AssetManager struct {
+	textures  Textures
+	textureID TextureAssociation
+
+	loadedAtTime map[string]time.Time
+
+	metaTiles      map[string]AbstractTile
+	metaCharacters map[string]AbstractCharacter
+	metaTextures   []AbstractTexture
+}
+
+func NewAssetManager() AssetManager {
+	temp := AssetManager{}
+
+	temp.metaTiles = make(map[string]AbstractTile)
+	temp.metaCharacters = make(map[string]AbstractCharacter)
+	temp.loadedAtTime = make(map[string]time.Time)
+	temp.textures = make(Textures)
+	temp.textureID = make(TextureAssociation)
+
+	return temp
+}
+
+func (man *AssetManager) loadResources() {
+	man.loadTextures()
+	//Textures must be loaded before loading entities for file associations
+	//TODO: Make this not a requirement?
+	man.loadTiles()
+	man.loadCharacters()
+}
+
+func (man *AssetManager) loadDisplaySettings() (DisplaySettings, bool) {
 	const filepath = "settings/display.settings"
 
-	timeLoaded, noChange := alreadyLoaded(filepath)
+	timeLoaded, noChange := man.alreadyLoaded(filepath)
 
 	if DEBUGLOGGING {
 		fmt.Println("Loading display settings...")
@@ -52,7 +87,7 @@ func loadDisplaySettings() (DisplaySettings, bool) {
 		return DisplaySettings{}, false
 	}
 
-	loadedAtTime[filepath] = timeLoaded
+	man.loadedAtTime[filepath] = timeLoaded
 
 	var ds DisplaySettings
 
@@ -64,16 +99,9 @@ func loadDisplaySettings() (DisplaySettings, bool) {
 	return ds, true
 }
 
-type AbstractTile struct {
-	Tile
-	variations int
-}
+func (man *AssetManager) loadTiles() {
 
-var metaTiles = make(map[string]AbstractTile)
-
-func loadTiles() {
-
-	if len(metaTextures) == 0 {
+	if len(man.metaTextures) == 0 {
 		fmt.Fprintln(os.Stderr, "Textures must load before loading entities (Tiles)")
 		os.Exit(1)
 	}
@@ -92,27 +120,20 @@ func loadTiles() {
 	for i, tile := range loadTiles {
 		vars := 0
 		loadTiles[i].id = ID{class: TILEID, number: i}
-		for _, t := range metaTextures {
+		for _, t := range man.metaTextures {
 			if len(t.name) >= len(tile.Name) && t.name[:len(tile.Name)] == tile.Name {
-				textureID[ID{class: TILEID, number: i, state: vars}] = t.textureIndex
+				man.textureID[ID{class: TILEID, number: i, state: vars}] = t.textureIndex
 				vars++
 			}
 		}
 		loadTiles[i].variations = vars
-		metaTiles[tile.Name] = loadTiles[i]
+		man.metaTiles[tile.Name] = loadTiles[i]
 	}
 }
 
-type AbstractCharacter struct {
-	NPC
-	variations int
-}
+func (man *AssetManager) loadCharacters() {
 
-var metaCharacters = make(map[string]AbstractCharacter)
-
-func loadCharacters() {
-
-	if len(metaTextures) == 0 {
+	if len(man.metaTextures) == 0 {
 		fmt.Fprintln(os.Stderr, "Textures must load before loading entities (Characters)")
 		os.Exit(1)
 	}
@@ -131,27 +152,19 @@ func loadCharacters() {
 	for i, char := range loadCharacters {
 		vars := 0
 		loadCharacters[i].id = ID{class: ACTORID, number: i}
-		for _, t := range metaTextures {
+		for _, t := range man.metaTextures {
 			if len(t.name) >= len(char.Name) && t.name[:len(char.Name)] == char.Name {
-				textureID[ID{class: ACTORID, number: i, state: vars}] = t.textureIndex
+				man.textureID[ID{class: ACTORID, number: i, state: vars}] = t.textureIndex
 				vars++
 			}
 		}
 		loadCharacters[i].variations = vars
-		metaCharacters[char.Name] = loadCharacters[i]
+		man.metaCharacters[char.Name] = loadCharacters[i]
 		fmt.Printf("%+v", loadCharacters[i])
 	}
 }
 
-type AbstractTexture struct {
-	name         string
-	path         string
-	textureIndex int
-}
-
-var metaTextures []AbstractTexture
-
-func loadTextures() {
+func (man *AssetManager) loadTextures() {
 
 	const (
 		dir = "assets"
@@ -167,7 +180,7 @@ func loadTextures() {
 		for _, ext := range exts {
 			if path[len(path)-len(ext):] == ext {
 				name := info.Name()[:len(info.Name())-len(ext)]
-				metaTextures = append(metaTextures, AbstractTexture{name: name, path: path})
+				man.metaTextures = append(man.metaTextures, AbstractTexture{name: name, path: path})
 			}
 		}
 		return nil
@@ -175,13 +188,13 @@ func loadTextures() {
 
 	check(err)
 
-	for i, e := range metaTextures {
+	for i, e := range man.metaTextures {
 		image, err := img.Load(e.path)
 		if err != nil {
 			panic(err)
 		}
-		textures[i], err = renderer.CreateTextureFromSurface(image)
-		metaTextures[i].textureIndex = i
+		man.textures[i], err = renderer.CreateTextureFromSurface(image)
+		man.metaTextures[i].textureIndex = i
 		if err != nil {
 			panic(err)
 		}
@@ -189,25 +202,23 @@ func loadTextures() {
 	}
 }
 
-func unloadTextures() {
-	for _, v := range textures {
+func (man *AssetManager) unloadTextures() {
+	for _, v := range man.textures {
 		v.Destroy()
 	}
 }
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
+func (man *AssetManager) getTexture(id ID) *sdl.Texture {
+	return man.textures[man.textureID[id]]
 }
 
-func alreadyLoaded(filepath string) (time.Time, bool) {
+func (man *AssetManager) alreadyLoaded(filepath string) (time.Time, bool) {
 	info, err := os.Stat(filepath)
 	if err != nil {
 		return info.ModTime(), false
 	}
 
-	if val, ok := loadedAtTime[filepath]; ok {
+	if val, ok := man.loadedAtTime[filepath]; ok {
 		if val.Equal(info.ModTime()) {
 			return val, true
 		}

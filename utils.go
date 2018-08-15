@@ -6,6 +6,13 @@ import (
 	"math/rand"
 )
 
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
+//Math
 const sqrt2 float64 = 1.41421356237309504880168872420969807
 
 func parts(c complex128) (float64, float64) {

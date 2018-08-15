@@ -26,16 +26,10 @@ var renderer *sdl.Renderer
 var texture *sdl.Texture
 
 var err error
-var textures = make(Textures)
-var textureID = make(TextureAssociation)
-
-func getTexture(id ID) *sdl.Texture {
-	return textures[textureID[id]]
-}
 
 func initDisplay() error {
 
-	temp, ok := loadDisplaySettings()
+	temp, ok := AssMan.loadDisplaySettings()
 
 	if ok {
 		ds = temp
@@ -89,7 +83,7 @@ func renderMap() {
 	windowWidth, windowHeight = window.GetSize()
 
 	//Dirty hot-loading
-	temp, ok := loadDisplaySettings()
+	temp, ok := AssMan.loadDisplaySettings()
 	if ok {
 		ds = temp
 	}
@@ -104,19 +98,19 @@ func renderMap() {
 
 			if i >= 0 && i < len(theMap) && j >= 0 && j < len((theMap)[0]) {
 				tile := theMap[i][j]
-				drawTile(getTexture(tile.id), tile.pos)
+				drawTile(AssMan.getTexture(tile.id), tile.pos)
 			}
 		}
 	}
 
 	for _, npc := range actors {
 		if real(npc.pos) <= px+tilesToSide+1 && imag(npc.pos) <= py+tilesToTop+1 {
-			drawTile(getTexture(npc.id), npc.pos)
+			drawTile(AssMan.getTexture(npc.id), npc.pos)
 		}
 	}
 
 	//draws hilbert
-	drawTile(getTexture(hilbert.id), hilbert.pos)
+	drawTile(AssMan.getTexture(hilbert.id), hilbert.pos)
 }
 
 func drawTile(texture *sdl.Texture, pos complex128) {

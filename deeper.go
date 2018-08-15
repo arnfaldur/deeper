@@ -24,6 +24,7 @@ var theMap Mapt
 var hilbert Player
 var actors []NPC
 var environment []*Tile
+var AssMan AssetManager
 
 var timeDilation = 0.0
 
@@ -49,14 +50,13 @@ func populateMap() {
 
 func main() {
 
+	AssMan = NewAssetManager()
+
+	//Requires AssMan
 	initDisplay()
 	defer destroyDisplay()
 
-	loadTextures()
-	//Textures must be loaded before loading entities for file associations
-	//TODO: Make this not a requirement?
-	loadTiles()
-	loadCharacters()
+	AssMan.loadResources()
 
 	running := true
 	var event sdl.Event
@@ -66,9 +66,9 @@ func main() {
 
 	//fucking awful
 	//TODO: fix this garbage
-	for _, texture := range metaTextures {
+	for _, texture := range AssMan.metaTextures {
 		if texture.name == "PLAYER" {
-			textureID[hilbert.id] = texture.textureIndex
+			AssMan.textureID[hilbert.id] = texture.textureIndex
 		}
 	}
 
@@ -163,7 +163,7 @@ func main() {
 		for _, t := range vicinity(hilbert.pos, (hilbert.Size+MAXCHARSIZE+sqrt2)/2) {
 			if t[0] >= 0 && t[0] < MAPSIZE && t[1] >= 0 && t[1] < MAPSIZE {
 				for i := range theMap[t[0]][t[1]].npcsOnTile {
-					drawTile(textures[16], theMap[t[0]][t[1]].npcsOnTile[i].pos)
+					drawTile(AssMan.textures[16], theMap[t[0]][t[1]].npcsOnTile[i].pos)
 				}
 			}
 		}
@@ -180,6 +180,6 @@ func main() {
 		time.Sleep(time.Until(startTime.Add(DURPERFRAME)))
 	}
 
-	unloadTextures()
+	AssMan.unloadTextures()
 	sdl.Quit()
 }
