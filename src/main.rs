@@ -11,12 +11,11 @@ fn main() {
     let dungeon = DungGen::new()
         .width(150)
         .height(150)
-        .n_rooms(120)
+        .n_rooms(20)
         .room_min(10)
         .room_range(15)
-        .generate();
-
-    // dungeon.print();
+        .generate()
+        .print();
 
     let (mut rl, thread) = raylib::init()
         .size(1024, 768)

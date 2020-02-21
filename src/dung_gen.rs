@@ -22,7 +22,7 @@ pub struct DungGen {
     pub room_min   : i32,
     pub room_range : i32,
 
-    pub n_rooms : i32,
+    pub n_rooms : usize,
 
     pub world : HashMap::<(i32, i32), i32>,
 }
@@ -39,7 +39,7 @@ impl DungGen {
     pub fn room_min(mut self, room_min: i32) -> DungGen { self.room_min = room_min; return self; }
     pub fn room_range(mut self, room_range: i32) -> DungGen { self.room_range = room_range; return self; }
 
-    pub fn n_rooms(mut self, n_rooms: i32) -> DungGen { self.n_rooms = n_rooms; return self; }
+    pub fn n_rooms(mut self, n_rooms: usize) -> DungGen { self.n_rooms = n_rooms; return self; }
 
     pub fn world(mut self, world : HashMap::<(i32, i32), i32>) -> DungGen { self.world = world; return self; }
 
@@ -48,7 +48,7 @@ impl DungGen {
 
         let mut rooms = Vec::<((i32,i32),(i32,i32))>::new();
 
-        while rooms.len() < 10 {
+        while rooms.len() < self.n_rooms {
             let lu : (i32, i32) = (rng.gen_range(0, self.width - (self.room_min + self.room_range)), rng.gen_range(0, self.height - (self.room_min + self.room_range)));
             let rd : (i32, i32) = (lu.0 + self.room_min + rng.gen_range(0, self.room_range), lu.1 + self.room_min + rng.gen_range(0, self.room_range));
 
@@ -158,7 +158,7 @@ impl DungGen {
         return self;
     }
 
-    pub fn print(self) {
+    pub fn print(self) -> DungGen {
         for y in 0..self.height {
             for x in 0..self.width {
                 match self.world.get(&(x,y)) {
@@ -173,5 +173,6 @@ impl DungGen {
             }
             println!();
         }
+        return self;
     }
 }
