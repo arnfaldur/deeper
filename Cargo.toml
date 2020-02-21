@@ -1,0 +1,11 @@
+[package]
+name = "deeper"
+version = "0.0.1"
+authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com", "Jökull Reynisson <jokullmani12@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.7"
+raylib = { git = "https://github.com/deltaphc/raylib-rs", branch = "master" }
