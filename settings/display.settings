@@ -1,7 +1,7 @@
 {
     "fps": 60,
-    "screenWidth": 800,
-    "screenHeight": 600,
-    "tileSize": 32,
-    "maxTiles": 10.0
+    "screen_width": 1024,
+    "screen_height": 768,
+    "tile_size": 32,
+    "max_tiles": 10.0
 }
