@@ -1,7 +1,10 @@
 extern crate rand;
+extern crate ena;
+
+use rand::{Rng};
 
 use std::collections::{HashMap, HashSet};
-use rand::{Rng};
+use self::ena::unify::{UnifyKey, UnificationTable, UnificationStore, InPlace};
 
 pub enum TileKind {
     NOTHING,
@@ -25,6 +28,23 @@ pub struct DungGen {
     pub n_rooms : usize,
 
     pub world : HashMap::<(i32, i32), i32>,
+}
+
+// (Internal screaming)
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct UnitKey(u32);
+
+impl UnifyKey for UnitKey {
+    type Value = ();
+    fn index(&self) -> u32 {
+        self.0
+    }
+    fn from_index(u: u32) -> UnitKey {
+        UnitKey(u)
+    }
+    fn tag() -> &'static str {
+        "UnitKey"
+    }
 }
 
 // note(Jökull): There are better builder patterns
@@ -82,19 +102,25 @@ impl DungGen {
             room_centers.push((xmin + (xmax - xmin) / 2, ymin + (ymax - ymin) / 2));
         }
 
+        let mut keys = HashMap::<(i32, i32), UnitKey>::new();
+        let mut comps: UnificationTable<InPlace<UnitKey>> = UnificationTable::new();
         let mut paths = HashSet::<((i32,i32), (i32,i32))>::new();
 
-        for r in &room_centers {
-            paths.insert((*r,*r));
+        for i in 0..room_centers.len() {
+            keys.insert(room_centers[i], comps.new_key(()));
+            paths.insert((room_centers[i], room_centers[i]));
         }
 
         loop {
             let mut remaining = Vec::<((i32, i32), (i32, i32))>::new();
             for r1 in &room_centers {
                 for r2 in &room_centers {
-                    if !paths.contains(&(*r1,*r2)) {
+                    if !comps.unioned(*keys.get(r1).unwrap(), *keys.get(r2).unwrap()) {
                         remaining.push((*r1, *r2));
                     }
+                    //if !paths.contains(&(*r1,*r2)) {
+                    //    remaining.push((*r1, *r2));
+                    //}
                 }
             }
             if remaining.len() == 0 { break; }
@@ -105,6 +131,9 @@ impl DungGen {
             for ((a,b),(c,d)) in remaining {
                 let dist = (a-c).abs() + (b-d).abs();
                 if dist < least_dist {
+                    least_dist = dist;
+                    to_connect = ((a,b),(c,d));
+                } else if dist == least_dist && rand::random::<bool>() {
                     least_dist = dist;
                     to_connect = ((a,b),(c,d));
                 }
@@ -143,16 +172,18 @@ impl DungGen {
 
             let (r1, r2) = to_connect;
 
-            for r in &room_centers {
-                if paths.contains(&(*r,r1)) {
-                    paths.insert((*r,r2));
-                    paths.insert((r2,*r));
-                }
-                if paths.contains(&(*r,r2)) {
-                    paths.insert((*r,r1));
-                    paths.insert((r1,*r));
-                }
-            }
+            comps.union(*keys.get(&r1).unwrap(), *keys.get(&r2).unwrap());
+
+            //for r in &room_centers {
+            //    if paths.contains(&(*r,r1)) {
+            //        paths.insert((*r,r2));
+            //        paths.insert((r2,*r));
+            //    }
+            //    if paths.contains(&(*r,r2)) {
+            //        paths.insert((*r,r1));
+            //        paths.insert((r1,*r));
+            //    }
+            //}
         }
 
         return self;

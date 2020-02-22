@@ -21,10 +21,10 @@ fn main() {
     let ds = ass_man.load_display_settings();
 
     let dungeon = DungGen::new()
-        .width(150)
-        .height(150)
-        .n_rooms(20)
-        .room_min(10)
+        .width(100)
+        .height(100)
+        .n_rooms(40)
+        .room_min(5)
         .room_range(15)
         .generate();
 
@@ -79,10 +79,6 @@ fn main() {
 
         d.clear_background(Color::BLACK);
         d.draw_text("deeper", 12, 12, 30, Color::WHITE);
-
-
-        if offset.x >= (sq_width * dungeon.width) as f32 { offset.x = -0.75 * (sq_width * dungeon.width) as f32 }
-        if offset.y >= (sq_width * dungeon.height) as f32 { offset.y = -0.75 * (sq_width * dungeon.height) as f32 }
 
         for x in 0..=dungeon.height {
             for y in 0..=dungeon.width {
