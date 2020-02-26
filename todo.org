@@ -1,0 +1,29 @@
+
+* Current Priorities
+
+** DONE Get 3D rendering working
+   CLOSED: [2020-02-26 Wed 05:33]
+** TODO Get orthogonal camera working
+
+* Master todo list
+
+* Uncategorized items (from taiga)
+
+** Get player moving on screen
+** Figure out a way to get sound working
+** Get some background music in there
+** Menu / UI systems
+** Make it possible to pick up items off ground
+** Make it possible to get items from containers
+** Inventory system in general
+** Make an NPC
+** Create a centralized system for handling and dispatching user input
+** Fill rooms with stuff and make them more interesting (internal walls, fixtures)
+** Implement doors
+** Make player animated
+** Get some lighting up in dis bitch
+** implement dialog system
+** Physics / Collisions
+** Make it possible to load specific levels from disk (for debugging and tutorial)
+** Add in-game debug console
+
