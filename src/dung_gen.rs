@@ -4,7 +4,7 @@ extern crate ena;
 use rand::{Rng};
 
 use std::collections::{HashMap, HashSet};
-use self::ena::unify::{UnifyKey, UnificationTable, UnificationStore, InPlace};
+use self::ena::unify::{UnifyKey, UnificationTable, InPlace};
 
 pub enum TileKind {
     NOTHING,
@@ -104,11 +104,9 @@ impl DungGen {
 
         let mut keys = HashMap::<(i32, i32), UnitKey>::new();
         let mut comps: UnificationTable<InPlace<UnitKey>> = UnificationTable::new();
-        let mut paths = HashSet::<((i32,i32), (i32,i32))>::new();
 
         for i in 0..room_centers.len() {
             keys.insert(room_centers[i], comps.new_key(()));
-            paths.insert((room_centers[i], room_centers[i]));
         }
 
         loop {
@@ -118,7 +116,8 @@ impl DungGen {
                     if !comps.unioned(*keys.get(r1).unwrap(), *keys.get(r2).unwrap()) {
                         remaining.push((*r1, *r2));
                     }
-                    //if !paths.contains(&(*r1,*r2)) {
+                    // Possible intra-connectivity paramater?
+                    //else if rng.gen::<f32>() < 0.001 {
                     //    remaining.push((*r1, *r2));
                     //}
                 }
@@ -133,9 +132,6 @@ impl DungGen {
                 if dist < least_dist {
                     least_dist = dist;
                     to_connect = ((a,b),(c,d));
-                } else if dist == least_dist && rand::random::<bool>() {
-                    least_dist = dist;
-                    to_connect = ((a,b),(c,d));
                 }
             }
 
@@ -144,7 +140,6 @@ impl DungGen {
             let (mut x_start, mut y_start, mut x_end, mut y_end) = (x0, y0, x1, y1);
 
             if x0 > x1 {
-                // Not possible :( ... (x_start, y_start, x_end, y_end) = (x1,y1,x0,y0);
                 x_start = x1;
                 y_start = y1;
                 x_end = x0;
