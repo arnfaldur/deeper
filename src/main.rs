@@ -26,8 +26,10 @@ fn main() {
 
     let sq_width = 10;
 
+    let scroll_rate = 0.03;
     let mut offset = vec2(0.25 * -sq_width as f32 * dungeon.width as f32,
                           0.25 * -sq_width as f32 * dungeon.height as f32);
+    let mut scale = 1.0;
 
     let mut last_mouse_pos = vec2(0.0, 0.0);
 
@@ -46,6 +48,13 @@ fn main() {
         }
         if rl.is_key_down(KEY_F) {
             offset.x -= 1.2;
+        }
+        let delta_zoom = rl.get_mouse_wheel_move() as f32 * scroll_rate;
+        offset += (offset - rl.get_mouse_position()) * delta_zoom;
+        scale *= 1.0 + delta_zoom;
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_RIGHT_BUTTON) {
+            offset = vec2(0.0, 0.0);
+            scale = 1.0;
         }
         let mouse_pos = rl.get_mouse_position();
         if rl.is_mouse_button_down(MouseButton::MOUSE_LEFT_BUTTON) {
