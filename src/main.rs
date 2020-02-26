@@ -52,7 +52,7 @@ fn main() {
 
     let mut zoom = 10.0;
 
-    let mut camera = Camera3D::perspective(
+    let mut camera = Camera3D::orthographic(
         vec3(-5.0, zoom, -5.0),
         vec3(12.0, 0.0, 12.0),
         vec3(0.0, 1.0, 0.0),
@@ -61,18 +61,39 @@ fn main() {
 
     rl.set_camera_mode(camera, raylib::consts::CameraMode::CAMERA_THIRD_PERSON);
 
+    // ??????????????
+    let cam_x = vec3(0.0, 1.0, 0.0).normalized();
+    let cam_y = vec3(1.0, 0.0, 0.0).normalized();
+    let cam_speed = 0.1;
+
     // Main game loop
     while !rl.window_should_close() {
         // Input handling
         let mouse_pos = rl.get_mouse_position();
 
-        zoom += rl.get_mouse_wheel_move() as f32;
+        use raylib::consts::KeyboardKey::*;
+        if rl.is_key_down(KEY_E) {
+            camera.position += cam_y.scale_by(cam_speed);
+            camera.target   += cam_y.scale_by(cam_speed);
+        }
+        if rl.is_key_down(KEY_S) {
+            camera.position -= cam_x.scale_by(cam_speed);
+            camera.target   -= cam_x.scale_by(cam_speed);
+        }
+        if rl.is_key_down(KEY_D) {
+            camera.position -= cam_y.scale_by(cam_speed);
+            camera.target   -= cam_y.scale_by(cam_speed);
+        }
+        if rl.is_key_down(KEY_F) {
+            camera.position += cam_x.scale_by(cam_speed);
+            camera.target   += cam_x.scale_by(cam_speed);
+        }
+
+        sq_width += rl.get_mouse_wheel_move() as f32;
 
         last_mouse_pos = mouse_pos;
 
-        rl.update_camera(&mut camera);
-
-        let fill = rl.get_time().sin() as f32;
+        let fill = 1.0;
 
         // Graphics
         let mut d = rl.begin_drawing(&thread);
