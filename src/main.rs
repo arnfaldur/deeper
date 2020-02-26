@@ -87,15 +87,15 @@ fn main() {
         pos_x = vec2(sq_width as f32, 0.0) + vec2(0.0, sq_width as f32 * height_ratio);
         pos_y = vec2(sq_width as f32, 0.0) + vec2(0.0, -sq_width as f32 * height_ratio);
 
+        // What percentage of the space do the tiles fill
+        // Has to get time before d borrows rl
+        let fill : f32 = rl.get_time().sin() as f32;
+
         // Graphics
         let mut d = rl.begin_drawing(&thread);
 
         d.clear_background(Color::BLACK);
         d.draw_text("deeper", 12, 12, 30, Color::WHITE);
-
-
-        let fill : f32 = 1.0;
-
 
         for x in 0..=dungeon.width {
             for y in 0..=dungeon.height {
