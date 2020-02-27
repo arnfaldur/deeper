@@ -34,8 +34,8 @@ fn main() {
         .resizable()
         .title("deeper")
         .build();
-    rl.set_target_fps(ds.fps);
 
+    rl.set_target_fps(ds.fps);
 
     use specs::{World, WorldExt, Builder};
 
@@ -50,16 +50,20 @@ fn main() {
 
     let mut sq_width : f32 = 0.5;
 
-    let mut zoom = 10.0;
-
-    let mut camera = Camera3D::orthographic(
-        vec3(-5.0, zoom, -5.0),
-        vec3(12.0, 0.0, 12.0),
-        vec3(0.0, 1.0, 0.0),
-        60.0
+    let mut camera = Camera3D::perspective(
+        vec3(0.0, 0.0, 0.0),
+        vec3(0.0, 0.0, 0.0),
+        Vector3::up(),
+        40.0
     );
 
-    rl.set_camera_mode(camera, raylib::consts::CameraMode::CAMERA_THIRD_PERSON);
+    let mut tht : f32 = 43.0;
+    let mut phi: f32 = -60.0;
+    let mut r : f32= 4.5;
+
+    let ang_vel = 0.01;
+
+    let mut cam_pos = vec3(8.0, 0.0, 8.0);
 
     // ??????????????
     let cam_x = vec3(0.0, 1.0, 0.0).normalized();
@@ -72,24 +76,26 @@ fn main() {
         let mouse_pos = rl.get_mouse_position();
 
         use raylib::consts::KeyboardKey::*;
-        if rl.is_key_down(KEY_E) {
-            camera.position += cam_y.scale_by(cam_speed);
-            camera.target   += cam_y.scale_by(cam_speed);
-        }
-        if rl.is_key_down(KEY_S) {
-            camera.position -= cam_x.scale_by(cam_speed);
-            camera.target   -= cam_x.scale_by(cam_speed);
-        }
-        if rl.is_key_down(KEY_D) {
-            camera.position -= cam_y.scale_by(cam_speed);
-            camera.target   -= cam_y.scale_by(cam_speed);
-        }
-        if rl.is_key_down(KEY_F) {
-            camera.position += cam_x.scale_by(cam_speed);
-            camera.target   += cam_x.scale_by(cam_speed);
-        }
+        if rl.is_key_down(KEY_E) { phi += ang_vel; }
+        if rl.is_key_down(KEY_S) { tht -= ang_vel; }
+        if rl.is_key_down(KEY_D) { phi -= ang_vel; }
+        if rl.is_key_down(KEY_F) { tht += ang_vel; }
+        if rl.is_key_down(KEY_W) { r -= ang_vel; }
+        if rl.is_key_down(KEY_R) { r += ang_vel; }
+        if rl.is_key_down(KEY_UP)    {cam_pos.z += cam_speed}
+        if rl.is_key_down(KEY_DOWN)  {cam_pos.z -= cam_speed}
+        if rl.is_key_down(KEY_LEFT)  {cam_pos.x -= cam_speed}
+        if rl.is_key_down(KEY_RIGHT) {cam_pos.x += cam_speed}
 
-        sq_width += rl.get_mouse_wheel_move() as f32;
+        println!("tpr : ({} {} {}) fovy: {}, pos : {:?}", tht, phi, r, camera.fovy, cam_pos);
+
+        camera.target = cam_pos;
+        camera.position = cam_pos;
+        camera.position.x += r * tht.cos() * phi.cos();
+        camera.position.y += r * phi.sin();
+        camera.position.z += r * tht.sin() * phi.cos();
+
+        camera.fovy += rl.get_mouse_wheel_move() as f32;
 
         last_mouse_pos = mouse_pos;
 
