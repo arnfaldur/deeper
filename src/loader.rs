@@ -9,6 +9,7 @@ struct PathSettings {
     display_settings_path : String,
     assets_path : String,
     entities_path : String,
+    shaders_path : String,
 }
 
 impl PathSettings {
@@ -16,7 +17,8 @@ impl PathSettings {
         Self {
             display_settings_path: "settings/display.settings".to_string(),
             assets_path: "assets/".to_string(),
-            entities_path: "entities/".to_string()
+            entities_path: "entities/".to_string(),
+            shaders_path: "shaders/".to_string()
         }
     }
 }

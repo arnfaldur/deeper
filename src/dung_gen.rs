@@ -27,6 +27,7 @@ pub struct DungGen {
 
     pub n_rooms : usize,
 
+    pub room_centers : Vec::<(i32, i32)>,
     pub world : HashMap::<(i32, i32), i32>,
 }
 
@@ -50,7 +51,7 @@ impl UnifyKey for UnitKey {
 // note(Jökull): There are better builder patterns
 impl DungGen {
     pub fn new() -> DungGen {
-        DungGen { width: 100, height: 50, room_min: 4, room_range: 11, n_rooms: 10, world: HashMap::<(i32, i32), i32>::new()}
+        DungGen { width: 100, height: 50, room_min: 4, room_range: 11, n_rooms: 10, room_centers: vec![], world: HashMap::<(i32, i32), i32>::new()}
     }
 
     pub fn width(mut self, width: i32) -> DungGen { self.width = width; return self; }
@@ -96,23 +97,23 @@ impl DungGen {
             rooms.push((lu, rd));
         }
 
-        let mut room_centers = Vec::<(i32, i32)>::new();
+        self.room_centers = Vec::<(i32, i32)>::new();
 
         for ((xmin, ymin), (xmax, ymax)) in rooms {
-            room_centers.push((xmin + (xmax - xmin) / 2, ymin + (ymax - ymin) / 2));
+            self.room_centers.push((xmin + (xmax - xmin) / 2, ymin + (ymax - ymin) / 2));
         }
 
         let mut keys = HashMap::<(i32, i32), UnitKey>::new();
         let mut comps: UnificationTable<InPlace<UnitKey>> = UnificationTable::new();
 
-        for i in 0..room_centers.len() {
-            keys.insert(room_centers[i], comps.new_key(()));
+        for i in 0..self.room_centers.len() {
+            keys.insert(self.room_centers[i], comps.new_key(()));
         }
 
         loop {
             let mut remaining = Vec::<((i32, i32), (i32, i32))>::new();
-            for r1 in &room_centers {
-                for r2 in &room_centers {
+            for r1 in &self.room_centers {
+                for r2 in &self.room_centers {
                     if !comps.unioned(*keys.get(r1).unwrap(), *keys.get(r2).unwrap()) {
                         remaining.push((*r1, *r2));
                     }
@@ -168,17 +169,6 @@ impl DungGen {
             let (r1, r2) = to_connect;
 
             comps.union(*keys.get(&r1).unwrap(), *keys.get(&r2).unwrap());
-
-            //for r in &room_centers {
-            //    if paths.contains(&(*r,r1)) {
-            //        paths.insert((*r,r2));
-            //        paths.insert((r2,*r));
-            //    }
-            //    if paths.contains(&(*r,r2)) {
-            //        paths.insert((*r,r1));
-            //        paths.insert((r1,*r));
-            //    }
-            //}
         }
 
         return self;

@@ -1,5 +1,6 @@
 {
   "display_settings_path" : "settings/display.settings",
-  "assets_path" : "assets/",
-  "entities_path" : "entities/"
+  "assets_path"   : "assets/",
+  "entities_path" : "entities/",
+  "shaders_path"  : "shaders/"
 }
