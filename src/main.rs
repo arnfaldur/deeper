@@ -14,6 +14,7 @@ use components::*;
 
 use raylib::prelude::*;
 use std::f32::consts::PI;
+use rand::seq::SliceRandom;
 
 const frag_src: &str = include_str!("../shaders/test.frag");
 const vert_src: &str = include_str!("../shaders/test.vert");
@@ -51,7 +52,7 @@ fn main() {
         vec3(0.0, 0.0, 0.0),
         vec3(0.0, 0.0, 0.0),
         Vector3::up(),
-        40.0
+        70.0
     );
 
     let mut tht : f32 = PI / 3.0;
@@ -60,8 +61,8 @@ fn main() {
 
     let ang_vel = 0.01;
 
-    let start_room = dungeon.room_centers.
-    let mut cam_pos = vec3(8.0, 0.0, 8.0);
+    let start_room = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap();
+    let mut cam_pos = vec3(start_room.0 as f32, 0.0, start_room.1 as f32);
 
     let cam_speed = 0.1;
 
@@ -145,8 +146,6 @@ fn main() {
         // 3D graphics
         {
             let mut d2 = d.begin_mode_3D(camera);
-
-            d2.draw_grid(50, 1.0);
 
             for x in 0..=dungeon.width {
                 for y in 0..=dungeon.height {
