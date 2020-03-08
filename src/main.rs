@@ -60,6 +60,7 @@ fn main() {
 
     let ang_vel = 0.01;
 
+    let start_room = dungeon.room_centers.
     let mut cam_pos = vec3(8.0, 0.0, 8.0);
 
     let cam_speed = 0.1;
@@ -142,25 +143,34 @@ fn main() {
         d.draw_text("deeper", 12, 12, 30, Color::WHITE);
 
         // 3D graphics
-        let mut d2 = d.begin_mode_3D(camera);
-        //let mut d2 = d2.begin_shader_mode(&shader);
+        {
+            let mut d2 = d.begin_mode_3D(camera);
 
-        for x in 0..=dungeon.width {
-            for y in 0..=dungeon.height {
-                match dungeon.world.get(&(x, y)) {
-                    None => (),
-                    Some(value) => match value {
-                        &dung_gen::FLOOR => {
-                            let pos = vec3(x as f32, -0.5, y as f32);
-                            shader.set_shader_value_matrix(matModel_loc, Matrix::translate(pos.x, pos.y, pos.z));
-                            d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
-                        },
-                        &dung_gen::WALL => {
-                            let pos = vec3(x as f32, 0.5, y as f32);
-                            shader.set_shader_value_matrix(matModel_loc, Matrix::translate(pos.x, pos.y, pos.z));
-                            d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
+            d2.draw_grid(50, 1.0);
+
+            for x in 0..=dungeon.width {
+                for y in 0..=dungeon.height {
+                    match dungeon.world.get(&(x, y)) {
+                        None => (),
+                        Some(value) => match value {
+                            &dung_gen::FLOOR => {
+                                let pos = vec3(x as f32, -0.5, y as f32);
+                                shader.set_shader_value_matrix(
+                                    matModel_loc,
+                                    Matrix::translate(pos.x, pos.y, pos.z)
+                                );
+                                d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
+                            },
+                            &dung_gen::WALL => {
+                                let pos = vec3(x as f32, 0.5, y as f32);
+                                shader.set_shader_value_matrix(
+                                    matModel_loc,
+                                    Matrix::translate(pos.x, pos.y, pos.z)
+                                );
+                                d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
+                            }
+                            _ => (),
                         }
-                        _ => (),
                     }
                 }
             }
