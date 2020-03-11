@@ -76,8 +76,8 @@ vec4 fPointLightFactor(PointLight light, vec4 normal, vec4 viewDir, Material mat
     float intensity = fLightFalloff(length(toLight), light.radius, 1.0);
 
     vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
-    vec4 specular = material.specular * fPhong(normal, lightDir, material.shininess);
-    //vec4 specular = material.specular * fBlinnPhong(normal, lightDir, viewDir, material.shininess);
+    //vec4 specular = material.specular * fPhong(normal, lightDir, material.shininess);
+    vec4 specular = material.specular * fBlinnPhong(normal, lightDir, viewDir, material.shininess);
 
     //return intensity * light.color * (diffuse + specular);
     return intensity * light.color * (diffuse + specular);
@@ -86,26 +86,17 @@ vec4 fPointLightFactor(PointLight light, vec4 normal, vec4 viewDir, Material mat
 void main() {
     DirectionalLight dl;
     dl.direction = vec4(1.0, 0.8, 0.8, 0.0);
-    //dl.ambient   = vec4(0.2, 0.2, 0.2, 1.0) ;
-    dl.color     = vec4(0.3, 0.3, 0.2, 1.0);
+    dl.color     = vec4(0.2, 0.2, 0.3, 1.0);
 
     Material mat;
     mat.diffuse   = fragColor;
-    mat.specular  = vec4(vec3(0.0), 1.0);
-    mat.shininess = 0.0;
+    mat.specular  = fragColor;
+    mat.shininess = 16.0;
 
     vec4 viewDir = vec4(eyePosition - fragPosition, 0.0);
     vec4 normal = vec4(fragNormal, 0.0);
 
     finalColor = fDirectionalLightFactor(dl, normal, mat);
-
-    PointLight test;
-    test.is_lit = 1;
-    test.radius = 150.0;
-    test.position = vec3(0.0, 1.0, 0.0);
-    test.color = vec4(1.0);
-
-    //finalColor += fPointLightFactor(test, normal, viewDir, mat);
 
     for (int i = 0; i < MAX_NR_OF_POINT_LIGHTS; i++) {
         finalColor += fPointLightFactor(uPointLights[i], normal, viewDir, mat);
