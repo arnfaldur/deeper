@@ -22,7 +22,7 @@ out vec3 fragNormal;
 
 void main() {
     fragPosition = vec3(matModel * vec4(vertexPosition, 1.0));
-
+    //fragPosition = vec3(inverse(view) * inverse(projection) * mvp * vec4(vertexPosition, 1.0));
     fragColor = colDiffuse;
     fragTexCoord = vertexTexCoord;
 

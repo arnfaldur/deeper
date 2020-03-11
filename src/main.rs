@@ -15,7 +15,7 @@ use components::*;
 use raylib::prelude::*;
 use std::f32::consts::PI;
 use rand::seq::SliceRandom;
-use std::ops::Add;
+use std::ops::{Add, Mul};
 use std::process::exit;
 
 const frag_src: &str = include_str!("../shaders/test.frag");
@@ -110,7 +110,7 @@ fn main() {
         let color_loc    = l_shader.get_shader_location(&format!("{}.color", prefix));
 
         l_shader.set_shader_value(is_lit_loc, 1);
-        l_shader.set_shader_value(radius_loc, 100.0);
+        l_shader.set_shader_value(radius_loc, 1000.0);
         l_shader.set_shader_value(position_loc, vec3(center.0 as f32, 1.0, center.1 as f32));
         let color = Vector4::new(0.9, 0.4, 0.1, 1.0);
         l_shader.set_shader_value(color_loc, color);
@@ -196,7 +196,7 @@ fn main() {
                                 let pos = vec3(x as f32, -0.5, y as f32);
                                 l_shader.set_shader_value_matrix(
                                     matModel_loc,
-                                    Matrix::translate(pos.x, pos.y, pos.z)
+                                    Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
                                 d2.draw_model(&cube_model, pos, 0.5, Color::DARKGRAY);
                             },
@@ -204,7 +204,7 @@ fn main() {
                                 let pos = vec3(x as f32, 0.5, y as f32);
                                 l_shader.set_shader_value_matrix(
                                     matModel_loc,
-                                    Matrix::translate(pos.x, pos.y, pos.z)
+                                    Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
                                 d2.draw_model(&cube_model, pos, 0.5, Color::LIGHTGRAY);
                             }
