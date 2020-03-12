@@ -46,6 +46,8 @@ fn main() {
     world.register::<Position>();
     world.register::<Velocity>();
 
+
+
     let mut last_mouse_pos = vec2(0.0, 0.0);
 
     let mut camera = Camera3D::perspective(
@@ -150,26 +152,23 @@ fn main() {
             for x in 0..=dungeon.width {
                 for y in 0..=dungeon.height {
                     match dungeon.world.get(&(x, y)) {
-                        None => (),
-                        Some(value) => match value {
-                            &dung_gen::FLOOR => {
-                                let pos = vec3(x as f32, -0.5, y as f32);
-                                shader.set_shader_value_matrix(
-                                    matModel_loc,
-                                    Matrix::translate(pos.x, pos.y, pos.z)
-                                );
-                                d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
-                            },
-                            &dung_gen::WALL => {
-                                let pos = vec3(x as f32, 0.5, y as f32);
-                                shader.set_shader_value_matrix(
-                                    matModel_loc,
-                                    Matrix::translate(pos.x, pos.y, pos.z)
-                                );
-                                d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
-                            }
-                            _ => (),
-                        }
+                        Some(&dung_gen::FLOOR) => {
+                            let pos = vec3(x as f32, -0.5, y as f32);
+                            shader.set_shader_value_matrix(
+                                matModel_loc,
+                                Matrix::translate(pos.x, pos.y, pos.z)
+                            );
+                            d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
+                        },
+                        Some(&dung_gen::WALL) => {
+                            let pos = vec3(x as f32, 0.5, y as f32);
+                            shader.set_shader_value_matrix(
+                                matModel_loc,
+                                Matrix::translate(pos.x, pos.y, pos.z)
+                            );
+                            d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
+                        },
+                        _ => (),
                     }
                 }
             }
