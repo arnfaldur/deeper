@@ -207,7 +207,7 @@ fn main() {
                                     matModel_loc,
                                     Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
-                                d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
+                                d2.draw_model(&cube_model, pos, 0.5, Color::DARKGRAY);
                             },
                             dung_gen::WALL => {
                                 let pos = vec3(x as f32, 0.5, y as f32);
@@ -215,7 +215,7 @@ fn main() {
                                     matModel_loc,
                                     Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
-                                d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
+                                d2.draw_model(&cube_model, pos, 0.5, Color::LIGHTGRAY);
                             }
                             _ => (),
                         }

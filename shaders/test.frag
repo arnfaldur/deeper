@@ -73,7 +73,7 @@ vec4 fPointLightFactor(PointLight light, vec4 normal, vec4 viewDir, Material mat
     vec4 toLight  = vec4(light.position - fragPosition, 0.0);
     vec4 lightDir = normalize(toLight);
 
-    float intensity = fLightFalloff(length(toLight), light.radius, 1.0);
+    float intensity = fLightFalloff(length(toLight), light.radius, 3.0);
 
     vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
     vec4 specular = material.specular * fPhong(normal, lightDir, material.shininess);
