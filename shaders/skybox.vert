@@ -1,18 +1,17 @@
 #version 330 core
-layout (location = 0) in vec3 aPos;
+in vec3 vertexPosition;
 
-uniform mat4 uModelMatrix;
-uniform mat4 uViewMatrix;
-uniform mat4 uProjectionMatrix;
+uniform mat4 projection;
+uniform mat4 view;
 
 out float height;
 
 void main(void) {
 
-     mat4 view = mat4(mat3(uViewMatrix));
-     vec4 position = uProjectionMatrix * view * vec4(aPos, 1.0);
+     mat4 t_view = mat4(mat3(view));
+     vec4 position = projection * t_view * vec4(vertexPosition, 1.0);
 
-     height = aPos.y;
+     height = vertexPosition.y;
 
      gl_Position = position.xyww;
 }

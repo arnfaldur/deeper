@@ -15,9 +15,14 @@ use components::*;
 use raylib::prelude::*;
 use std::f32::consts::PI;
 use rand::seq::SliceRandom;
+use std::ops::Add;
+use std::process::exit;
 
 const frag_src: &str = include_str!("../shaders/test.frag");
 const vert_src: &str = include_str!("../shaders/test.vert");
+
+const sb_frag_src: &str = include_str!("../shaders/skybox.frag");
+const sb_vert_src: &str = include_str!("../shaders/skybox.vert");
 
 fn main() {
     let mut ass_man = AssetManager::new();
@@ -64,43 +69,56 @@ fn main() {
     let ang_vel = 0.01;
 
     let start_room = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap();
-    let mut cam_pos = vec3(start_room.0 as f32, 0.0, start_room.1 as f32);
+    let mut cam_pos = vec3(start_room.0 as f32, 0.5, start_room.1 as f32);
 
-    let cam_speed = 0.1;
+    let cam_speed = 0.05;
+
+    let mut player_model : raylib::ffi::Model;
+
+    unsafe {
+        let mut pm = raylib::ffi::LoadModel(std::ffi::CString::new("./assets/Models/guy.iqm").unwrap().as_ptr());
+        player_model = pm;
+    }
 
     let mut cube_model = rl.load_model(
         &thread,
-        "./assets/Models/windmill.obj"
+        "./assets/Models/testshape.obj"
     ).unwrap();
 
     let materials = cube_model.materials_mut();
     let material = &mut materials[0];
 
-    let mut shader = rl.load_shader_code(
+    let mut sky_box_shader = rl.load_shader_code(
+        &thread,
+        Some(sb_vert_src),
+        Some(sb_frag_src)
+    );
+
+    let mut l_shader = rl.load_shader_code(
         &thread,
         Some(vert_src),
         Some(frag_src)
     );
 
-    let matModel_loc = shader.get_shader_location("matModel");
-    let eyePosition_loc  = shader.get_shader_location("eyePosition");
+    let matModel_loc = l_shader.get_shader_location("matModel");
+    let eyePosition_loc  = l_shader.get_shader_location("eyePosition");
 
     for i in 0..dungeon.room_centers.len() {
         let center = dungeon.room_centers[i];
         let prefix = format!("uPointLights[{}]", i);
-        let is_lit_loc   = shader.get_shader_location(&format!("{}.is_lit", prefix));
-        let radius_loc   = shader.get_shader_location(&format!("{}.radius", prefix));
-        let position_loc = shader.get_shader_location(&format!("{}.position", prefix));
-        let color_loc    = shader.get_shader_location(&format!("{}.color", prefix));
+        let is_lit_loc   = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
+        let radius_loc   = l_shader.get_shader_location(&format!("{}.radius", prefix));
+        let position_loc = l_shader.get_shader_location(&format!("{}.position", prefix));
+        let color_loc    = l_shader.get_shader_location(&format!("{}.color", prefix));
 
-        shader.set_shader_value(is_lit_loc, 1);
-        shader.set_shader_value(radius_loc, 10.0);
-        shader.set_shader_value(position_loc, vec3(center.0 as f32, 1.0, center.1 as f32));
-        let color = Vector4::new(1.0, 0.0, 0.0, 1.0);
-        shader.set_shader_value(color_loc, color);
+        l_shader.set_shader_value(is_lit_loc, 1);
+        l_shader.set_shader_value(radius_loc, 100.0);
+        l_shader.set_shader_value(position_loc, vec3(center.0 as f32, 1.0, center.1 as f32));
+        let color = Vector4::new(0.9, 0.4, 0.1, 1.0);
+        l_shader.set_shader_value(color_loc, color);
     }
 
-    material.shader = *shader.as_ref();
+    material.shader = *l_shader.as_ref();
 
     // Main game loop
     while !rl.window_should_close() {
@@ -119,12 +137,21 @@ fn main() {
         if rl.is_key_down(KEY_R) { r += cam_speed; }
         r = r.max(2.0).min(10.0);
 
-        if rl.is_key_down(KEY_UP)    {cam_pos.z += cam_speed}
-        if rl.is_key_down(KEY_DOWN)  {cam_pos.z -= cam_speed}
-        if rl.is_key_down(KEY_LEFT)  {cam_pos.x -= cam_speed}
-        if rl.is_key_down(KEY_RIGHT) {cam_pos.x += cam_speed}
+        if rl.is_key_down(KEY_UP)    { cam_pos.z += cam_speed }
+        if rl.is_key_down(KEY_DOWN)  { cam_pos.z -= cam_speed }
+        if rl.is_key_down(KEY_LEFT)  { cam_pos.x -= cam_speed }
+        if rl.is_key_down(KEY_RIGHT) { cam_pos.x += cam_speed }
 
-        //println!("tpr : ({} {} {}) fovy: {}, pos : {:?}", tht, phi, r, camera.fovy, cam_pos);
+        use raylib::consts::MouseButton::*;
+        if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
+            let hit_info = get_collision_ray_ground(
+                rl.get_mouse_ray(mouse_pos, camera),
+                0.0
+            );
+            let diff = hit_info.position - cam_pos;
+            cam_pos.x += diff.x * (cam_speed / diff.length());
+            cam_pos.z += diff.z * (cam_speed / diff.length());
+        }
 
         camera.target = cam_pos;
         camera.position = cam_pos;
@@ -132,46 +159,67 @@ fn main() {
         camera.position.y += r * phi.sin();
         camera.position.z += r * tht.sin() * phi.cos();
 
-        shader.set_shader_value(eyePosition_loc, camera.position);
-
         camera.fovy += rl.get_mouse_wheel_move() as f32;
 
+
+
+        l_shader.set_shader_value(eyePosition_loc, camera.position);
+
         last_mouse_pos = mouse_pos;
+
+        let fps = 1.0 / rl.get_frame_time();
 
         // Graphics
         let mut d = rl.begin_drawing(&thread);
 
         d.clear_background(Color::BLACK);
 
-        d.draw_text("deeper", 12, 12, 30, Color::WHITE);
 
-        // 3D graphics
-        {
+        // 3D Graphics
+        unsafe {
             let mut d2 = d.begin_mode_3D(camera);
+
+            //d2.draw_model(&player_model, cam_pos, 0.5, Color::WHITE);
+            raylib::ffi::DrawModel(
+                player_model,
+                raylib::ffi::Vector3{
+                    x: cam_pos.x,
+                    y: cam_pos.y,
+                    z: cam_pos.z
+                },
+                0.5,
+                raylib::ffi::Color{r:255,g:255, b:255, a:255}
+            );
 
             for x in 0..=dungeon.width {
                 for y in 0..=dungeon.height {
                     match dungeon.world.get(&(x, y)) {
-                        Some(&dung_gen::FLOOR) => {
-                            let pos = vec3(x as f32, -0.5, y as f32);
-                            shader.set_shader_value_matrix(
-                                matModel_loc,
-                                Matrix::translate(pos.x, pos.y, pos.z)
-                            );
-                            d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
-                        },
-                        Some(&dung_gen::WALL) => {
-                            let pos = vec3(x as f32, 0.5, y as f32);
-                            shader.set_shader_value_matrix(
-                                matModel_loc,
-                                Matrix::translate(pos.x, pos.y, pos.z)
-                            );
-                            d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
-                        },
-                        _ => (),
+                        None => (),
+                        Some(&value) => match value {
+                            dung_gen::FLOOR => {
+                                let pos = vec3(x as f32, -0.5, y as f32);
+                                l_shader.set_shader_value_matrix(
+                                    matModel_loc,
+                                    Matrix::translate(pos.x, pos.y, pos.z)
+                                );
+                                d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
+                            },
+                            dung_gen::WALL => {
+                                let pos = vec3(x as f32, 0.5, y as f32);
+                                l_shader.set_shader_value_matrix(
+                                    matModel_loc,
+                                    Matrix::translate(pos.x, pos.y, pos.z)
+                                );
+                                d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
+                            }
+                            _ => (),
+                        }
                     }
                 }
             }
         }
+
+        d.draw_text("deeper", 12, 12, 30, Color::WHITE);
+        d.draw_text(&format!("FPS {}", fps), 12, 46, 18, Color::WHITE);
     }
 }

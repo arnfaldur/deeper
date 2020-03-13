@@ -18,10 +18,10 @@ pub struct Velocity {
 
 #[derive(Component)]
 #[storage(VecStorage)]
-pub struct Agent {}
+pub struct Agent;
 
-struct SystemMovement;
-impl<'a> System<'a> for SystemMovement {
+struct MovementSystem;
+impl<'a> System<'a> for MovementSystem {
     type SystemData = (WriteStorage<'a, Position>, ReadStorage<'a, Velocity>);
 
     fn run(&mut self, (mut pos, vel): Self::SystemData) {
@@ -29,6 +29,16 @@ impl<'a> System<'a> for SystemMovement {
             pos.x += vel.x;
             pos.y += vel.y;
         }
+    }
+}
+
+pub struct Player;
+pub struct PlayerSystem;
+impl<'a> System<'a> for PlayerSystem {
+    type SystemData = ();
+
+    fn run(&mut self, data: Self::SystemData) {
+        unimplemented!()
     }
 }
 

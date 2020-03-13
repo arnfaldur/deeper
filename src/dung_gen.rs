@@ -69,9 +69,17 @@ impl DungGen {
 
         let mut rooms = Vec::<((i32,i32),(i32,i32))>::new();
 
+        let margin = 1;
+
         while rooms.len() < self.n_rooms {
-            let lu : (i32, i32) = (rng.gen_range(0, self.width - (self.room_min + self.room_range)), rng.gen_range(0, self.height - (self.room_min + self.room_range)));
-            let rd : (i32, i32) = (lu.0 + self.room_min + rng.gen_range(0, self.room_range), lu.1 + self.room_min + rng.gen_range(0, self.room_range));
+            let lu : (i32, i32) = (
+                rng.gen_range(margin, self.width  - (self.room_min + self.room_range) - margin),
+                rng.gen_range(margin, self.height - (self.room_min + self.room_range) - margin)
+            );
+            let rd : (i32, i32) = (
+                lu.0 + self.room_min + rng.gen_range(0, self.room_range),
+                lu.1 + self.room_min + rng.gen_range(0, self.room_range)
+            );
 
             let mut valid = true;
             for x in lu.0..=rd.0 {
@@ -87,12 +95,16 @@ impl DungGen {
 
             for x in lu.0..=rd.0 {
                 for y in lu.1..=rd.1 {
-                    match (x,y) {
-                        (x,_) if x == lu.0 || x == rd.0 => self.world.insert((x,y), WALL),
-                        (_,y) if y == lu.1 || y == rd.1 => self.world.insert((x,y), WALL),
-                        _ => self.world.insert((x,y), FLOOR),
-                    };
+                    self.world.insert((x,y), FLOOR);
                 }
+            }
+            for x in lu.0-1..=rd.0+1 {
+                self.world.insert((x, lu.1 - 1), WALL);
+                self.world.insert((x, rd.1 + 1), WALL);
+            }
+            for y in lu.1-1..=rd.1+1 {
+                self.world.insert((lu.0 - 1, y), WALL);
+                self.world.insert((rd.0 + 1, y), WALL);
             }
             rooms.push((lu, rd));
         }
@@ -112,6 +124,7 @@ impl DungGen {
 
         loop {
             let mut remaining = Vec::<((i32, i32), (i32, i32))>::new();
+
             for r1 in &self.room_centers {
                 for r2 in &self.room_centers {
                     if !comps.unioned(*keys.get(r1).unwrap(), *keys.get(r2).unwrap()) {
@@ -123,6 +136,7 @@ impl DungGen {
                     //}
                 }
             }
+
             if remaining.len() == 0 { break; }
 
             let mut to_connect = ((0,0), (0,0));
@@ -147,8 +161,8 @@ impl DungGen {
                 y_end = y0;
             }
 
-            for x in x_start..=x_end {
-                self.world.insert((x, y_start), FLOOR);
+            for x in x_start..=x_end+1 {
+                if x <= x_end { self.world.insert((x, y_start), FLOOR); }
                 if self.world.get(&(x, y_start+1)) == None { self.world.insert((x,y_start+1), WALL); }
                 if self.world.get(&(x, y_start-1)) == None { self.world.insert((x,y_start-1), WALL); }
             }
@@ -160,8 +174,8 @@ impl DungGen {
                 y_end = temp;
             }
 
-            for y in y_start..=y_end {
-                self.world.insert((x_end, y), FLOOR);
+            for y in y_start..=y_end+1 {
+                if y <= y_end { self.world.insert((x_end, y), FLOOR); }
                 if self.world.get(&(x_end+1, y)) == None { self.world.insert((x_end+1,y), WALL);}
                 if self.world.get(&(x_end-1, y)) == None { self.world.insert((x_end-1,y), WALL);}
             }
