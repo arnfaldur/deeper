@@ -51,6 +51,8 @@ fn main() {
     world.register::<Position>();
     world.register::<Velocity>();
 
+
+
     let mut last_mouse_pos = vec2(0.0, 0.0);
 
     let mut camera = Camera3D::perspective(
@@ -67,7 +69,7 @@ fn main() {
     let ang_vel = 0.01;
 
     let start_room = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap();
-    let mut cam_pos = vec3(start_room.0 as f32, 0.0, start_room.1 as f32);
+    let mut cam_pos = vec3(start_room.0 as f32, 0.5, start_room.1 as f32);
 
     let cam_speed = 0.05;
 
@@ -165,6 +167,7 @@ fn main() {
         camera.fovy += rl.get_mouse_wheel_move() as f32;
 
 
+
         l_shader.set_shader_value(eyePosition_loc, camera.position);
 
         last_mouse_pos = mouse_pos;
@@ -197,22 +200,22 @@ fn main() {
                 for y in 0..=dungeon.height {
                     match dungeon.world.get(&(x, y)) {
                         None => (),
-                        Some(value) => match value {
-                            &dung_gen::FLOOR => {
+                        Some(&value) => match value {
+                            dung_gen::FLOOR => {
                                 let pos = vec3(x as f32, -0.5, y as f32);
                                 l_shader.set_shader_value_matrix(
                                     matModel_loc,
                                     Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
-                                d2.draw_model(&cube_model, pos, 0.5, Color::DARKGRAY);
+                                d2.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
                             },
-                            &dung_gen::WALL => {
+                            dung_gen::WALL => {
                                 let pos = vec3(x as f32, 0.5, y as f32);
                                 l_shader.set_shader_value_matrix(
                                     matModel_loc,
                                     Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
-                                d2.draw_model(&cube_model, pos, 0.5, Color::LIGHTGRAY);
+                                d2.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
                             }
                             _ => (),
                         }

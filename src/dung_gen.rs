@@ -193,10 +193,10 @@ impl DungGen {
             for x in 0..self.width {
                 match self.world.get(&(x,y)) {
                     None => print!("  "),
-                    Some(value) => match value {
-                        &WALL => print!("# "),
-                        &FLOOR => print!(". "),
-                        &DEBUG => print!("X "),
+                    Some(&value) => match value {
+                        WALL => print!("# "),
+                        FLOOR => print!(". "),
+                        DEBUG => print!("X "),
                         _ => print!("? "),
                     }
                 }
