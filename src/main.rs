@@ -146,8 +146,14 @@ fn main() {
                 rl.get_mouse_ray(mouse_pos, camera),
                 0.0
             );
+
             let diff = hit_info.position - cam_pos;
-            cam_pos += diff.scale_by(cam_speed / diff.length());
+
+            if diff.length() <= 1.0 {
+                cam_pos += diff.scale_by(cam_speed);
+            } else {
+                cam_pos += diff.scale_by(cam_speed / diff.length());
+            }
         }
 
         camera.target = cam_pos;
