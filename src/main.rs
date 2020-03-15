@@ -1,17 +1,18 @@
 #![feature(nll)]
 
 mod loader;
-use loader::{
-    AssetManager,
-};
+
+use loader::AssetManager;
 
 mod dung_gen;
+
 use dung_gen::{
     DungGen,
     TileKind,
 };
 
 mod components;
+
 use components::*;
 
 use raylib::prelude::*;
@@ -61,7 +62,7 @@ fn main() {
     dispatcher.setup(&mut world);
 
     world.create_entity()
-        .with(Position{x:0.0,y:0.0})
+        .with(Position { x: 0.0, y: 0.0 })
         .build();
 
     dispatcher.dispatch(&mut world);
@@ -72,12 +73,12 @@ fn main() {
         vec3(0.0, 0.0, 0.0),
         vec3(0.0, 0.0, 0.0),
         Vector3::up(),
-        70.0
+        70.0,
     );
 
-    let mut tht : f32 = PI / 3.0;
-    let mut phi : f32 = PI / 4.0;
-    let mut r   : f32 = 4.5;
+    let mut tht: f32 = PI / 3.0;
+    let mut phi: f32 = PI / 4.0;
+    let mut r: f32 = 4.5;
 
     let ang_vel = 0.01;
 
@@ -86,7 +87,7 @@ fn main() {
 
     let cam_speed = 0.05;
 
-    let mut player_model : raylib::ffi::Model;
+    let mut player_model: raylib::ffi::Model;
 
     unsafe {
         let mut pm = raylib::ffi::LoadModel(std::ffi::CString::new("./assets/Models/guy.iqm").unwrap().as_ptr());
@@ -95,7 +96,7 @@ fn main() {
 
     let mut cube_model = rl.load_model(
         &thread,
-        "./assets/Models/testshape.obj"
+        "./assets/Models/testshape.obj",
     ).unwrap();
 
     let materials = cube_model.materials_mut();
@@ -104,25 +105,25 @@ fn main() {
     let mut sky_box_shader = rl.load_shader_code(
         &thread,
         Some(sb_vert_src),
-        Some(sb_frag_src)
+        Some(sb_frag_src),
     );
 
     let mut l_shader = rl.load_shader_code(
         &thread,
         Some(vert_src),
-        Some(frag_src)
+        Some(frag_src),
     );
 
     let matModel_loc = l_shader.get_shader_location("matModel");
-    let eyePosition_loc  = l_shader.get_shader_location("eyePosition");
+    let eyePosition_loc = l_shader.get_shader_location("eyePosition");
 
     for i in 0..dungeon.room_centers.len() {
         let center = dungeon.room_centers[i];
         let prefix = format!("uPointLights[{}]", i);
-        let is_lit_loc   = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
-        let radius_loc   = l_shader.get_shader_location(&format!("{}.radius", prefix));
+        let is_lit_loc = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
+        let radius_loc = l_shader.get_shader_location(&format!("{}.radius", prefix));
         let position_loc = l_shader.get_shader_location(&format!("{}.position", prefix));
-        let color_loc    = l_shader.get_shader_location(&format!("{}.color", prefix));
+        let color_loc = l_shader.get_shader_location(&format!("{}.color", prefix));
 
         l_shader.set_shader_value(is_lit_loc, 1);
         l_shader.set_shader_value(radius_loc, 1000.0);
@@ -150,16 +151,16 @@ fn main() {
         if rl.is_key_down(KEY_R) { r += cam_speed; }
         r = r.max(2.0).min(10.0);
 
-        if rl.is_key_down(KEY_UP)    { cam_pos.z += cam_speed }
-        if rl.is_key_down(KEY_DOWN)  { cam_pos.z -= cam_speed }
-        if rl.is_key_down(KEY_LEFT)  { cam_pos.x -= cam_speed }
+        if rl.is_key_down(KEY_UP) { cam_pos.z += cam_speed }
+        if rl.is_key_down(KEY_DOWN) { cam_pos.z -= cam_speed }
+        if rl.is_key_down(KEY_LEFT) { cam_pos.x -= cam_speed }
         if rl.is_key_down(KEY_RIGHT) { cam_pos.x += cam_speed }
 
         use raylib::consts::MouseButton::*;
         if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
             let hit_info = get_collision_ray_ground(
                 rl.get_mouse_ray(mouse_pos, camera),
-                0.0
+                0.0,
             );
 
             let diff = hit_info.position - cam_pos;
@@ -178,7 +179,6 @@ fn main() {
         camera.position.z += r * tht.sin() * phi.cos();
 
         camera.fovy += rl.get_mouse_wheel_move() as f32;
-
 
 
         l_shader.set_shader_value(eyePosition_loc, camera.position);
@@ -203,10 +203,10 @@ fn main() {
                     raylib::ffi::Vector3 {
                         x: cam_pos.x,
                         y: cam_pos.y,
-                        z: cam_pos.z
+                        z: cam_pos.z,
                     },
-                    0.5,
-                    raylib::ffi::Color { r: 255, g: 255, b: 255, a: 255 }
+                    1.0,
+                    raylib::ffi::Color { r: 255, g: 255, b: 255, a: 255 },
                 );
             }
             for x in 0..=dungeon.width {
@@ -218,17 +218,17 @@ fn main() {
                                 let pos = vec3(x as f32, -1.0, y as f32);
                                 l_shader.set_shader_value_matrix(
                                     matModel_loc,
-                                    Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
+                                    Matrix::translate(pos.x, pos.y, pos.z),
                                 );
-                                d3.draw_model(&cube_model, pos, 0.5, Color::DARKGRAY);
-                            },
+                                d3.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
+                            }
                             dung_gen::WALL => {
                                 let pos = vec3(x as f32, 0.0, y as f32);
                                 l_shader.set_shader_value_matrix(
                                     matModel_loc,
-                                    Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
+                                    Matrix::translate(pos.x, pos.y, pos.z),
                                 );
-                                d3.draw_model(&cube_model, pos, 0.5, Color::LIGHTGRAY);
+                                d3.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
                             }
                             _ => (),
                         }
