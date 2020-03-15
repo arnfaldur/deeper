@@ -1,3 +1,5 @@
+#![feature(nll)]
+
 mod loader;
 use loader::{
     AssetManager,
@@ -17,6 +19,7 @@ use std::f32::consts::PI;
 use rand::seq::SliceRandom;
 use std::ops::{Add, Mul};
 use std::process::exit;
+use specs::{DispatcherBuilder, WorldExt, Builder};
 
 const frag_src: &str = include_str!("../shaders/test.frag");
 const vert_src: &str = include_str!("../shaders/test.vert");
@@ -51,7 +54,17 @@ fn main() {
     world.register::<Position>();
     world.register::<Velocity>();
 
+    // initialize dispacher with all game systems
+    let mut dispatcher = DispatcherBuilder::new()
+        .with(MovementSystem, "MovementSystem", &[])
+        .build();
+    dispatcher.setup(&mut world);
 
+    world.create_entity()
+        .with(Position{x:0.0,y:0.0})
+        .build();
+
+    dispatcher.dispatch(&mut world);
 
     let mut last_mouse_pos = vec2(0.0, 0.0);
 
@@ -64,7 +77,7 @@ fn main() {
 
     let mut tht : f32 = PI / 3.0;
     let mut phi : f32 = PI / 4.0;
-    let mut r   : f32= 4.5;
+    let mut r   : f32 = 4.5;
 
     let ang_vel = 0.01;
 
@@ -175,27 +188,27 @@ fn main() {
         let fps = 1.0 / rl.get_frame_time();
 
         // Graphics
-        let mut d = rl.begin_drawing(&thread);
+        let mut d2 = rl.begin_drawing(&thread);
 
-        d.clear_background(Color::BLACK);
+        d2.clear_background(Color::BLACK);
 
+        { // None Lexical Lifetimes should obsolete this
+            // 3D Graphics
+            let mut d3 = d2.begin_mode_3D(camera);
 
-        // 3D Graphics
-        unsafe {
-            let mut d2 = d.begin_mode_3D(camera);
-
-            //d2.draw_model(&player_model, cam_pos, 0.5, Color::WHITE);
-            raylib::ffi::DrawModel(
-                player_model,
-                raylib::ffi::Vector3{
-                    x: cam_pos.x,
-                    y: cam_pos.y,
-                    z: cam_pos.z
-                },
-                0.5,
-                raylib::ffi::Color{r:255,g:255, b:255, a:255}
-            );
-
+            unsafe {
+                //d2.draw_model(&player_model, cam_pos, 0.5, Color::WHITE);
+                raylib::ffi::DrawModel(
+                    player_model,
+                    raylib::ffi::Vector3 {
+                        x: cam_pos.x,
+                        y: cam_pos.y,
+                        z: cam_pos.z
+                    },
+                    0.5,
+                    raylib::ffi::Color { r: 255, g: 255, b: 255, a: 255 }
+                );
+            }
             for x in 0..=dungeon.width {
                 for y in 0..=dungeon.height {
                     match dungeon.world.get(&(x, y)) {
@@ -207,7 +220,7 @@ fn main() {
                                     matModel_loc,
                                     Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
-                                d2.draw_model(&cube_model, pos, 0.5, Color::DARKGRAY);
+                                d3.draw_model(&cube_model, pos, 0.5, Color::DARKGRAY);
                             },
                             dung_gen::WALL => {
                                 let pos = vec3(x as f32, 0.0, y as f32);
@@ -215,7 +228,7 @@ fn main() {
                                     matModel_loc,
                                     Matrix::scale(0.5, 0.5, 0.5).mul(Matrix::translate(pos.x, pos.y, pos.z))
                                 );
-                                d2.draw_model(&cube_model, pos, 0.5, Color::LIGHTGRAY);
+                                d3.draw_model(&cube_model, pos, 0.5, Color::LIGHTGRAY);
                             }
                             _ => (),
                         }
@@ -224,7 +237,8 @@ fn main() {
             }
         }
 
-        d.draw_text("deeper", 12, 12, 30, Color::WHITE);
-        d.draw_text(&format!("FPS {}", fps), 12, 46, 18, Color::WHITE);
+
+        d2.draw_text("deeper", 12, 12, 30, Color::WHITE);
+        d2.draw_text(&format!("FPS {}", fps), 12, 46, 18, Color::WHITE);
     }
 }

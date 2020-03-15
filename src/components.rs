@@ -5,22 +5,22 @@ use raylib::prelude::*;
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct Position {
-    x: f32,
-    y: f32,
+    pub x: f32,
+    pub y: f32,
 }
 
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct Velocity {
-    x: f32,
-    y: f32,
+    pub x: f32,
+    pub y: f32,
 }
 
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Agent;
 
-struct MovementSystem;
+pub(crate) struct MovementSystem;
 impl<'a> System<'a> for MovementSystem {
     type SystemData = (WriteStorage<'a, Position>, ReadStorage<'a, Velocity>);
 
