@@ -8,7 +8,7 @@ use specs::{
     AccessorCow,
     RunningTime,
     Component,
-    VecStorage
+    VecStorage,
 };
 
 use raylib::prelude::*;
@@ -17,6 +17,7 @@ use rand::seq::SliceRandom;
 use std::ops::{Add, Mul};
 use std::process::exit;
 use specs::prelude::*;
+use crate::dung_gen::DungGen;
 
 #[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]
@@ -26,7 +27,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new() -> Position { Position { x : 0.0, y : 0.0 } }
+    pub fn new() -> Position { Position { x: 0.0, y: 0.0 } }
 }
 
 #[derive(Component, Debug)]
@@ -37,13 +38,15 @@ pub struct Velocity {
 }
 
 impl Velocity {
-    pub fn new() -> Velocity { Velocity { x : 0.0, y : 0.0 } }
+    pub fn new() -> Velocity { Velocity { x: 0.0, y: 0.0 } }
 }
+
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Agent;
 
 pub struct MovementSystem;
+
 impl<'a> System<'a> for MovementSystem {
     type SystemData = (WriteStorage<'a, Position>, ReadStorage<'a, Velocity>);
 
@@ -136,12 +139,13 @@ impl<'a> System<'a> for CameraSystem {
 
 #[derive(Component)]
 pub struct Model3D {
-    pub idx : usize,
+    pub idx: usize,
+    tint: Color,
 }
 
 impl Model3D {
-    pub fn new() -> Model3D { Model3D { idx  : 0 } }
-    pub fn from_index(index : usize) -> Model3D { Model3D { idx : index } }
+    pub fn new() -> Model3D { Model3D { idx: 0, tint: Color::WHITE } }
+    pub fn from_index(index: usize) -> Model3D { Model3D { idx: index, tint: Color::WHITE } }
 }
 
 pub struct GraphicsSystem {
@@ -180,7 +184,7 @@ impl<'a> System<'a> for GraphicsSystem {
             );
 
             for (pos, model) in (&pos, &models).join() {
-                d3.draw_model(&self.model_array[model.idx], pos.clone().to_vec3(), 1.0, Color::LIGHTGRAY);
+                d3.draw_model(&self.model_array[model.idx], pos.clone().to_vec3(), 1.0, model.tint);
             }
         }
 
@@ -209,9 +213,9 @@ impl<'a> System<'a> for PlayerSystem {
         use raylib::consts::KeyboardKey::*;
         let cam_speed = 0.1;
         for (_, pos) in (&player, &mut pos).join() {
-            if rl.is_key_down(KEY_UP)    { pos.y += cam_speed }
-            if rl.is_key_down(KEY_DOWN)  { pos.y -= cam_speed }
-            if rl.is_key_down(KEY_LEFT)  { pos.x -= cam_speed }
+            if rl.is_key_down(KEY_UP) { pos.y += cam_speed }
+            if rl.is_key_down(KEY_DOWN) { pos.y -= cam_speed }
+            if rl.is_key_down(KEY_LEFT) { pos.x -= cam_speed }
             if rl.is_key_down(KEY_RIGHT) { pos.x += cam_speed }
 
             use raylib::consts::MouseButton::*;
@@ -239,4 +243,67 @@ impl<'a> System<'a> for PlayerSystem {
     fn setup(&mut self, world: &mut World) {
         println!("PlayerSystem setup!");
     }
+}
+
+#[derive(Component)]
+struct WallTile;
+
+#[derive(Component)]
+struct FloorTile;
+
+
+pub(crate) struct DunGenSystem;
+
+impl<'a> System<'a> for DunGenSystem {
+    type SystemData = ();
+
+    fn run(&mut self, (): Self::SystemData) {
+    }
+    fn setup(&mut self, world: &mut World) {
+        let dungeon = DungGen::new()
+            .width(75)
+            .height(75)
+            .n_rooms(10)
+            .room_min(5)
+            .room_range(15)
+            .generate();
+        for x in 0..=dungeon.width {
+            for y in 0..=dungeon.height {
+                match dungeon.world.get(&(x, y)) {
+                    None => (),
+                    Some(&value) => match value {
+                        FLOOR => {
+                            world.create_entity()
+                                .with(Position { x: x as f32, y: y as f32 })
+                                .with(FloorTile)
+                                .with(Model3D { idx: 0, tint: Color::DARKGRAY })
+                                .build();
+                        }
+                        WALL => {
+                            world.create_entity()
+                                .with(Position { x: x as f32, y: y as f32 })
+                                .with(WallTile)
+                                .with(Model3D { idx: 1, tint: Color::LIGHTGRAY })
+                                .build();
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub(crate) fn register_components(world: &mut World) {
+    world.register::<Position>();
+    world.register::<Position3D>();
+    world.register::<Velocity>();
+    world.register::<Player>();
+    world.register::<Camera>();
+    world.register::<Target>();
+    world.register::<ActiveCamera>();
+    world.register::<SphericalOffset>();
+    world.register::<Model3D>();
+    world.register::<WallTile>();
+    world.register::<FloorTile>();
 }

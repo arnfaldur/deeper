@@ -40,15 +40,7 @@ fn main() {
 
     let mut world = World::new();
 
-    world.register::<Position>();
-    world.register::<Position3D>();
-    world.register::<Velocity>();
-    world.register::<Player>();
-    world.register::<components::Camera>();
-    world.register::<Target>();
-    world.register::<ActiveCamera>();
-    world.register::<SphericalOffset>();
-    world.register::<Model3D>();
+    register_components(&mut world);
 
     let model_array = vec![
         rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
@@ -60,6 +52,7 @@ fn main() {
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
+        .with(DunGenSystem, "DunGenSystem", &[])
         .with(MovementSystem, "MovementSystem", &[])
         .with(PlayerSystem, "PlayerSystem", &[])
         .with(SphericalFollowSystem, "SphericalFollowSystem", &["PlayerSystem", "MovementSystem"])
