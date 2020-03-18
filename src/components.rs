@@ -2,7 +2,7 @@ use specs::prelude::*;
 use specs::{Component, VecStorage};
 use raylib::prelude::*;
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]
 pub struct Position {
     pub x: f32,
@@ -32,13 +32,15 @@ impl<'a> System<'a> for MovementSystem {
     }
 }
 
-pub struct Player;
-pub struct PlayerSystem;
-impl<'a> System<'a> for PlayerSystem {
-    type SystemData = ();
+impl From<&Position> for Vector3 {
+    fn from(pos: &Position) -> Vector3 {
+        Vector3::new(pos.x, pos.y, 0.0)
+    }
+}
 
-    fn run(&mut self, data: Self::SystemData) {
-        unimplemented!()
+impl Position {
+    pub fn to_vec3(self) -> Vector3 {
+        Vector3::new(self.x, self.y, 0.0)
     }
 }
 

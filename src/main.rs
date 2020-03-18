@@ -11,6 +11,7 @@ use dung_gen::{
     TileKind,
 };
 
+mod old_main;
 mod components;
 
 use components::*;
@@ -20,26 +21,168 @@ use std::f32::consts::PI;
 use rand::seq::SliceRandom;
 use std::ops::{Add, Mul};
 use std::process::exit;
-use specs::{DispatcherBuilder, WorldExt, Builder};
+use specs::prelude::*;
+use specs::{DispatcherBuilder, WorldExt, Builder, System, AccessorCow, RunningTime};
 
-const frag_src: &str = include_str!("../shaders/test.frag");
-const vert_src: &str = include_str!("../shaders/test.vert");
+use specs::Component;
 
-const sb_frag_src: &str = include_str!("../shaders/skybox.frag");
-const sb_vert_src: &str = include_str!("../shaders/skybox.vert");
+#[derive(Component)]
+struct Player;
+
+#[derive(Component)]
+struct Camera {
+    fov: f32,
+    up: Vector3,
+}
+
+#[derive(Component)]
+struct Target(Entity);
+
+#[derive(Component)]
+struct Position3D(Vector3);
+
+#[derive(Component)]
+struct ActiveCamera(Entity);
+
+#[derive(Component)]
+struct SphericalOffset {
+    theta: f32,
+    phi: f32,
+    radius: f32,
+}
+
+struct SphericalFollowSystem;
+
+impl<'a> System<'a> for SphericalFollowSystem {
+    type SystemData = (
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Target>,
+        ReadStorage<'a, SphericalOffset>,
+        WriteStorage<'a, Position3D>,
+    );
+
+    fn run(&mut self, (pos2d, target, follow, mut pos3d): Self::SystemData) {
+        for (target, follow, pos3d) in (&target, &follow, &mut pos3d).join() {
+            pos3d.0 = pos2d.get(target.0).cloned().unwrap().to_vec3();
+            pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
+            pos3d.0.y += follow.radius * follow.phi.sin();
+            pos3d.0.z += follow.radius * follow.theta.sin() * follow.phi.cos();
+        }
+    }
+}
+
+struct CameraSystem;
+
+impl<'a> System<'a> for CameraSystem {
+    type SystemData = (WriteStorage<'a, Camera>, ReadStorage<'a, Position3D>);
+
+    fn run(&mut self, (camera, pos): Self::SystemData) {
+        for (camera, pos) in (&camera, &pos).join() {}
+    }
+}
+
+#[derive(Component)]
+struct Model3D(usize);
+
+struct GraphicsSystem {
+    thread: RaylibThread,
+    model_array: Vec<Model>,
+}
+
+impl<'a> System<'a> for GraphicsSystem {
+    type SystemData = (
+        WriteExpect<'a, RaylibHandle>,
+        ReadExpect<'a, ActiveCamera>,
+        ReadStorage<'a, Player>,
+        ReadStorage<'a, Camera>,
+        ReadStorage<'a, Target>,
+        ReadStorage<'a, Position3D>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Model3D>,
+    );
+
+    fn run(&mut self, (mut rl, active_cam, player, camera, target, pos3d, pos, models): Self::SystemData) {
+        let fps = 1.0 / rl.get_frame_time();
+        let mut d2: RaylibDrawHandle = rl.begin_drawing(&self.thread);
+
+        d2.clear_background(Color::BLACK);
+
+        {
+            let active_camera = camera.get(active_cam.0).unwrap();
+            let active_target = target.get(active_cam.0).unwrap();
+            let mut d3 = d2.begin_mode_3D(
+                Camera3D::perspective(
+                    pos3d.get(active_cam.0).unwrap().0,
+                    pos.get(active_target.0).unwrap().to_vec3(),
+                    active_camera.up,
+                    active_camera.fov,
+                )
+            );
+
+            for (pos, model) in (&pos, &models).join() {
+                d3.draw_model(&self.model_array[model.0], pos.clone().to_vec3(), 1.0, Color::LIGHTGRAY);
+            }
+        }
+
+        d2.draw_text("deeper", 12, 12, 30, Color::WHITE);
+        d2.draw_text(&format!("FPS {}", fps), 12, 46, 18, Color::WHITE);
+    }
+
+    fn setup(&mut self, world: &mut World) {
+        println!("GraphicsSystem setup!");
+    }
+}
+
+struct PlayerSystem;
+
+impl<'a> System<'a> for PlayerSystem {
+    type SystemData = (
+        ReadExpect<'a, RaylibHandle>,
+        ReadStorage<'a, Player>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Camera>,
+        ReadStorage<'a, Target>,
+        WriteStorage<'a, SphericalOffset>,
+    );
+
+    fn run(&mut self, (rl, player, mut pos, mut cam, target, mut offset): Self::SystemData) {
+        use raylib::consts::KeyboardKey::*;
+        let cam_speed = 0.1;
+        for (_, pos) in (&player, &mut pos).join() {
+            if rl.is_key_down(KEY_UP) { pos.y += cam_speed }
+            if rl.is_key_down(KEY_DOWN) { pos.y -= cam_speed }
+            if rl.is_key_down(KEY_LEFT) { pos.x -= cam_speed }
+            if rl.is_key_down(KEY_RIGHT) { pos.x += cam_speed }
+        }
+
+        let ang_vel = 0.03;
+        for (cam, target, offset) in (&mut cam, &target, &mut offset).join() {
+            if let Some(player) = player.get(target.0) {
+                if rl.is_key_down(KEY_E) { offset.phi += ang_vel; }
+                if rl.is_key_down(KEY_D) { offset.phi -= ang_vel; }
+                offset.phi = offset.phi.max(0.3).min(PI / 2.0 - 0.3);
+
+                if rl.is_key_down(KEY_S) { offset.theta += ang_vel; }
+                if rl.is_key_down(KEY_F) { offset.theta -= ang_vel; }
+
+                if rl.is_key_down(KEY_W) { offset.radius -= cam_speed; }
+                if rl.is_key_down(KEY_R) { offset.radius += cam_speed; }
+                offset.radius = offset.radius.max(2.0).min(10.0);
+
+                cam.fov += rl.get_mouse_wheel_move() as f32;
+            };
+        }
+    }
+
+    fn setup(&mut self, world: &mut World) {
+        println!("PlayerSystem setup!");
+    }
+}
 
 fn main() {
     let mut ass_man = AssetManager::new();
 
     let ds = ass_man.load_display_settings();
-
-    let dungeon = DungGen::new()
-        .width(75)
-        .height(75)
-        .n_rooms(10)
-        .room_min(5)
-        .room_range(15)
-        .generate();
 
     let (mut rl, thread) = raylib::init()
         .size(ds.screen_width, ds.screen_height)
@@ -47,198 +190,73 @@ fn main() {
         .title("deeper")
         .build();
 
-    rl.set_target_fps(ds.fps);
+    //rl.set_target_fps(ds.fps);
 
     use specs::{World, WorldExt, Builder};
 
     let mut world = World::new();
+
     world.register::<Position>();
+    world.register::<Position3D>();
     world.register::<Velocity>();
+    world.register::<Player>();
+    world.register::<Camera>();
+    world.register::<Target>();
+    world.register::<ActiveCamera>();
+    world.register::<SphericalOffset>();
+    world.register::<Model3D>();
+
+    let model_array = vec![
+        rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
+    ];
+
+    // Relinquish the raylib handle to the world
+    world.insert(rl);
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(MovementSystem, "MovementSystem", &[])
+        .with(PlayerSystem, "PlayerSystem", &[])
+        .with(SphericalFollowSystem, "SphericalFollowSystem", &["PlayerSystem", "MovementSystem"])
+        .with_thread_local(GraphicsSystem { thread, model_array })
         .build();
-    dispatcher.setup(&mut world);
+
+    let player = world.create_entity()
+        .with(Player)
+        .with(Position { x: 0.0, y: 0.0 })
+        .with(Model3D(0))
+        .build();
+    let active_camera = world.create_entity()
+        .with(Camera {
+            up: Vector3::up(),
+            fov: 70.0,
+        })
+        .with(Target(player))
+        .with(Position3D(vec3(0.0, 0.0, 0.0)))
+        .with(SphericalOffset {
+            theta: PI / 3.0,
+            phi: PI / 4.0,
+            radius: 4.5,
+        })
+        .build();
+    world.insert(ActiveCamera(active_camera));
 
     world.create_entity()
-        .with(Position { x: 0.0, y: 0.0 })
+        .with(Position { x: 1.0, y: 2.0 })
+        .with(Model3D(1))
         .build();
 
-    dispatcher.dispatch(&mut world);
-
-    let mut last_mouse_pos = vec2(0.0, 0.0);
-
-    let mut camera = Camera3D::perspective(
-        vec3(0.0, 0.0, 0.0),
-        vec3(0.0, 0.0, 0.0),
-        Vector3::up(),
-        70.0,
-    );
-
-    let mut tht: f32 = PI / 3.0;
-    let mut phi: f32 = PI / 4.0;
-    let mut r: f32 = 4.5;
-
-    let ang_vel = 0.01;
-
-    let start_room = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap();
-    let mut cam_pos = vec3(start_room.0 as f32, 0.0, start_room.1 as f32);
-
-    let cam_speed = 0.05;
-
-    let mut player_model: raylib::ffi::Model;
-
-    unsafe {
-        let mut pm = raylib::ffi::LoadModel(std::ffi::CString::new("./assets/Models/guy.iqm").unwrap().as_ptr());
-        player_model = pm;
-    }
-
-    let mut cube_model = rl.load_model(
-        &thread,
-        "./assets/Models/testshape.obj",
-    ).unwrap();
-
-    let materials = cube_model.materials_mut();
-    let material = &mut materials[0];
-
-    let mut sky_box_shader = rl.load_shader_code(
-        &thread,
-        Some(sb_vert_src),
-        Some(sb_frag_src),
-    );
-
-    let mut l_shader = rl.load_shader_code(
-        &thread,
-        Some(vert_src),
-        Some(frag_src),
-    );
-
-    let matModel_loc = l_shader.get_shader_location("matModel");
-    let eyePosition_loc = l_shader.get_shader_location("eyePosition");
-
-    for i in 0..dungeon.room_centers.len() {
-        let center = dungeon.room_centers[i];
-        let prefix = format!("uPointLights[{}]", i);
-        let is_lit_loc = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
-        let radius_loc = l_shader.get_shader_location(&format!("{}.radius", prefix));
-        let position_loc = l_shader.get_shader_location(&format!("{}.position", prefix));
-        let color_loc = l_shader.get_shader_location(&format!("{}.color", prefix));
-
-        l_shader.set_shader_value(is_lit_loc, 1);
-        l_shader.set_shader_value(radius_loc, 1000.0);
-        l_shader.set_shader_value(position_loc, vec3(center.0 as f32, 1.0, center.1 as f32));
-        let color = Vector4::new(0.9, 0.4, 0.1, 1.0);
-        l_shader.set_shader_value(color_loc, color);
-    }
-
-    material.shader = *l_shader.as_ref();
-
+    // Setup world
+    dispatcher.setup(&mut world);
     // Main game loop
-    while !rl.window_should_close() {
-        // Input handling
-        let mouse_pos = rl.get_mouse_position();
-
-        use raylib::consts::KeyboardKey::*;
-        if rl.is_key_down(KEY_E) { phi += ang_vel; }
-        if rl.is_key_down(KEY_D) { phi -= ang_vel; }
-        phi = phi.max(0.3).min(PI / 2.0 - 0.3);
-
-        if rl.is_key_down(KEY_S) { tht += ang_vel; }
-        if rl.is_key_down(KEY_F) { tht -= ang_vel; }
-
-        if rl.is_key_down(KEY_W) { r -= cam_speed; }
-        if rl.is_key_down(KEY_R) { r += cam_speed; }
-        r = r.max(2.0).min(10.0);
-
-        if rl.is_key_down(KEY_UP) { cam_pos.z += cam_speed }
-        if rl.is_key_down(KEY_DOWN) { cam_pos.z -= cam_speed }
-        if rl.is_key_down(KEY_LEFT) { cam_pos.x -= cam_speed }
-        if rl.is_key_down(KEY_RIGHT) { cam_pos.x += cam_speed }
-
-        use raylib::consts::MouseButton::*;
-        if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
-            let hit_info = get_collision_ray_ground(
-                rl.get_mouse_ray(mouse_pos, camera),
-                0.0,
-            );
-
-            let diff = hit_info.position - cam_pos;
-
-            if diff.length() <= 1.0 {
-                cam_pos += diff.scale_by(cam_speed);
-            } else {
-                cam_pos += diff.scale_by(cam_speed / diff.length());
-            }
-        }
-
-        camera.target = cam_pos;
-        camera.position = cam_pos;
-        camera.position.x += r * tht.cos() * phi.cos();
-        camera.position.y += r * phi.sin();
-        camera.position.z += r * tht.sin() * phi.cos();
-
-        camera.fovy += rl.get_mouse_wheel_move() as f32;
-
-
-        l_shader.set_shader_value(eyePosition_loc, camera.position);
-
-        last_mouse_pos = mouse_pos;
-
-        let fps = 1.0 / rl.get_frame_time();
-
-        // Graphics
-        let mut d2 = rl.begin_drawing(&thread);
-
-        d2.clear_background(Color::BLACK);
-
-        { // None Lexical Lifetimes should obsolete this
-            // 3D Graphics
-            let mut d3 = d2.begin_mode_3D(camera);
-
-            unsafe {
-                //d2.draw_model(&player_model, cam_pos, 0.5, Color::WHITE);
-                raylib::ffi::DrawModel(
-                    player_model,
-                    raylib::ffi::Vector3 {
-                        x: cam_pos.x,
-                        y: cam_pos.y,
-                        z: cam_pos.z,
-                    },
-                    1.0,
-                    raylib::ffi::Color { r: 255, g: 255, b: 255, a: 255 },
-                );
-            }
-            for x in 0..=dungeon.width {
-                for y in 0..=dungeon.height {
-                    match dungeon.world.get(&(x, y)) {
-                        None => (),
-                        Some(&value) => match value {
-                            dung_gen::FLOOR => {
-                                let pos = vec3(x as f32, -1.0, y as f32);
-                                l_shader.set_shader_value_matrix(
-                                    matModel_loc,
-                                    Matrix::translate(pos.x, pos.y, pos.z),
-                                );
-                                d3.draw_model(&cube_model, pos, 1.0, Color::DARKGRAY);
-                            }
-                            dung_gen::WALL => {
-                                let pos = vec3(x as f32, 0.0, y as f32);
-                                l_shader.set_shader_value_matrix(
-                                    matModel_loc,
-                                    Matrix::translate(pos.x, pos.y, pos.z),
-                                );
-                                d3.draw_model(&cube_model, pos, 1.0, Color::LIGHTGRAY);
-                            }
-                            _ => (),
-                        }
-                    }
-                }
-            }
-        }
-
-
-        d2.draw_text("deeper", 12, 12, 30, Color::WHITE);
-        d2.draw_text(&format!("FPS {}", fps), 12, 46, 18, Color::WHITE);
+    while !window_should_close(&world) {
+        // Should be the only thing in the loop, before the loop is completely removed
+        dispatcher.dispatch(&mut world);
     }
+}
+
+fn window_should_close(world: &World) -> bool {
+    let rl = world.read_resource::<RaylibHandle>();
+    return rl.window_should_close();
 }
