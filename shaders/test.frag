@@ -4,8 +4,14 @@ in vec3 fragPosition;
 in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragNormal;
+in vec4 fragTangent;
+in mat3 fragTangentMatrix;
 
 uniform vec3 eyePosition;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
 
 // Final output color
 out vec4 finalColor;
@@ -54,6 +60,7 @@ vec4 fDirectionalLightFactor(DirectionalLight light, vec4 normal, Material mater
     vec4 lightDir = normalize(light.direction);
     vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
     vec4 specular = material.specular * fPhong(normal, lightDir, 64);
+    // TODO: fix
     //vec4 specular = material.specular * fBlinnPhong(normal, light.direction, viewDir, material.shininess);
     return light.ambient * material.diffuse + light.color * (diffuse + specular);
 }
@@ -87,14 +94,17 @@ void main() {
     DirectionalLight dl;
     dl.direction = vec4(1.0, 0.8, 0.8, 0.0);
     dl.color     = vec4(0.2, 0.2, 0.3, 1.0);
+    //dl.color     = vec4(1.0, 1.0, 1.0, 1.0);
 
     Material mat;
     mat.diffuse   = fragColor;
+    //mat.diffuse = texture(texture2, fragTexCoord);
     mat.specular  = vec4(1.0);
     mat.shininess = 32.0;
 
     vec4 viewDir = vec4(eyePosition - fragPosition, 0.0);
-    vec4 normal = vec4(fragNormal, 0.0);
+    vec4 normal  = vec4(normalize(fragTangentMatrix * normalize(texture(texture2, fragTexCoord).rgb * 2 - 1)), 0.0);
+    vec4 normal  = vec4(fragNormal, 0.0);
 
     finalColor = fDirectionalLightFactor(dl, normal, mat);
 
@@ -102,5 +112,6 @@ void main() {
         finalColor += fPointLightFactor(uPointLights[i], normal, viewDir, mat);
     }
 
-    finalColor = vec4(vec3(finalColor), 1.0);
+    finalColor = vec4(finalColor.xyz, 1.0);
+    //finalColor = vec4(fragTangent.xyz, 1.0);
 }
