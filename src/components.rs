@@ -17,7 +17,7 @@ use rand::seq::SliceRandom;
 use std::ops::{Add, Mul};
 use std::process::exit;
 use specs::prelude::*;
-use crate::dung_gen::DungGen;
+
 
 #[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]
@@ -140,17 +140,35 @@ impl<'a> System<'a> for CameraSystem {
 #[derive(Component)]
 pub struct Model3D {
     pub idx: usize,
+    offset: Vector3,
+    scale: f32,
+    z_rotation : f32,
     tint: Color,
 }
 
+// Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
-    pub fn new() -> Model3D { Model3D { idx: 0, tint: Color::WHITE } }
-    pub fn from_index(index: usize) -> Model3D { Model3D { idx: index, tint: Color::WHITE } }
+    pub fn new() -> Self { Self { idx: 0, offset: Vector3::zero(), tint: Color::WHITE, scale: 1.0, z_rotation: 0.0} }
+    pub fn from_index(index: usize) -> Model3D { let mut m = Self::new(); m.idx = index; return m; }
+    pub fn with_offset(mut self, offset: Vector3) -> Model3D { self.offset = offset; self }
+    pub fn with_scale(mut self, scale: f32) -> Self { self.scale = scale; self }
+    pub fn with_z_rotation(mut self, z_rotation: f32) -> Self { self.z_rotation = z_rotation; self }
+    pub fn with_tint(mut self, tint: Color) -> Self { self.tint = tint; self }
 }
+
+extern crate raylib;
+use raylib::shaders::Shader;
 
 pub struct GraphicsSystem {
     pub thread: RaylibThread,
     pub model_array: Vec<Model>,
+    pub l_shader: Shader,
+    matModel_loc : i32,
+    eyePosition_loc : i32,
+}
+
+impl GraphicsSystem {
+    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self { Self { thread, model_array, l_shader, matModel_loc: 0, eyePosition_loc: 0 } }
 }
 
 impl<'a> System<'a> for GraphicsSystem {
@@ -174,9 +192,13 @@ impl<'a> System<'a> for GraphicsSystem {
         {
             let active_camera = camera.get(active_cam.0).unwrap();
             let active_target = target.get(active_cam.0).unwrap();
+            let camera_position = pos3d.get(active_cam.0).unwrap().0;
+
+            self.l_shader.set_shader_value(self.eyePosition_loc, camera_position);
+
             let mut d3 = d2.begin_mode_3D(
                 Camera3D::perspective(
-                    pos3d.get(active_cam.0).unwrap().0,
+                    camera_position,
                     pos.get(active_target.0).unwrap().to_vec3(),
                     active_camera.up,
                     active_camera.fov,
@@ -184,7 +206,19 @@ impl<'a> System<'a> for GraphicsSystem {
             );
 
             for (pos, model) in (&pos, &models).join() {
-                d3.draw_model(&self.model_array[model.idx], pos.clone().to_vec3(), 1.0, model.tint);
+                let model_pos = pos.clone().to_vec3() + model.offset;
+                self.l_shader.set_shader_value_matrix(
+                    self.matModel_loc,
+                    Matrix::scale(model.scale, model.scale, model.scale).mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
+                );
+                d3.draw_model_ex(
+                    &self.model_array[model.idx],
+                    model_pos,
+                    Vector3::new(0.0, 0.0, 1.0),
+                    model.z_rotation,
+                    Vector3::new(model.scale, model.scale, model.scale),
+                    model.tint
+                );
             }
         }
 
@@ -193,6 +227,9 @@ impl<'a> System<'a> for GraphicsSystem {
     }
 
     fn setup(&mut self, world: &mut World) {
+        self.matModel_loc     = self.l_shader.get_shader_location("matModel");
+        self.eyePosition_loc  = self.l_shader.get_shader_location("eyePosition");
+
         println!("GraphicsSystem setup!");
     }
 }
@@ -252,41 +289,91 @@ struct WallTile;
 struct FloorTile;
 
 
-pub(crate) struct DunGenSystem;
+use crate::dung_gen::{DungGen};
+
+pub struct DunGenSystem {
+    pub dungeon : DungGen,
+}
 
 impl<'a> System<'a> for DunGenSystem {
     type SystemData = ();
 
     fn run(&mut self, (): Self::SystemData) {
+
     }
+
     fn setup(&mut self, world: &mut World) {
-        let dungeon = DungGen::new()
-            .width(75)
-            .height(75)
-            .n_rooms(10)
-            .room_min(5)
-            .room_range(15)
-            .generate();
-        for x in 0..=dungeon.width {
-            for y in 0..=dungeon.height {
-                match dungeon.world.get(&(x, y)) {
+        use crate::dung_gen::{FLOOR, WALL, WALL_NORTH, WALL_SOUTH, WALL_EAST, WALL_WEST, NOTHING};
+
+        for x in 0..=self.dungeon.width {
+            for y in 0..=self.dungeon.height {
+                match self.dungeon.world.get(&(x, y)) {
                     None => (),
-                    Some(&value) => match value {
-                        FLOOR => {
-                            world.create_entity()
-                                .with(Position { x: x as f32, y: y as f32 })
-                                .with(FloorTile)
-                                .with(Model3D { idx: 0, tint: Color::DARKGRAY })
-                                .build();
+                    Some(&value) => {
+                        match value {
+                            FLOOR => {
+                                world.create_entity()
+                                    .with(Position { x: x as f32, y: y as f32 })
+                                    .with(FloorTile)
+                                    .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
+                                    .build();
+                            },
+                            WALL => {
+                                world.create_entity()
+                                    .with(Position { x: x as f32, y: y as f32 })
+                                    .with(WallTile)
+                                    .with(Model3D::from_index(0).with_tint(Color::LIGHTGRAY))
+                                    .build();
+                            },
+                            WALL_NORTH => {
+                                world.create_entity()
+                                    .with(Position { x: x as f32, y: y as f32 })
+                                    .with(WallTile)
+                                    .with(Model3D::from_index(3)
+                                        .with_tint(Color::DARKGRAY)
+                                        .with_z_rotation(0.0)
+                                    ).build();
+                            },
+                            WALL_SOUTH => {
+                                world.create_entity()
+                                    .with(Position { x: x as f32, y: y as f32 })
+                                    .with(WallTile)
+                                    .with(Model3D::from_index(3)
+                                        .with_tint(Color::DARKGRAY)
+                                        .with_z_rotation(180.0)
+                                    ).build();
+                            },
+                            WALL_EAST => {
+                                world.create_entity()
+                                    .with(Position { x: x as f32, y: y as f32 })
+                                    .with(WallTile)
+                                    .with(Model3D::from_index(3)
+                                        .with_tint(Color::DARKGRAY)
+                                        .with_z_rotation(-90.0)
+                                    ).build();
+                            },
+                            WALL_WEST => {
+                                world.create_entity()
+                                    .with(Position { x: x as f32, y: y as f32 })
+                                    .with(WallTile)
+                                    .with(Model3D::from_index(3)
+                                        .with_tint(Color::DARKGRAY)
+                                        .with_z_rotation(90.0)
+                                    ).build();
+                            },
+                            // Note(Jökull): Way too slow
+                            //NOTHING => {
+                            //    world.create_entity()
+                            //        .with(Position { x: x as f32, y: y as f32 })
+                            //        .with(FloorTile)
+                            //        .with(
+                            //            Model3D::from_index(1)
+                            //                .with_tint(Color::DARKGRAY)
+                            //                .with_offset(Vector3::new(0.0, 0.0, 1.0))
+                            //        ).build();
+                            //},
+                            _ => (),
                         }
-                        WALL => {
-                            world.create_entity()
-                                .with(Position { x: x as f32, y: y as f32 })
-                                .with(WallTile)
-                                .with(Model3D { idx: 1, tint: Color::LIGHTGRAY })
-                                .build();
-                        }
-                        _ => (),
                     }
                 }
             }

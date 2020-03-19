@@ -6,17 +6,14 @@ use rand::{Rng};
 use std::collections::{HashMap, HashSet};
 use self::ena::unify::{UnifyKey, UnificationTable, InPlace};
 
-pub enum TileKind {
-    NOTHING,
-    WALL,
-    FLOOR,
-    DEBUG,
-}
-
 pub const NOTHING : i32 = 0;
 pub const WALL : i32 = 1;
 pub const FLOOR : i32 = 2;
-pub const DEBUG : i32 = 3;
+pub const WALL_NORTH : i32= 3;
+pub const WALL_SOUTH : i32 = 4;
+pub const WALL_EAST : i32 = 5;
+pub const WALL_WEST : i32 = 6;
+pub const DEBUG : i32 = 7;
 
 pub struct DungGen {
     pub width      : i32,
@@ -211,6 +208,63 @@ impl DungGen {
             let (r1, r2) = to_connect;
             comps.union(*keys.get(&r1).unwrap(), *keys.get(&r2).unwrap());
         }
+
+        for x in 0..self.width {
+            for y in 0..self.width {
+                if self.world.get(&(x,y)) == None { self.world.insert((x,y), NOTHING); }
+            }
+        }
+
+        let mut walls_north = vec!();
+        let mut walls_south = vec!();
+        let mut walls_east = vec!();
+        let mut walls_west = vec!();
+
+        for x in 1..self.width-1 {
+            for y in 1..self.height-1 {
+                let loc = (x,y);
+                if *self.world.get(&loc).unwrap() == WALL {
+                    let N = *self.world.get(&(x,y+1)).unwrap();
+                    let S = *self.world.get(&(x,y-1)).unwrap();
+                    let E = *self.world.get(&(x+1,y)).unwrap();
+                    let W = *self.world.get(&(x-1,y)).unwrap();
+                    //let NE = self.world.get(&(x+1,y+1));
+                    //let NW = self.world.get(&(x-1,y+1));
+                    //let SE = self.world.get(&(x+1,y-1));
+                    //let SW = self.world.get(&(x-1,y-1));
+
+                    if N == WALL || N == NOTHING {
+                       if S == FLOOR && E == WALL && W == WALL {
+                           walls_north.push(loc);
+                           continue;
+                       }
+                    }
+                    if S == WALL || S == NOTHING {
+                        if N == FLOOR && E == WALL && W == WALL {
+                            walls_south.push(loc);
+                            continue;
+                        }
+                    }
+                    if E == WALL || E == NOTHING {
+                        if W == FLOOR && N == WALL && S == WALL {
+                            walls_east.push(loc);
+                            continue;
+                        }
+                    }
+                    if W == WALL || W == NOTHING {
+                        if E == FLOOR && N == WALL && S == WALL {
+                            walls_west.push(loc);
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        for n in walls_north { self.world.insert(n, WALL_NORTH); }
+        for s in walls_south { self.world.insert(s, WALL_SOUTH); }
+        for e in walls_east  { self.world.insert(e, WALL_EAST); }
+        for w in walls_west  { self.world.insert(w, WALL_WEST); }
 
         return self;
     }

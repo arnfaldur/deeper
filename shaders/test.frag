@@ -93,7 +93,7 @@ vec4 fPointLightFactor(PointLight light, vec4 normal, vec4 viewDir, Material mat
 void main() {
     DirectionalLight dl;
     dl.direction = vec4(1.0, 0.8, 0.8, 0.0);
-    dl.color     = vec4(0.2, 0.2, 0.3, 1.0);
+    dl.color     = vec4(0.3, 0.3, 0.4, 1.0);
     //dl.color     = vec4(1.0, 1.0, 1.0, 1.0);
 
     Material mat;
@@ -103,8 +103,8 @@ void main() {
     mat.shininess = 32.0;
 
     vec4 viewDir = vec4(eyePosition - fragPosition, 0.0);
-    vec4 normal  = vec4(normalize(fragTangentMatrix * normalize(texture(texture2, fragTexCoord).rgb * 2 - 1)), 0.0);
-    vec4 normal  = vec4(fragNormal, 0.0);
+    //vec4 normal  = vec4(normalize(fragTangentMatrix * normalize(texture(texture2, fragTexCoord).rgb * 2 - 1)), 0.0);
+    vec4 normal  = vec4(normalize(fragNormal), 0.0);
 
     finalColor = fDirectionalLightFactor(dl, normal, mat);
 

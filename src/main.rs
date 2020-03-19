@@ -6,7 +6,6 @@ mod dung_gen;
 
 use dung_gen::{
     DungGen,
-    TileKind,
 };
 
 mod components;
@@ -23,8 +22,21 @@ use specs::{DispatcherBuilder, WorldExt, Builder, System, AccessorCow, RunningTi
 
 use specs::Component;
 
+const frag_src: &str = include_str!("../shaders/test.frag");
+const vert_src: &str = include_str!("../shaders/test.vert");
+
 fn main() {
     let mut ass_man = AssetManager::new();
+
+    let dungeon = DungGen::new()
+        .width(75)
+        .height(75)
+        .n_rooms(10)
+        .room_min(5)
+        .room_range(15)
+        .generate();
+
+    let player_start = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap().clone();
 
     let ds = ass_man.load_display_settings();
 
@@ -42,27 +54,58 @@ fn main() {
 
     register_components(&mut world);
 
-    let model_array = vec![
+    let mut l_shader = rl.load_shader_code(
+        &thread,
+        Some(vert_src),
+        Some(frag_src)
+    );
+
+
+    for i in 0..dungeon.room_centers.len() {
+        let center = dungeon.room_centers[i];
+        let prefix = format!("uPointLights[{}]", i);
+        let is_lit_loc   = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
+        let radius_loc   = l_shader.get_shader_location(&format!("{}.radius", prefix));
+        let position_loc = l_shader.get_shader_location(&format!("{}.position", prefix));
+        let color_loc    = l_shader.get_shader_location(&format!("{}.color", prefix));
+
+        l_shader.set_shader_value(is_lit_loc, 1);
+        l_shader.set_shader_value(radius_loc, 1000.0);
+        l_shader.set_shader_value(position_loc, vec3(center.0 as f32, center.1 as f32, 1.0));
+        let color = Vector4::new(0.9, 0.4, 0.1, 1.0);
+        l_shader.set_shader_value(color_loc, color);
+    }
+
+    let mut model_array = vec![
         rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/walltest.obj").unwrap(),
     ];
+
+    for mut model in &mut model_array {
+        let materials = model.materials_mut();
+        let material = &mut materials[0];
+
+        material.shader = *l_shader.as_ref();
+    }
 
     // Relinquish the raylib handle to the world
     world.insert(rl);
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
-        .with(DunGenSystem, "DunGenSystem", &[])
+        .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(MovementSystem, "MovementSystem", &[])
         .with(PlayerSystem, "PlayerSystem", &[])
         .with(SphericalFollowSystem, "SphericalFollowSystem", &["PlayerSystem", "MovementSystem"])
-        .with_thread_local(GraphicsSystem { thread, model_array })
+        .with_thread_local(GraphicsSystem::new(thread, model_array, l_shader))
         .build();
 
     let player = world.create_entity()
         .with(Player)
-        .with(Position::new())
-        .with(Model3D::from_index(0))
+        .with(Position{ x: player_start.0 as f32, y: player_start.1 as f32 })
+        .with(Model3D::from_index(2).with_scale(0.5))
         .build();
 
     let active_camera = world.create_entity()
@@ -80,11 +123,6 @@ fn main() {
         .build();
 
     world.insert(ActiveCamera(active_camera));
-
-    world.create_entity()
-        .with(Position { x: 1.0, y: 2.0 })
-        .with(Model3D::from_index(1))
-        .build();
 
     // Setup world
     dispatcher.setup(&mut world);
