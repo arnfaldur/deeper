@@ -1,21 +1,16 @@
 extern crate specs;
 
 use specs::{
-    DispatcherBuilder,
     WorldExt,
     Builder,
     System,
-    AccessorCow,
-    RunningTime,
     Component,
     VecStorage,
 };
 
 use raylib::prelude::*;
 use std::f32::consts::PI;
-use rand::seq::SliceRandom;
-use std::ops::{Add, Mul};
-use std::process::exit;
+use std::ops::{Mul};
 use specs::prelude::*;
 
 
@@ -163,12 +158,12 @@ pub struct GraphicsSystem {
     pub thread: RaylibThread,
     pub model_array: Vec<Model>,
     pub l_shader: Shader,
-    matModel_loc : i32,
-    eyePosition_loc : i32,
+    mat_model_loc: i32,
+    eye_position_loc: i32,
 }
 
 impl GraphicsSystem {
-    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self { Self { thread, model_array, l_shader, matModel_loc: 0, eyePosition_loc: 0 } }
+    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self { Self { thread, model_array, l_shader, mat_model_loc: 0, eye_position_loc: 0 } }
 }
 
 impl<'a> System<'a> for GraphicsSystem {
@@ -194,7 +189,7 @@ impl<'a> System<'a> for GraphicsSystem {
             let active_target = target.get(active_cam.0).unwrap();
             let camera_position = pos3d.get(active_cam.0).unwrap().0;
 
-            self.l_shader.set_shader_value(self.eyePosition_loc, camera_position);
+            self.l_shader.set_shader_value(self.eye_position_loc, camera_position);
 
             let mut d3 = d2.begin_mode_3D(
                 Camera3D::perspective(
@@ -208,7 +203,7 @@ impl<'a> System<'a> for GraphicsSystem {
             for (pos, model) in (&pos, &models).join() {
                 let model_pos = pos.clone().to_vec3() + model.offset;
                 self.l_shader.set_shader_value_matrix(
-                    self.matModel_loc,
+                    self.mat_model_loc,
                     Matrix::scale(model.scale, model.scale, model.scale).mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
                 );
                 d3.draw_model_ex(
@@ -227,8 +222,8 @@ impl<'a> System<'a> for GraphicsSystem {
     }
 
     fn setup(&mut self, world: &mut World) {
-        self.matModel_loc     = self.l_shader.get_shader_location("matModel");
-        self.eyePosition_loc  = self.l_shader.get_shader_location("eyePosition");
+        self.mat_model_loc = self.l_shader.get_shader_location("matModel");
+        self.eye_position_loc = self.l_shader.get_shader_location("eyePosition");
 
         println!("GraphicsSystem setup!");
     }
@@ -254,13 +249,11 @@ impl<'a> System<'a> for PlayerSystem {
             if rl.is_key_down(KEY_DOWN) { pos.y -= cam_speed }
             if rl.is_key_down(KEY_LEFT) { pos.x -= cam_speed }
             if rl.is_key_down(KEY_RIGHT) { pos.x += cam_speed }
-
-            use raylib::consts::MouseButton::*;
         }
 
         let ang_vel = 0.03;
         for (cam, target, offset) in (&mut cam, &target, &mut offset).join() {
-            if let Some(player) = player.get(target.0) {
+            if let Some(_player) = player.get(target.0) {
                 if rl.is_key_down(KEY_E) { offset.phi += ang_vel; }
                 if rl.is_key_down(KEY_D) { offset.phi -= ang_vel; }
                 offset.phi = offset.phi.max(0.3).min(PI / 2.0 - 0.3);

@@ -22,8 +22,8 @@ use specs::{DispatcherBuilder, WorldExt, Builder, System, AccessorCow, RunningTi
 
 use specs::Component;
 
-const frag_src: &str = include_str!("../shaders/test.frag");
-const vert_src: &str = include_str!("../shaders/test.vert");
+const FRAG_SRC: &str = include_str!("../shaders/test.frag");
+const VERT_SRC: &str = include_str!("../shaders/test.vert");
 
 fn main() {
     let mut ass_man = AssetManager::new();
@@ -56,8 +56,8 @@ fn main() {
 
     let mut l_shader = rl.load_shader_code(
         &thread,
-        Some(vert_src),
-        Some(frag_src)
+        Some(VERT_SRC),
+        Some(FRAG_SRC)
     );
 
 
@@ -83,7 +83,7 @@ fn main() {
         rl.load_model(&thread, "./assets/Models/walltest.obj").unwrap(),
     ];
 
-    for mut model in &mut model_array {
+    for model in &mut model_array {
         let materials = model.materials_mut();
         let material = &mut materials[0];
 
