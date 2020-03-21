@@ -9,8 +9,11 @@ use dung_gen::{
 };
 
 mod components;
+mod systems;
 
 use components::*;
+use crate::components::components::*;
+use crate::systems::systems::*;
 
 use raylib::prelude::*;
 use std::f32::consts::PI;
@@ -109,7 +112,7 @@ fn main() {
         .build();
 
     let active_camera = world.create_entity()
-        .with(components::Camera {
+        .with(components::components::Camera {
             up: Vector3::new(0.0, 0.0, 1.0),
             fov: 40.0,
         })
