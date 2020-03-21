@@ -82,8 +82,14 @@ impl From<&Velocity> for Vector2 {
     }
 }
 
-#[derive(Component)]
-pub struct Player;
+pub struct Player {
+    entity : Entity,
+    speed : f32,
+}
+
+impl Player {
+    pub fn from_entity(entity: Entity) -> Self { return Self { entity,  speed:  0.05 } }
+}
 
 #[derive(Component)]
 pub struct Camera {
@@ -101,10 +107,30 @@ pub struct Position3D(pub Vector3);
 pub struct ActiveCamera(pub Entity);
 
 #[derive(Component)]
+pub struct PlayerCamera(pub Entity);
+
+#[derive(Component)]
 pub struct SphericalOffset {
     pub theta: f32,
     pub phi: f32,
     pub radius: f32,
+    pub theta_delta: f32,
+    pub phi_delta: f32,
+    pub radius_delta: f32,
+}
+
+// Note(Jökull): Until we have a standardized way of interacting or setting these values,
+//               we can have the defaults as the most practical
+impl SphericalOffset {
+    pub fn new() -> Self { Self {
+        theta: PI / 3.0,
+        phi: 0.2 * PI,
+        radius: 15.0,
+        // TODO: Not satisfactory, but need to limit untraceable magic constants
+        theta_delta: -0.005,
+        phi_delta: 0.005,
+        radius_delta: 0.1,
+    }}
 }
 
 pub struct SphericalFollowSystem;
@@ -132,9 +158,7 @@ struct CameraSystem;
 impl<'a> System<'a> for CameraSystem {
     type SystemData = (WriteStorage<'a, Camera>, ReadStorage<'a, Position3D>);
 
-    fn run(&mut self, (camera, pos): Self::SystemData) {
-        for (camera, pos) in (&camera, &pos).join() {}
-    }
+    fn run(&mut self, (camera, pos): Self::SystemData) {}
 }
 
 #[derive(Component)]
@@ -175,7 +199,6 @@ impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
         WriteExpect<'a, RaylibHandle>,
         ReadExpect<'a, ActiveCamera>,
-        ReadStorage<'a, Player>,
         ReadStorage<'a, Camera>,
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
@@ -183,7 +206,7 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Model3D>,
     );
 
-    fn run(&mut self, (mut rl, active_cam, player, camera, target, pos3d, pos, models): Self::SystemData) {
+    fn run(&mut self, (mut rl, active_cam, camera, target, pos3d, pos, models): Self::SystemData) {
         let fps = 1.0 / rl.get_frame_time();
         let mut d2: RaylibDrawHandle = rl.begin_drawing(&self.thread);
 
@@ -207,10 +230,12 @@ impl<'a> System<'a> for GraphicsSystem {
 
             for (pos, model) in (&pos, &models).join() {
                 let model_pos = pos.clone().to_vec3() + model.offset;
+
                 self.l_shader.set_shader_value_matrix(
                     self.matModel_loc,
                     Matrix::scale(model.scale, model.scale, model.scale).mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
                 );
+
                 d3.draw_model_ex(
                     &self.model_array[model.idx],
                     model_pos,
@@ -234,46 +259,72 @@ impl<'a> System<'a> for GraphicsSystem {
     }
 }
 
-pub struct PlayerSystem;
+pub struct PlayerSystem {
+    // Note(Jökull): Yeah, I know. This is just while we're feeling out what is the
+    //               responsibility of the input handling system exactly
+    last_mouse_pos: Vector2,
+}
 
+impl PlayerSystem {
+    pub fn new() -> Self { Self { last_mouse_pos: Vector2::zero() } }
+}
+
+// Note(Jökull): Is this really just the input handler?
 impl<'a> System<'a> for PlayerSystem {
     type SystemData = (
         ReadExpect<'a, RaylibHandle>,
-        ReadStorage<'a, Player>,
-        WriteStorage<'a, Position>,
-        WriteStorage<'a, Camera>,
-        ReadStorage<'a, Target>,
+        ReadExpect<'a, Player>,
+        ReadExpect<'a, PlayerCamera>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Position3D>,
+        ReadStorage<'a, Camera>,
+
+        WriteStorage<'a, Model3D>,
+        WriteStorage<'a, Velocity>,
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(&mut self, (rl, player, mut pos, mut cam, target, mut offset): Self::SystemData) {
-        use raylib::consts::KeyboardKey::*;
-        let cam_speed = 0.1;
-        for (_, pos) in (&player, &mut pos).join() {
-            if rl.is_key_down(KEY_UP) { pos.y += cam_speed }
-            if rl.is_key_down(KEY_DOWN) { pos.y -= cam_speed }
-            if rl.is_key_down(KEY_LEFT) { pos.x -= cam_speed }
-            if rl.is_key_down(KEY_RIGHT) { pos.x += cam_speed }
+    fn run(&mut self, (rl, player, player_cam, pos, pos3d, cam, mut model, mut vel, mut offset): Self::SystemData) {
+        use raylib::consts::{KeyboardKey::*, MouseButton::*};
+        let camera = cam.get(player_cam.0).unwrap();
+        let camera_pos = pos3d.get(player_cam.0).unwrap();
+        let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
 
-            use raylib::consts::MouseButton::*;
+        let mouse_delta = rl.get_mouse_position() - self.last_mouse_pos;
+        self.last_mouse_pos = rl.get_mouse_position();
+
+        if rl.is_mouse_button_down(MOUSE_MIDDLE_BUTTON) {
+            camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
+            camera_offset.phi   += camera_offset.phi_delta   * mouse_delta.y;
+            camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
         }
 
-        let ang_vel = 0.03;
-        for (cam, target, offset) in (&mut cam, &target, &mut offset).join() {
-            if let Some(player) = player.get(target.0) {
-                if rl.is_key_down(KEY_E) { offset.phi += ang_vel; }
-                if rl.is_key_down(KEY_D) { offset.phi -= ang_vel; }
-                offset.phi = offset.phi.max(0.3).min(PI / 2.0 - 0.3);
+        let mut player_vel = vel.get_mut(player.entity).unwrap();
+        player_vel.x = 0.0;
+        player_vel.y = 0.0;
 
-                if rl.is_key_down(KEY_S) { offset.theta -= ang_vel; }
-                if rl.is_key_down(KEY_F) { offset.theta += ang_vel; }
+        if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
+            // Note(Jökull): We need a better solution for this
+            let player_pos = pos.get(player.entity).unwrap();
+            let rl_cam = raylib::camera::Camera::perspective(
+                camera_pos.0,
+                player_pos.to_vec3(),
+                camera.up,
+                camera.fov,
+            );
+            let mouse_ray = rl.get_mouse_ray(rl.get_mouse_position(), rl_cam);
+            let t = mouse_ray.position.z / mouse_ray.direction.z;
+            let ray_hit = mouse_ray.position - mouse_ray.direction.scale_by(t);
+            let difference = (ray_hit - player_pos.to_vec3()).normalized();
+            player_vel.x = difference.x * player.speed;
+            player_vel.y = difference.y * player.speed;
 
-                if rl.is_key_down(KEY_W) { offset.radius -= cam_speed; }
-                if rl.is_key_down(KEY_R) { offset.radius += cam_speed; }
-                offset.radius = offset.radius.max(2.0).min(10.0);
-
-                cam.fov += rl.get_mouse_wheel_move() as f32;
-            };
+            let model = model.get_mut(player.entity).unwrap();
+            let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
+            if difference.x > 0.0 {
+                new_rotation += 180.0;
+            }
+            model.z_rotation = new_rotation;
         }
     }
 
@@ -385,7 +436,6 @@ pub(crate) fn register_components(world: &mut World) {
     world.register::<Position>();
     world.register::<Position3D>();
     world.register::<Velocity>();
-    world.register::<Player>();
     world.register::<Camera>();
     world.register::<Target>();
     world.register::<ActiveCamera>();

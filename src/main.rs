@@ -29,11 +29,11 @@ fn main() {
     let mut ass_man = AssetManager::new();
 
     let dungeon = DungGen::new()
-        .width(75)
-        .height(75)
+        .width(60)
+        .height(60)
         .n_rooms(10)
         .room_min(5)
-        .room_range(15)
+        .room_range(5)
         .generate();
 
     let player_start = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap().clone();
@@ -97,32 +97,30 @@ fn main() {
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(MovementSystem, "MovementSystem", &[])
-        .with(PlayerSystem, "PlayerSystem", &[])
+        .with(PlayerSystem::new(), "PlayerSystem", &[])
         .with(SphericalFollowSystem, "SphericalFollowSystem", &["PlayerSystem", "MovementSystem"])
         .with_thread_local(GraphicsSystem::new(thread, model_array, l_shader))
         .build();
 
     let player = world.create_entity()
-        .with(Player)
         .with(Position{ x: player_start.0 as f32, y: player_start.1 as f32 })
+        .with(Velocity { x: 0.0, y: 0.0 })
         .with(Model3D::from_index(2).with_scale(0.5))
         .build();
 
-    let active_camera = world.create_entity()
+    let player_camera = world.create_entity()
         .with(components::Camera {
             up: Vector3::new(0.0, 0.0, 1.0),
-            fov: 40.0,
+            fov: 25.0,
         })
         .with(Target(player))
         .with(Position3D(vec3(0.0, 0.0, 0.0)))
-        .with(SphericalOffset {
-            theta: PI / 3.0,
-            phi: PI / 4.0,
-            radius: 4.5,
-        })
+        .with(SphericalOffset::new())
         .build();
 
-    world.insert(ActiveCamera(active_camera));
+    world.insert(Player::from_entity(player));
+    world.insert(ActiveCamera(player_camera));
+    world.insert(PlayerCamera(player_camera));
 
     // Setup world
     dispatcher.setup(&mut world);
