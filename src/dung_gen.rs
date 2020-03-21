@@ -3,7 +3,7 @@ extern crate ena;
 
 use rand::{Rng};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use self::ena::unify::{UnifyKey, UnificationTable, InPlace};
 
 pub const NOTHING : i32 = 0;

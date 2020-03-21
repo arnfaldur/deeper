@@ -1,49 +1,9 @@
-extern crate specs;
-
-use specs::{
-    DispatcherBuilder,
-    WorldExt,
-    Builder,
-    System,
-    AccessorCow,
-    RunningTime,
-    Component,
-    VecStorage,
-};
-
+use specs::prelude::*;
 use raylib::prelude::*;
 use std::f32::consts::PI;
-use rand::seq::SliceRandom;
-use std::ops::{Add, Mul};
-use std::process::exit;
-use specs::prelude::*;
+use std::ops::{Mul};
 
-
-#[derive(Component, Debug, Copy, Clone)]
-#[storage(VecStorage)]
-pub struct Position {
-    pub x: f32,
-    pub y: f32,
-}
-
-impl Position {
-    pub fn new() -> Position { Position { x: 0.0, y: 0.0 } }
-}
-
-#[derive(Component, Debug)]
-#[storage(VecStorage)]
-pub struct Velocity {
-    pub x: f32,
-    pub y: f32,
-}
-
-impl Velocity {
-    pub fn new() -> Velocity { Velocity { x: 0.0, y: 0.0 } }
-}
-
-#[derive(Component)]
-#[storage(VecStorage)]
-pub struct Agent;
+use crate::components::components::*;
 
 pub struct MovementSystem;
 
@@ -56,81 +16,6 @@ impl<'a> System<'a> for MovementSystem {
             pos.y += vel.y;
         }
     }
-}
-
-impl From<&Position> for Vector3 {
-    fn from(pos: &Position) -> Vector3 {
-        Vector3::new(pos.x, pos.y, 0.0)
-    }
-}
-
-impl Position {
-    pub fn to_vec3(self) -> Vector3 {
-        Vector3::new(self.x, self.y, 0.0)
-    }
-}
-
-impl From<&Position> for Vector2 {
-    fn from(pos: &Position) -> Vector2 {
-        Vector2::new(pos.x, pos.y)
-    }
-}
-
-impl From<&Velocity> for Vector2 {
-    fn from(pos: &Velocity) -> Vector2 {
-        Vector2::new(pos.x, pos.y)
-    }
-}
-
-pub struct Player {
-    entity : Entity,
-    speed : f32,
-}
-
-impl Player {
-    pub fn from_entity(entity: Entity) -> Self { return Self { entity,  speed:  0.05 } }
-}
-
-#[derive(Component)]
-pub struct Camera {
-    pub fov: f32,
-    pub up: Vector3,
-}
-
-#[derive(Component)]
-pub struct Target(pub Entity);
-
-#[derive(Component)]
-pub struct Position3D(pub Vector3);
-
-#[derive(Component)]
-pub struct ActiveCamera(pub Entity);
-
-#[derive(Component)]
-pub struct PlayerCamera(pub Entity);
-
-#[derive(Component)]
-pub struct SphericalOffset {
-    pub theta: f32,
-    pub phi: f32,
-    pub radius: f32,
-    pub theta_delta: f32,
-    pub phi_delta: f32,
-    pub radius_delta: f32,
-}
-
-// Note(Jökull): Until we have a standardized way of interacting or setting these values,
-//               we can have the defaults as the most practical
-impl SphericalOffset {
-    pub fn new() -> Self { Self {
-        theta: PI / 3.0,
-        phi: 0.2 * PI,
-        radius: 15.0,
-        // TODO: Not satisfactory, but need to limit untraceable magic constants
-        theta_delta: -0.005,
-        phi_delta: 0.005,
-        radius_delta: 0.1,
-    }}
 }
 
 pub struct SphericalFollowSystem;
@@ -156,28 +41,9 @@ impl<'a> System<'a> for SphericalFollowSystem {
 struct CameraSystem;
 
 impl<'a> System<'a> for CameraSystem {
-    type SystemData = (WriteStorage<'a, Camera>, ReadStorage<'a, Position3D>);
+    type SystemData = (WriteStorage<'a, crate::components::components::Camera>, ReadStorage<'a, Position3D>);
 
     fn run(&mut self, (camera, pos): Self::SystemData) {}
-}
-
-#[derive(Component)]
-pub struct Model3D {
-    pub idx: usize,
-    offset: Vector3,
-    scale: f32,
-    z_rotation : f32,
-    tint: Color,
-}
-
-// Note(Jökull): Probably not great to have both constructor and builder patterns
-impl Model3D {
-    pub fn new() -> Self { Self { idx: 0, offset: Vector3::zero(), tint: Color::WHITE, scale: 1.0, z_rotation: 0.0} }
-    pub fn from_index(index: usize) -> Model3D { let mut m = Self::new(); m.idx = index; return m; }
-    pub fn with_offset(mut self, offset: Vector3) -> Model3D { self.offset = offset; self }
-    pub fn with_scale(mut self, scale: f32) -> Self { self.scale = scale; self }
-    pub fn with_z_rotation(mut self, z_rotation: f32) -> Self { self.z_rotation = z_rotation; self }
-    pub fn with_tint(mut self, tint: Color) -> Self { self.tint = tint; self }
 }
 
 extern crate raylib;
@@ -187,19 +53,20 @@ pub struct GraphicsSystem {
     pub thread: RaylibThread,
     pub model_array: Vec<Model>,
     pub l_shader: Shader,
-    matModel_loc : i32,
-    eyePosition_loc : i32,
+    mat_model_loc: i32,
+    eye_position_loc: i32,
 }
 
 impl GraphicsSystem {
-    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self { Self { thread, model_array, l_shader, matModel_loc: 0, eyePosition_loc: 0 } }
+    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self { Self { thread, model_array, l_shader, mat_model_loc: 0, eye_position_loc: 0 } }
 }
 
 impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
         WriteExpect<'a, RaylibHandle>,
         ReadExpect<'a, ActiveCamera>,
-        ReadStorage<'a, Camera>,
+        ReadStorage<'a, crate::components::components::Camera>,
+
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Position>,
@@ -217,7 +84,7 @@ impl<'a> System<'a> for GraphicsSystem {
             let active_target = target.get(active_cam.0).unwrap();
             let camera_position = pos3d.get(active_cam.0).unwrap().0;
 
-            self.l_shader.set_shader_value(self.eyePosition_loc, camera_position);
+            self.l_shader.set_shader_value(self.eye_position_loc, camera_position);
 
             let mut d3 = d2.begin_mode_3D(
                 Camera3D::perspective(
@@ -232,7 +99,7 @@ impl<'a> System<'a> for GraphicsSystem {
                 let model_pos = pos.clone().to_vec3() + model.offset;
 
                 self.l_shader.set_shader_value_matrix(
-                    self.matModel_loc,
+                    self.mat_model_loc,
                     Matrix::scale(model.scale, model.scale, model.scale).mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
                 );
 
@@ -252,8 +119,8 @@ impl<'a> System<'a> for GraphicsSystem {
     }
 
     fn setup(&mut self, world: &mut World) {
-        self.matModel_loc     = self.l_shader.get_shader_location("matModel");
-        self.eyePosition_loc  = self.l_shader.get_shader_location("eyePosition");
+        self.mat_model_loc = self.l_shader.get_shader_location("matModel");
+        self.eye_position_loc = self.l_shader.get_shader_location("eyePosition");
 
         println!("GraphicsSystem setup!");
     }
@@ -277,7 +144,7 @@ impl<'a> System<'a> for PlayerSystem {
         ReadExpect<'a, PlayerCamera>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Position3D>,
-        ReadStorage<'a, Camera>,
+        ReadStorage<'a, crate::components::components::Camera>,
 
         WriteStorage<'a, Model3D>,
         WriteStorage<'a, Velocity>,
@@ -332,13 +199,6 @@ impl<'a> System<'a> for PlayerSystem {
         println!("PlayerSystem setup!");
     }
 }
-
-#[derive(Component)]
-struct WallTile;
-
-#[derive(Component)]
-struct FloorTile;
-
 
 use crate::dung_gen::{DungGen};
 
@@ -432,15 +292,3 @@ impl<'a> System<'a> for DunGenSystem {
     }
 }
 
-pub(crate) fn register_components(world: &mut World) {
-    world.register::<Position>();
-    world.register::<Position3D>();
-    world.register::<Velocity>();
-    world.register::<Camera>();
-    world.register::<Target>();
-    world.register::<ActiveCamera>();
-    world.register::<SphericalOffset>();
-    world.register::<Model3D>();
-    world.register::<WallTile>();
-    world.register::<FloorTile>();
-}

@@ -93,7 +93,7 @@ vec4 fPointLightFactor(PointLight light, vec4 normal, vec4 viewDir, Material mat
 void main() {
     DirectionalLight dl;
     dl.direction = vec4(1.0, 0.8, 0.8, 0.0);
-    dl.color     = vec4(0.3, 0.3, 0.4, 1.0);
+    dl.color     = vec4(0.2, 0.2, 0.3, 1.0);
     //dl.color     = vec4(1.0, 1.0, 1.0, 1.0);
 
     Material mat;
