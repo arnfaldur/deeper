@@ -100,7 +100,9 @@ impl<'a> System<'a> for GraphicsSystem {
 
                 self.l_shader.set_shader_value_matrix(
                     self.mat_model_loc,
-                    Matrix::scale(model.scale, model.scale, model.scale).mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
+                    Matrix::scale(model.scale, model.scale, model.scale)
+                        .mul(Matrix::rotate(Vector3::new(0.0, 0.0, 1.0), PI * model.z_rotation / 180.0))
+                        .mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
                 );
 
                 d3.draw_model_ex(
