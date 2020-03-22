@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use raylib::prelude::*;
+use raylib::prelude::*);
 use std::f32::consts::PI;
 use std::ops::{Mul};
 
@@ -184,7 +184,8 @@ impl<'a> System<'a> for PlayerSystem {
             let mouse_ray = rl.get_mouse_ray(rl.get_mouse_position(), rl_cam);
             let t = mouse_ray.position.z / mouse_ray.direction.z;
             let ray_hit = mouse_ray.position - mouse_ray.direction.scale_by(t);
-            let difference = (ray_hit - player_pos.to_vec3()).normalized();
+            let difference = (ray_hit - player_pos.to_vec3());
+            let difference = difference.scale_by(1.0 / difference.length());
             player_vel.x = difference.x * player.speed;
             player_vel.y = difference.y * player.speed;
 
