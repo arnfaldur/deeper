@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use raylib::prelude::*);
+use raylib::prelude::*;
 use std::f32::consts::PI;
 use std::ops::{Mul};
 

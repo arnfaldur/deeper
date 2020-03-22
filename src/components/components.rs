@@ -86,7 +86,7 @@ pub struct Camera {
     pub up: Vector3,
 }
 
-#[derive(Component)
+#[derive(Component)]
 pub struct Target(pub Entity);
 
 #[derive(Component)]
