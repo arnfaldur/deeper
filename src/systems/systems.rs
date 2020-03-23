@@ -1,5 +1,5 @@
-use specs::prelude::*;
 use raylib::prelude::*;
+use specs::prelude::*;
 use std::f32::consts::PI;
 use std::ops::Mul;
 
@@ -40,7 +40,10 @@ impl<'a> System<'a> for SphericalFollowSystem {
 struct CameraSystem;
 
 impl<'a> System<'a> for CameraSystem {
-    type SystemData = (WriteStorage<'a, crate::components::components::Camera>, ReadStorage<'a, Position3D>);
+    type SystemData = (
+        WriteStorage<'a, crate::components::components::Camera>,
+        ReadStorage<'a, Position3D>,
+    );
 
     fn run(&mut self, (camera, pos): Self::SystemData) {}
 }
@@ -58,7 +61,15 @@ pub struct GraphicsSystem {
 }
 
 impl GraphicsSystem {
-    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self { Self { thread, model_array, l_shader, mat_model_loc: 0, eye_position_loc: 0 } }
+    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self {
+        Self {
+            thread,
+            model_array,
+            l_shader,
+            mat_model_loc: 0,
+            eye_position_loc: 0,
+        }
+    }
 }
 
 impl<'a> System<'a> for GraphicsSystem {
@@ -83,16 +94,15 @@ impl<'a> System<'a> for GraphicsSystem {
             let active_target = target.get(active_cam.0).unwrap();
             let camera_position = pos3d.get(active_cam.0).unwrap().0;
 
-            self.l_shader.set_shader_value(self.eye_position_loc, camera_position);
+            self.l_shader
+                .set_shader_value(self.eye_position_loc, camera_position);
 
-            let mut d3 = d2.begin_mode_3D(
-                Camera3D::perspective(
-                    camera_position,
-                    pos.get(active_target.0).unwrap().to_vec3(),
-                    active_camera.up,
-                    active_camera.fov,
-                )
-            );
+            let mut d3 = d2.begin_mode_3D(Camera3D::perspective(
+                camera_position,
+                pos.get(active_target.0).unwrap().to_vec3(),
+                active_camera.up,
+                active_camera.fov,
+            ));
 
             for (pos, model) in (&pos, &models).join() {
                 let model_pos = pos.clone().to_vec3() + model.offset;
@@ -100,7 +110,10 @@ impl<'a> System<'a> for GraphicsSystem {
                 self.l_shader.set_shader_value_matrix(
                     self.mat_model_loc,
                     Matrix::scale(model.scale, model.scale, model.scale)
-                        .mul(Matrix::rotate(Vector3::new(0.0, 0.0, 1.0), PI * model.z_rotation / 180.0))
+                        .mul(Matrix::rotate(
+                            Vector3::new(0.0, 0.0, 1.0),
+                            PI * model.z_rotation / 180.0,
+                        ))
                         .mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
                 );
 
@@ -134,7 +147,11 @@ pub struct PlayerSystem {
 }
 
 impl PlayerSystem {
-    pub fn new() -> Self { Self { last_mouse_pos: Vector2::zero() } }
+    pub fn new() -> Self {
+        Self {
+            last_mouse_pos: Vector2::zero(),
+        }
+    }
 }
 
 // Note(Jökull): Is this really just the input handler?
@@ -151,7 +168,10 @@ impl<'a> System<'a> for PlayerSystem {
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(&mut self, (rl, player, player_cam, pos, pos3d, cam, mut model, mut vel, mut offset): Self::SystemData) {
+    fn run(
+        &mut self,
+        (rl, player, player_cam, pos, pos3d, cam, mut model, mut vel, mut offset): Self::SystemData,
+    ) {
         use raylib::consts::{KeyboardKey::*, MouseButton::*};
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
@@ -181,7 +201,7 @@ impl<'a> System<'a> for PlayerSystem {
             let mouse_ray = rl.get_mouse_ray(rl.get_mouse_position(), rl_cam);
             let t = mouse_ray.position.z / mouse_ray.direction.z;
             let ray_hit = mouse_ray.position - mouse_ray.direction.scale_by(t);
-            let difference = (ray_hit - player_pos.to_vec3());
+            let difference = ray_hit - player_pos.to_vec3();
             let difference = difference.scale_by(1.0 / difference.length());
             player_vel.0.x = difference.x * player.speed;
             player_vel.0.y = difference.y * player.speed;
@@ -214,15 +234,21 @@ impl<'a> System<'a> for Physics2DSystem {
     );
 
     fn run(&mut self, (ents, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
-
         for _ in (&dynamics, &statics).join() {
-            println!("There's a naughty static body that really feels dynamic inside.");
-            exit(0);
+            panic!("There's a naughty static body that really feels dynamic inside.");
         }
 
         for (_, pos_d, vel, circle_d) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_s, circle_s) in (&statics, &pos, &circles).join() {
                 if (pos_d.0 + vel.0).distance_to(pos_s.0) < (circle_d.radius + circle_s.radius) {
+                    let diff = pos_s.0 - pos_d.0;
+                    let collinear_part = diff.scale_by(vel.0.dot(diff));
+                    vel.0 -= collinear_part;
+                }
+            }
+            for (_, pos_s, square_s) in (&statics, &pos, &squares).join() {
+                let thing: Vector2 = pos_d.0 - pos_s.0;
+                if (pos_d.0 + vel.0).distance_to(pos_s.0) < (circle_d.radius + square_s.side_length) {
                     let diff = pos_s.0 - pos_d.0;
                     let collinear_part = diff.scale_by(vel.0.dot(diff));
                     vel.0 -= collinear_part;
@@ -242,8 +268,7 @@ impl<'a> System<'a> for Physics2DSystem {
     }
 }
 
-use crate::dung_gen::DungGen;
-use std::process::exit;
+use crate::dung_gen::{DungGen, WallDirection};
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
@@ -261,68 +286,38 @@ impl<'a> System<'a> for DunGenSystem {
             for y in 0..=self.dungeon.height {
                 match self.dungeon.world.get(&(x, y)) {
                     None => (),
-                    Some(&value) => {
-                        let mut ent = world.create_entity()
-                            .with(Position(vec2(x as f32, y as f32)));
-
-                        match value {
-                            WallType::FLOOR => {
-                                ent.with(FloorTile)
-                                    .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
-                            }
-                            WallType::WALL => {
-                                ent.with(WallTile)
-                                    .with(Model3D::from_index(0).with_tint(Color::LIGHTGRAY))
-                                    .with(StaticBody)
-                                    .with(CircleCollider { radius: 0.5 })
-                            }
-                            WallType::WALL_NORTH => {
-                                ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        .with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(0.0)
-                                    )
-                                    .with(StaticBody)
-                                    .with(CircleCollider { radius: 0.5 })
-                            }
-                            WallType::WALL_SOUTH => {
-                                ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        .with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(180.0)
-                                    )
-                                    .with(StaticBody)
-                                    .with(CircleCollider { radius: 0.5 })
-                            }
-                            WallType::WALL_EAST => {
-                                ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        .with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(-90.0)
-                                    )
-                                    .with(StaticBody)
-                                    .with(CircleCollider { radius: 0.5 })
-                            }
-                            WallType::WALL_WEST => {
-                                ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        .with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(90.0)
-                                    )
-                                    .with(StaticBody)
-                                    .with(CircleCollider { radius: 0.5 })
-                            }
-                            WallType::NOTHING => {
-                                ent
-                            }
-                            WallType::DEBUG => {
-                                ent
-                            }
-                        }.build();
+                    Some(WallType::NOTHING) => (),
+                    Some(WallType::FLOOR) => {
+                        world.create_entity()
+                            .with(Position(vec2(x as f32, y as f32)))
+                            .with(FloorTile)
+                            .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
+                            .build();
+                    }
+                    Some(WallType::WALL(maybe_direction)) => {
+                        world.create_entity()
+                            .with(Position(vec2(x as f32, y as f32)))
+                            .with(WallTile)
+                            .with(
+                                match maybe_direction {
+                                    None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
+                                    Some(direction) => Model3D::from_index(4).
+                                        with_tint(Color::DARKGRAY).with_z_rotation(
+                                        match direction {
+                                            WallDirection::North => 0.0,
+                                            WallDirection::South => 180.0,
+                                            WallDirection::East => 270.0,
+                                            WallDirection::West => 90.0,
+                                        }
+                                    ),
+                                }
+                            )
+                            .with(StaticBody)
+                            .with(SquareCollider { side_length: 0.5 })
+                            .build();
                     }
                 }
             }
         }
     }
 }
-

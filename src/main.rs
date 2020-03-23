@@ -9,19 +9,12 @@ use dung_gen::DungGen;
 mod components;
 mod systems;
 
-use components::*;
 use crate::components::components::*;
 use crate::systems::systems::*;
 
-use raylib::prelude::*;
-use std::f32::consts::PI;
 use rand::seq::SliceRandom;
-use std::ops::{Add, Mul};
-use std::process::exit;
+use raylib::prelude::*;
 use specs::prelude::*;
-use specs::{DispatcherBuilder, WorldExt, Builder, System, AccessorCow, RunningTime};
-
-use specs::Component;
 
 const FRAG_SRC: &str = include_str!("../shaders/test.frag");
 const VERT_SRC: &str = include_str!("../shaders/test.vert");
@@ -37,7 +30,11 @@ fn main() {
         .room_range(5)
         .generate();
 
-    let player_start = dungeon.room_centers.choose(&mut rand::thread_rng()).unwrap().clone();
+    let player_start = dungeon
+        .room_centers
+        .choose(&mut rand::thread_rng())
+        .unwrap()
+        .clone();
 
     let ds = ass_man.load_display_settings();
 
@@ -49,18 +46,11 @@ fn main() {
 
     rl.set_target_fps(ds.fps);
 
-    use specs::{World, WorldExt, Builder};
-
     let mut world = World::new();
 
     register_components(&mut world);
 
-    let mut l_shader = rl.load_shader_code(
-        &thread,
-        Some(VERT_SRC),
-        Some(FRAG_SRC),
-    );
-
+    let mut l_shader = rl.load_shader_code(&thread, Some(VERT_SRC), Some(FRAG_SRC));
 
     for i in 0..dungeon.room_centers.len() {
         let center = dungeon.room_centers[i];
@@ -80,9 +70,15 @@ fn main() {
     let mut model_array = vec![
         rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/DungeonCollection2/struct_large_straight_wall.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/walltest.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj")
+            .unwrap(),
+        rl.load_model(
+            &thread,
+            "./assets/Models/DungeonCollection2/struct_large_straight_wall.obj",
+        )
+            .unwrap(),
+        rl.load_model(&thread, "./assets/Models/walltest.obj")
+            .unwrap(),
     ];
 
     for model in &mut model_array {
@@ -100,12 +96,21 @@ fn main() {
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
         .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem"])
-        .with(MovementSystem, "MovementSystem", &["Physics2DSystem","PlayerSystem"])
-        .with(SphericalFollowSystem, "SphericalFollowSystem", &["MovementSystem"])
+        .with(
+            MovementSystem,
+            "MovementSystem",
+            &["Physics2DSystem", "PlayerSystem"],
+        )
+        .with(
+            SphericalFollowSystem,
+            "SphericalFollowSystem",
+            &["MovementSystem"],
+        )
         .with_thread_local(GraphicsSystem::new(thread, model_array, l_shader))
         .build();
 
-    let player = world.create_entity()
+    let player = world
+        .create_entity()
         .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
         .with(DynamicBody)
         .with(CircleCollider { radius: 0.5 })
@@ -113,7 +118,8 @@ fn main() {
         .with(Model3D::from_index(2).with_scale(0.5))
         .build();
 
-    let player_camera = world.create_entity()
+    let player_camera = world
+        .create_entity()
         .with(components::components::Camera {
             up: Vector3::new(0.0, 0.0, 1.0),
             fov: 25.0,

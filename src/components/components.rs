@@ -1,15 +1,9 @@
 extern crate specs;
 
-use specs::{
-    WorldExt,
-    Builder,
-    System,
-    Component,
-    VecStorage,
-};
+use specs::{Component, VecStorage, WorldExt};
 
-use specs::prelude::*;
 use raylib::prelude::*;
+use specs::prelude::*;
 
 use std::f32::consts::PI;
 
@@ -20,7 +14,12 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn from_entity(entity: Entity) -> Self { return Self { entity, speed: 0.05 }; }
+    pub fn from_entity(entity: Entity) -> Self {
+        return Self {
+            entity,
+            speed: 0.05,
+        };
+    }
 }
 
 pub struct ActiveCamera(pub Entity);
@@ -34,7 +33,9 @@ pub struct PlayerCamera(pub Entity);
 pub struct Position(pub Vector2);
 
 impl Position {
-    pub fn new() -> Position { Position(vec2(0.0, 0.0)) }
+    pub fn new() -> Position {
+        Position(vec2(0.0, 0.0))
+    }
 }
 
 #[derive(Component, Debug)]
@@ -42,7 +43,9 @@ impl Position {
 pub struct Velocity(pub Vector2);
 
 impl Velocity {
-    pub fn new() -> Velocity { Velocity(vec2(0.0, 0.0)) }
+    pub fn new() -> Velocity {
+        Velocity(vec2(0.0, 0.0))
+    }
 }
 
 #[derive(Component)]
@@ -138,7 +141,15 @@ pub struct Model3D {
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
-    pub fn new() -> Self { Self { idx: 0, offset: Vector3::zero(), tint: Color::WHITE, scale: 1.0, z_rotation: 0.0 } }
+    pub fn new() -> Self {
+        Self {
+            idx: 0,
+            offset: Vector3::zero(),
+            tint: Color::WHITE,
+            scale: 1.0,
+            z_rotation: 0.0,
+        }
+    }
     pub fn from_index(index: usize) -> Model3D {
         let mut m = Self::new();
         m.idx = index;
@@ -167,7 +178,6 @@ pub struct WallTile;
 
 #[derive(Component)]
 pub struct FloorTile;
-
 
 pub fn register_components(world: &mut World) {
     world.register::<Position>();
