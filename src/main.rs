@@ -98,16 +98,18 @@ fn main() {
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
-        .with(MovementSystem, "MovementSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
-        .with(SphericalFollowSystem, "SphericalFollowSystem", &["PlayerSystem", "MovementSystem"])
+        .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem"])
+        .with(MovementSystem, "MovementSystem", &["Physics2DSystem","PlayerSystem"])
+        .with(SphericalFollowSystem, "SphericalFollowSystem", &["MovementSystem"])
         .with_thread_local(GraphicsSystem::new(thread, model_array, l_shader))
         .build();
 
     let player = world.create_entity()
         .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
+        .with(DynamicBody)
         .with(CircleCollider { radius: 0.5 })
-        .with(Velocity { x: 0.0, y: 0.0 })
+        .with(Velocity::new())
         .with(Model3D::from_index(2).with_scale(0.5))
         .build();
 

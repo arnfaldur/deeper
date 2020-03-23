@@ -39,13 +39,10 @@ impl Position {
 
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
-pub struct Velocity {
-    pub x: f32,
-    pub y: f32,
-}
+pub struct Velocity(pub Vector2);
 
 impl Velocity {
-    pub fn new() -> Velocity { Velocity { x: 0.0, y: 0.0 } }
+    pub fn new() -> Velocity { Velocity(vec2(0.0, 0.0)) }
 }
 
 #[derive(Component)]

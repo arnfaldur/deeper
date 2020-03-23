@@ -12,8 +12,7 @@ impl<'a> System<'a> for MovementSystem {
 
     fn run(&mut self, (mut pos, vel): Self::SystemData) {
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.0.x += vel.x;
-            pos.0.y += vel.y;
+            pos.0 += vel.0;
         }
     }
 }
@@ -168,8 +167,7 @@ impl<'a> System<'a> for PlayerSystem {
         }
 
         let mut player_vel = vel.get_mut(player.entity).unwrap();
-        player_vel.x = 0.0;
-        player_vel.y = 0.0;
+        player_vel.0 = vec2(0.0, 0.0);
 
         if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
             // Note(Jökull): We need a better solution for this
@@ -185,8 +183,8 @@ impl<'a> System<'a> for PlayerSystem {
             let ray_hit = mouse_ray.position - mouse_ray.direction.scale_by(t);
             let difference = (ray_hit - player_pos.to_vec3());
             let difference = difference.scale_by(1.0 / difference.length());
-            player_vel.x = difference.x * player.speed;
-            player_vel.y = difference.y * player.speed;
+            player_vel.0.x = difference.x * player.speed;
+            player_vel.0.y = difference.y * player.speed;
 
             let model = model.get_mut(player.entity).unwrap();
             let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
@@ -202,32 +200,50 @@ impl<'a> System<'a> for PlayerSystem {
     }
 }
 
-struct Physics2DSystem;
+pub struct Physics2DSystem;
 
 impl<'a> System<'a> for Physics2DSystem {
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
         ReadStorage<'a, StaticBody>,
         ReadStorage<'a, DynamicBody>,
         ReadStorage<'a, CircleCollider>,
         ReadStorage<'a, SquareCollider>,
     );
 
-    fn run(&mut self, (ents, pos, statics, dynamics, circles, squares): Self::SystemData) {
-        let boi: Entity;
-        let igi: Position;
-        for (entity_a, pos_a, stat, circle_a) in (&ents, &pos, &statics, &circles).join() {
-            for (entity_b, pos_b, dynamic, circle_b) in (&ents, &pos, &dynamics, &circles).join() {
-                if (entity_a != entity_b && (pos_a.0.distance_to(pos_b.0) < (circle_a.radius + circle_b.radius))) {
-                    println!("{:?} is colliding with {:?}!", entity_a, entity_b);
+    fn run(&mut self, (ents, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
+
+        for _ in (&dynamics, &statics).join() {
+            println!("There's a naughty static body that really feels dynamic inside.");
+            exit(0);
+        }
+
+        for (_, pos_d, vel, circle_d) in (&dynamics, &pos, &mut vel, &circles).join() {
+            for (_, pos_s, circle_s) in (&statics, &pos, &circles).join() {
+                if (pos_d.0 + vel.0).distance_to(pos_s.0) < (circle_d.radius + circle_s.radius) {
+                    let diff = pos_s.0 - pos_d.0;
+                    let collinear_part = diff.scale_by(vel.0.dot(diff));
+                    vel.0 -= collinear_part;
                 }
             }
         }
+
+        // let boi: Entity;
+        // let igi: Position;
+        // for (entity_a, pos_a, stat, circle_a) in (&ents, &pos, &statics, &circles).join() {
+        //     for (entity_b, pos_b, dynamic, circle_b) in (&ents, &pos, &dynamics, &circles).join() {
+        //         if entity_a != entity_b && (pos_a.0.distance_to(pos_b.0) < (circle_a.radius + circle_b.radius)) {
+        //             println!("{:?} is colliding with {:?}!", entity_a, entity_b);
+        //         }
+        //     }
+        // }
     }
 }
 
 use crate::dung_gen::DungGen;
+use std::process::exit;
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
@@ -247,7 +263,6 @@ impl<'a> System<'a> for DunGenSystem {
                     None => (),
                     Some(&value) => {
                         let mut ent = world.create_entity()
-                            .with(CircleCollider { radius: 0.5 })
                             .with(Position(vec2(x as f32, y as f32)));
 
                         match value {
@@ -258,6 +273,8 @@ impl<'a> System<'a> for DunGenSystem {
                             WallType::WALL => {
                                 ent.with(WallTile)
                                     .with(Model3D::from_index(0).with_tint(Color::LIGHTGRAY))
+                                    .with(StaticBody)
+                                    .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_NORTH => {
                                 ent.with(WallTile)
@@ -265,6 +282,8 @@ impl<'a> System<'a> for DunGenSystem {
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(0.0)
                                     )
+                                    .with(StaticBody)
+                                    .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_SOUTH => {
                                 ent.with(WallTile)
@@ -272,6 +291,8 @@ impl<'a> System<'a> for DunGenSystem {
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(180.0)
                                     )
+                                    .with(StaticBody)
+                                    .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_EAST => {
                                 ent.with(WallTile)
@@ -279,6 +300,8 @@ impl<'a> System<'a> for DunGenSystem {
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(-90.0)
                                     )
+                                    .with(StaticBody)
+                                    .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_WEST => {
                                 ent.with(WallTile)
@@ -286,6 +309,8 @@ impl<'a> System<'a> for DunGenSystem {
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(90.0)
                                     )
+                                    .with(StaticBody)
+                                    .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::NOTHING => {
                                 ent
@@ -293,17 +318,6 @@ impl<'a> System<'a> for DunGenSystem {
                             WallType::DEBUG => {
                                 ent
                             }
-                            // Note(Jökull): Way too slow
-                            //NOTHING => {
-                            //    world.create_entity()
-                            //        .with(Position { x: x as f32, y: y as f32 })
-                            //        .with(FloorTile)
-                            //        .with(
-                            //            Model3D::from_index(1)
-                            //                .with_tint(Color::DARKGRAY)
-                            //                .with_offset(Vector3::new(0.0, 0.0, 1.0))
-                            //        ).build();
-                            //},
                         }.build();
                     }
                 }
