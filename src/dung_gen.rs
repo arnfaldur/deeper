@@ -1,37 +1,40 @@
 extern crate rand;
 extern crate ena;
 
-use rand::{Rng};
+use rand::Rng;
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use self::ena::unify::{UnifyKey, UnificationTable, InPlace};
 
-pub const NOTHING : i32 = 0;
-pub const WALL : i32 = 1;
-pub const FLOOR : i32 = 2;
-pub const WALL_NORTH : i32= 3;
-pub const WALL_SOUTH : i32 = 4;
-pub const WALL_EAST : i32 = 5;
-pub const WALL_WEST : i32 = 6;
-pub const DEBUG : i32 = 7;
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub enum WallType {
+    NOTHING,
+    WALL,
+    FLOOR,
+    WALL_NORTH,
+    WALL_SOUTH,
+    WALL_EAST,
+    WALL_WEST,
+    DEBUG,
+}
 
 pub struct DungGen {
-    pub width      : i32,
-    pub height     : i32,
+    pub width: i32,
+    pub height: i32,
 
     // The minimum width and height for a room
-    pub room_min   : i32,
+    pub room_min: i32,
     // The maximum width and height are both
     // room_min + room_range
-    pub room_range : i32,
+    pub room_range: i32,
 
-    pub n_rooms : usize,
+    pub n_rooms: usize,
 
     // Used over the course of the algorithm,
     // made public to position player currently
-    pub room_centers : Vec::<(i32, i32)>,
+    pub room_centers: Vec::<(i32, i32)>,
     // The result of the algorithm is stored here
-    pub world : HashMap::<(i32, i32), i32>,
+    pub world: HashMap::<(i32, i32), WallType>,
 }
 
 // (Internal screaming)
@@ -55,18 +58,36 @@ impl UnifyKey for UnitKey {
 // note(Jökull): There are better builder patterns
 impl DungGen {
     pub fn new() -> DungGen {
-        DungGen { width: 100, height: 50, room_min: 4, room_range: 11, n_rooms: 10, room_centers: vec![], world: HashMap::<(i32, i32), i32>::new()}
+        DungGen { width: 100, height: 50, room_min: 4, room_range: 11, n_rooms: 10, room_centers: vec![], world: HashMap::<(i32, i32), WallType>::new() }
     }
 
-    pub fn width (mut self, width: i32)  -> DungGen { self.width = width; return self; }
-    pub fn height(mut self, height: i32) -> DungGen { self.height = height; return self; }
+    pub fn width(mut self, width: i32) -> DungGen {
+        self.width = width;
+        return self;
+    }
+    pub fn height(mut self, height: i32) -> DungGen {
+        self.height = height;
+        return self;
+    }
 
-    pub fn room_min  (mut self, room_min: i32)   -> DungGen { self.room_min = room_min; return self; }
-    pub fn room_range(mut self, room_range: i32) -> DungGen { self.room_range = room_range; return self; }
+    pub fn room_min(mut self, room_min: i32) -> DungGen {
+        self.room_min = room_min;
+        return self;
+    }
+    pub fn room_range(mut self, room_range: i32) -> DungGen {
+        self.room_range = room_range;
+        return self;
+    }
 
-    pub fn n_rooms(mut self, n_rooms: usize) -> DungGen { self.n_rooms = n_rooms; return self; }
+    pub fn n_rooms(mut self, n_rooms: usize) -> DungGen {
+        self.n_rooms = n_rooms;
+        return self;
+    }
 
-    pub fn world(mut self, world : HashMap::<(i32, i32), i32>) -> DungGen { self.world = world; return self; }
+    pub fn world(mut self, world: HashMap::<(i32, i32), WallType>) -> DungGen {
+        self.world = world;
+        return self;
+    }
 
     pub fn generate(mut self) -> DungGen {
         let mut rng = rand::thread_rng();
@@ -83,7 +104,7 @@ impl DungGen {
 
             // Step 1: Generate a random room in the world
 
-            let xmin = rng.gen_range(margin, self.width  - (self.room_min + self.room_range) - margin);
+            let xmin = rng.gen_range(margin, self.width - (self.room_min + self.room_range) - margin);
             let ymin = rng.gen_range(margin, self.height - (self.room_min + self.room_range) - margin);
 
             let xmax = xmin + self.room_min + rng.gen_range(0, self.room_range);
@@ -97,7 +118,7 @@ impl DungGen {
             // Check for intersection
             for x in xmin..=xmax {
                 for y in ymin..=ymax {
-                    if self.world.contains_key(&(x,y)) {
+                    if self.world.contains_key(&(x, y)) {
                         valid = false;
                         break;
                     }
@@ -112,18 +133,18 @@ impl DungGen {
             // Lay down floor
             for x in xmin..=xmax {
                 for y in ymin..=ymax {
-                    self.world.insert((x,y), FLOOR);
+                    self.world.insert((x, y), WallType::FLOOR);
                 }
             }
 
             // Set walls on the outside of the room
-            for x in xmin-1..=xmax+1 {
-                self.world.insert((x, ymin - 1), WALL);
-                self.world.insert((x, ymax + 1), WALL);
+            for x in xmin - 1..=xmax + 1 {
+                self.world.insert((x, ymin - 1), WallType::WALL);
+                self.world.insert((x, ymax + 1), WallType::WALL);
             }
-            for y in ymin-1..=ymax+1 {
-                self.world.insert((xmin - 1, y), WALL);
-                self.world.insert((xmax + 1, y), WALL);
+            for y in ymin - 1..=ymax + 1 {
+                self.world.insert((xmin - 1, y), WallType::WALL);
+                self.world.insert((xmax + 1, y), WallType::WALL);
             }
 
             // Add the center of the generated room to the list
@@ -160,14 +181,14 @@ impl DungGen {
             if remaining.len() == 0 { break; }
 
             // Select the pair of such rooms with the least distance between them.
-            let mut to_connect = ((0,0), (0,0));
+            let mut to_connect = ((0, 0), (0, 0));
             let mut least_dist = std::i32::MAX;
 
-            for ((a,b),(c,d)) in remaining {
-                let dist = (a-c).abs() + (b-d).abs();
+            for ((a, b), (c, d)) in remaining {
+                let dist = (a - c).abs() + (b - d).abs();
                 if dist < least_dist {
                     least_dist = dist;
-                    to_connect = ((a,b),(c,d));
+                    to_connect = ((a, b), (c, d));
                 }
             }
 
@@ -185,10 +206,10 @@ impl DungGen {
                 y_end = y0;
             }
 
-            for x in x_start..=x_end+1 {
-                if x <= x_end { self.world.insert((x, y_start), FLOOR); }
-                if self.world.get(&(x, y_start+1)) == None { self.world.insert((x,y_start+1), WALL); }
-                if self.world.get(&(x, y_start-1)) == None { self.world.insert((x,y_start-1), WALL); }
+            for x in x_start..=x_end + 1 {
+                if x <= x_end { self.world.insert((x, y_start), WallType::FLOOR); }
+                if let None = self.world.get(&(x, y_start + 1)) { self.world.insert((x, y_start + 1), WallType::WALL); }
+                if let None = self.world.get(&(x, y_start - 1)) { self.world.insert((x, y_start - 1), WallType::WALL); }
             }
 
             // And now make sure we iterate in the correct y direction as well.
@@ -198,10 +219,10 @@ impl DungGen {
                 y_end = temp;
             }
 
-            for y in y_start..=y_end+1 {
-                if y <= y_end { self.world.insert((x_end, y), FLOOR); }
-                if self.world.get(&(x_end+1, y)) == None { self.world.insert((x_end+1,y), WALL);}
-                if self.world.get(&(x_end-1, y)) == None { self.world.insert((x_end-1,y), WALL);}
+            for y in y_start..=y_end + 1 {
+                if y <= y_end { self.world.insert((x_end, y), WallType::FLOOR); }
+                if let None = self.world.get(&(x_end + 1, y)) { self.world.insert((x_end + 1, y), WallType::WALL); }
+                if let None = self.world.get(&(x_end - 1, y)) { self.world.insert((x_end - 1, y), WallType::WALL); }
             }
 
             // Finally mark these rooms as being connected
@@ -211,7 +232,7 @@ impl DungGen {
 
         for x in 0..self.width {
             for y in 0..self.width {
-                if self.world.get(&(x,y)) == None { self.world.insert((x,y), NOTHING); }
+                if let None = self.world.get(&(x, y)) { self.world.insert((x, y), WallType::NOTHING); }
             }
         }
 
@@ -220,39 +241,39 @@ impl DungGen {
         let mut walls_east = vec!();
         let mut walls_west = vec!();
 
-        for x in 1..self.width-1 {
-            for y in 1..self.height-1 {
-                let loc = (x,y);
-                if *self.world.get(&loc).unwrap() == WALL {
-                    let N = *self.world.get(&(x,y+1)).unwrap();
-                    let S = *self.world.get(&(x,y-1)).unwrap();
-                    let E = *self.world.get(&(x+1,y)).unwrap();
-                    let W = *self.world.get(&(x-1,y)).unwrap();
+        for x in 1..self.width - 1 {
+            for y in 1..self.height - 1 {
+                let loc = (x, y);
+                if *self.world.get(&loc).unwrap() == WallType::WALL {
+                    let N = *self.world.get(&(x, y + 1)).unwrap();
+                    let S = *self.world.get(&(x, y - 1)).unwrap();
+                    let E = *self.world.get(&(x + 1, y)).unwrap();
+                    let W = *self.world.get(&(x - 1, y)).unwrap();
                     //let NE = self.world.get(&(x+1,y+1));
                     //let NW = self.world.get(&(x-1,y+1));
                     //let SE = self.world.get(&(x+1,y-1));
                     //let SW = self.world.get(&(x-1,y-1));
 
-                    if N == WALL || N == NOTHING {
-                       if S == FLOOR && E == WALL && W == WALL {
-                           walls_north.push(loc);
-                           continue;
-                       }
+                    if N == WallType::WALL || N == WallType::NOTHING {
+                        if S == WallType::FLOOR && E == WallType::WALL && W == WallType::WALL {
+                            walls_north.push(loc);
+                            continue;
+                        }
                     }
-                    if S == WALL || S == NOTHING {
-                        if N == FLOOR && E == WALL && W == WALL {
+                    if S == WallType::WALL || S == WallType::NOTHING {
+                        if N == WallType::FLOOR && E == WallType::WALL && W == WallType::WALL {
                             walls_south.push(loc);
                             continue;
                         }
                     }
-                    if E == WALL || E == NOTHING {
-                        if W == FLOOR && N == WALL && S == WALL {
+                    if E == WallType::WALL || E == WallType::NOTHING {
+                        if W == WallType::FLOOR && N == WallType::WALL && S == WallType::WALL {
                             walls_east.push(loc);
                             continue;
                         }
                     }
-                    if W == WALL || W == NOTHING {
-                        if E == FLOOR && N == WALL && S == WALL {
+                    if W == WallType::WALL || W == WallType::NOTHING {
+                        if E == WallType::FLOOR && N == WallType::WALL && S == WallType::WALL {
                             walls_west.push(loc);
                             continue;
                         }
@@ -261,10 +282,10 @@ impl DungGen {
             }
         }
 
-        for n in walls_north { self.world.insert(n, WALL_NORTH); }
-        for s in walls_south { self.world.insert(s, WALL_SOUTH); }
-        for e in walls_east  { self.world.insert(e, WALL_EAST); }
-        for w in walls_west  { self.world.insert(w, WALL_WEST); }
+        for n in walls_north { self.world.insert(n, WallType::WALL_NORTH); }
+        for s in walls_south { self.world.insert(s, WallType::WALL_SOUTH); }
+        for e in walls_east { self.world.insert(e, WallType::WALL_EAST); }
+        for w in walls_west { self.world.insert(w, WallType::WALL_WEST); }
 
         return self;
     }
@@ -272,12 +293,12 @@ impl DungGen {
     pub fn print(self) -> DungGen {
         for y in 0..self.height {
             for x in 0..self.width {
-                match self.world.get(&(x,y)) {
+                match self.world.get(&(x, y)) {
                     None => print!("  "),
                     Some(&value) => match value {
-                        WALL  => print!("# "),
-                        FLOOR => print!(". "),
-                        DEBUG => print!("X "),
+                        WallType::WALL => print!("# "),
+                        WallType::FLOOR => print!(". "),
+                        WallType::DEBUG => print!("X "),
                         _ => print!("? "),
                     }
                 }

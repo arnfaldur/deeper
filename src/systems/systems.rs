@@ -1,7 +1,7 @@
 use specs::prelude::*;
 use raylib::prelude::*;
 use std::f32::consts::PI;
-use std::ops::{Mul};
+use std::ops::Mul;
 
 use crate::components::components::*;
 
@@ -12,8 +12,8 @@ impl<'a> System<'a> for MovementSystem {
 
     fn run(&mut self, (mut pos, vel): Self::SystemData) {
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.x += vel.x;
-            pos.y += vel.y;
+            pos.0.x += vel.x;
+            pos.0.y += vel.y;
         }
     }
 }
@@ -47,6 +47,7 @@ impl<'a> System<'a> for CameraSystem {
 }
 
 extern crate raylib;
+
 use raylib::shaders::Shader;
 
 pub struct GraphicsSystem {
@@ -66,7 +67,6 @@ impl<'a> System<'a> for GraphicsSystem {
         WriteExpect<'a, RaylibHandle>,
         ReadExpect<'a, ActiveCamera>,
         ReadStorage<'a, crate::components::components::Camera>,
-
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Position>,
@@ -111,7 +111,7 @@ impl<'a> System<'a> for GraphicsSystem {
                     Vector3::new(0.0, 0.0, 1.0),
                     model.z_rotation,
                     Vector3::new(model.scale, model.scale, model.scale),
-                    model.tint
+                    model.tint,
                 );
             }
         }
@@ -147,7 +147,6 @@ impl<'a> System<'a> for PlayerSystem {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, crate::components::components::Camera>,
-
         WriteStorage<'a, Model3D>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, SphericalOffset>,
@@ -164,7 +163,7 @@ impl<'a> System<'a> for PlayerSystem {
 
         if rl.is_mouse_button_down(MOUSE_MIDDLE_BUTTON) {
             camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
-            camera_offset.phi   += camera_offset.phi_delta   * mouse_delta.y;
+            camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
             camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
         }
 
@@ -203,78 +202,97 @@ impl<'a> System<'a> for PlayerSystem {
     }
 }
 
-use crate::dung_gen::{DungGen};
+struct Physics2DSystem;
+
+impl<'a> System<'a> for Physics2DSystem {
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, StaticBody>,
+        ReadStorage<'a, DynamicBody>,
+        ReadStorage<'a, CircleCollider>,
+        ReadStorage<'a, SquareCollider>,
+    );
+
+    fn run(&mut self, (ents, pos, statics, dynamics, circles, squares): Self::SystemData) {
+        let boi: Entity;
+        let igi: Position;
+        for (entity_a, pos_a, stat, circle_a) in (&ents, &pos, &statics, &circles).join() {
+            for (entity_b, pos_b, dynamic, circle_b) in (&ents, &pos, &dynamics, &circles).join() {
+                if (entity_a != entity_b && (pos_a.0.distance_to(pos_b.0) < (circle_a.radius + circle_b.radius))) {
+                    println!("{:?} is colliding with {:?}!", entity_a, entity_b);
+                }
+            }
+        }
+    }
+}
+
+use crate::dung_gen::DungGen;
 
 pub struct DunGenSystem {
-    pub dungeon : DungGen,
+    pub dungeon: DungGen,
 }
 
 impl<'a> System<'a> for DunGenSystem {
     type SystemData = ();
 
-    fn run(&mut self, (): Self::SystemData) {
-
-    }
+    fn run(&mut self, (): Self::SystemData) {}
 
     fn setup(&mut self, world: &mut World) {
-        use crate::dung_gen::{FLOOR, WALL, WALL_NORTH, WALL_SOUTH, WALL_EAST, WALL_WEST, NOTHING};
+        use crate::dung_gen::WallType;
 
         for x in 0..=self.dungeon.width {
             for y in 0..=self.dungeon.height {
                 match self.dungeon.world.get(&(x, y)) {
                     None => (),
                     Some(&value) => {
+                        let mut ent = world.create_entity()
+                            .with(CircleCollider { radius: 0.5 })
+                            .with(Position(vec2(x as f32, y as f32)));
+
                         match value {
-                            FLOOR => {
-                                world.create_entity()
-                                    .with(Position { x: x as f32, y: y as f32 })
-                                    .with(FloorTile)
+                            WallType::FLOOR => {
+                                ent.with(FloorTile)
                                     .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
-                                    .build();
-                            },
-                            WALL => {
-                                world.create_entity()
-                                    .with(Position { x: x as f32, y: y as f32 })
-                                    .with(WallTile)
+                            }
+                            WallType::WALL => {
+                                ent.with(WallTile)
                                     .with(Model3D::from_index(0).with_tint(Color::LIGHTGRAY))
-                                    .build();
-                            },
-                            WALL_NORTH => {
-                                world.create_entity()
-                                    .with(Position { x: x as f32, y: y as f32 })
-                                    .with(WallTile)
-                                    .with(Model3D::from_index(3)
+                            }
+                            WallType::WALL_NORTH => {
+                                ent.with(WallTile)
+                                    .with(Model3D::from_index(0)
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(0.0)
-                                    ).build();
-                            },
-                            WALL_SOUTH => {
-                                world.create_entity()
-                                    .with(Position { x: x as f32, y: y as f32 })
-                                    .with(WallTile)
-                                    .with(Model3D::from_index(3)
+                                    )
+                            }
+                            WallType::WALL_SOUTH => {
+                                ent.with(WallTile)
+                                    .with(Model3D::from_index(0)
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(180.0)
-                                    ).build();
-                            },
-                            WALL_EAST => {
-                                world.create_entity()
-                                    .with(Position { x: x as f32, y: y as f32 })
-                                    .with(WallTile)
-                                    .with(Model3D::from_index(3)
+                                    )
+                            }
+                            WallType::WALL_EAST => {
+                                ent.with(WallTile)
+                                    .with(Model3D::from_index(0)
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(-90.0)
-                                    ).build();
-                            },
-                            WALL_WEST => {
-                                world.create_entity()
-                                    .with(Position { x: x as f32, y: y as f32 })
-                                    .with(WallTile)
-                                    .with(Model3D::from_index(3)
+                                    )
+                            }
+                            WallType::WALL_WEST => {
+                                ent.with(WallTile)
+                                    .with(Model3D::from_index(0)
                                         .with_tint(Color::DARKGRAY)
                                         .with_z_rotation(90.0)
-                                    ).build();
-                            },
+                                    )
+                            }
+                            WallType::NOTHING => {
+                                ent
+                            }
+                            WallType::DEBUG => {
+                                ent
+                            }
                             // Note(Jökull): Way too slow
                             //NOTHING => {
                             //    world.create_entity()
@@ -286,8 +304,7 @@ impl<'a> System<'a> for DunGenSystem {
                             //                .with_offset(Vector3::new(0.0, 0.0, 1.0))
                             //        ).build();
                             //},
-                            _ => (),
-                        }
+                        }.build();
                     }
                 }
             }

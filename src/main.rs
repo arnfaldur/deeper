@@ -4,9 +4,7 @@ use loader::AssetManager;
 
 mod dung_gen;
 
-use dung_gen::{
-    DungGen,
-};
+use dung_gen::DungGen;
 
 mod components;
 mod systems;
@@ -60,17 +58,17 @@ fn main() {
     let mut l_shader = rl.load_shader_code(
         &thread,
         Some(VERT_SRC),
-        Some(FRAG_SRC)
+        Some(FRAG_SRC),
     );
 
 
     for i in 0..dungeon.room_centers.len() {
         let center = dungeon.room_centers[i];
         let prefix = format!("uPointLights[{}]", i);
-        let is_lit_loc   = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
-        let radius_loc   = l_shader.get_shader_location(&format!("{}.radius", prefix));
+        let is_lit_loc = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
+        let radius_loc = l_shader.get_shader_location(&format!("{}.radius", prefix));
         let position_loc = l_shader.get_shader_location(&format!("{}.position", prefix));
-        let color_loc    = l_shader.get_shader_location(&format!("{}.color", prefix));
+        let color_loc = l_shader.get_shader_location(&format!("{}.color", prefix));
 
         l_shader.set_shader_value(is_lit_loc, 1);
         l_shader.set_shader_value(radius_loc, 1000.0);
@@ -83,6 +81,7 @@ fn main() {
         rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/DungeonCollection2/struct_large_straight_wall.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/walltest.obj").unwrap(),
     ];
 
@@ -106,7 +105,8 @@ fn main() {
         .build();
 
     let player = world.create_entity()
-        .with(Position{ x: player_start.0 as f32, y: player_start.1 as f32 })
+        .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
+        .with(CircleCollider { radius: 0.5 })
         .with(Velocity { x: 0.0, y: 0.0 })
         .with(Model3D::from_index(2).with_scale(0.5))
         .build();
