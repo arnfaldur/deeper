@@ -20,7 +20,7 @@ const FRAG_SRC: &str = include_str!("../shaders/test.frag");
 const VERT_SRC: &str = include_str!("../shaders/test.vert");
 
 fn main() {
-    let mut ass_man = AssetManager::new();
+    let ass_man = AssetManager::new();
 
     let dungeon = DungGen::new()
         .width(60)
@@ -70,15 +70,9 @@ fn main() {
     let mut model_array = vec![
         rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj")
-            .unwrap(),
-        rl.load_model(
-            &thread,
-            "./assets/Models/DungeonCollection2/struct_large_straight_wall.obj",
-        )
-            .unwrap(),
-        rl.load_model(&thread, "./assets/Models/walltest.obj")
-            .unwrap(),
+        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/walltest.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/sphere2.obj").unwrap(),
     ];
 
     for model in &mut model_array {
@@ -112,9 +106,10 @@ fn main() {
     let player = world
         .create_entity()
         .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
-        .with(DynamicBody)
-        .with(CircleCollider { radius: 0.5 })
+        .with(Orientation(0.0))
         .with(Velocity::new())
+        .with(DynamicBody)
+        .with(CircleCollider { radius: 0.3 })
         .with(Model3D::from_index(2).with_scale(0.5))
         .build();
 
@@ -132,6 +127,17 @@ fn main() {
     world.insert(Player::from_entity(player));
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
+
+    for enemy in 0..32 {
+        world.create_entity()
+            .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
+            .with(Orientation(0.0))
+            .with(Velocity::new())
+            .with(DynamicBody)
+            .with(AIFollow { target: player, minimum_distance: 1.0 })
+            .with(Model3D::from_index(4).with_scale(0.5))
+            .build();
+    }
 
     // Setup world
     dispatcher.setup(&mut world);

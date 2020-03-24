@@ -37,17 +37,6 @@ impl<'a> System<'a> for SphericalFollowSystem {
     }
 }
 
-struct CameraSystem;
-
-impl<'a> System<'a> for CameraSystem {
-    type SystemData = (
-        WriteStorage<'a, crate::components::components::Camera>,
-        ReadStorage<'a, Position3D>,
-    );
-
-    fn run(&mut self, (camera, pos): Self::SystemData) {}
-}
-
 extern crate raylib;
 
 use raylib::shaders::Shader;
@@ -80,10 +69,11 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Position>,
+        ReadStorage<'a, Orientation>,
         ReadStorage<'a, Model3D>,
     );
 
-    fn run(&mut self, (mut rl, active_cam, camera, target, pos3d, pos, models): Self::SystemData) {
+    fn run(&mut self, (mut rl, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData) {
         let fps = 1.0 / rl.get_frame_time();
         let mut d2: RaylibDrawHandle = rl.begin_drawing(&self.thread);
 
@@ -104,15 +94,16 @@ impl<'a> System<'a> for GraphicsSystem {
                 active_camera.fov,
             ));
 
-            for (pos, model) in (&pos, &models).join() {
+            for (pos, model, orient) in (&pos, &models, (&orient).maybe()).join() {
                 let model_pos = pos.clone().to_vec3() + model.offset;
 
+                let orientation = if let Some(o) = orient { o.0 } else { 0.0 };
                 self.l_shader.set_shader_value_matrix(
                     self.mat_model_loc,
                     Matrix::scale(model.scale, model.scale, model.scale)
                         .mul(Matrix::rotate(
                             Vector3::new(0.0, 0.0, 1.0),
-                            PI * model.z_rotation / 180.0,
+                            PI * orientation / 180.0,
                         ))
                         .mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
                 );
@@ -121,7 +112,7 @@ impl<'a> System<'a> for GraphicsSystem {
                     &self.model_array[model.idx],
                     model_pos,
                     Vector3::new(0.0, 0.0, 1.0),
-                    model.z_rotation,
+                    orientation,
                     Vector3::new(model.scale, model.scale, model.scale),
                     model.tint,
                 );
@@ -162,6 +153,7 @@ impl<'a> System<'a> for PlayerSystem {
         ReadExpect<'a, PlayerCamera>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Position3D>,
+        WriteStorage<'a, Orientation>,
         ReadStorage<'a, crate::components::components::Camera>,
         WriteStorage<'a, Model3D>,
         WriteStorage<'a, Velocity>,
@@ -170,7 +162,7 @@ impl<'a> System<'a> for PlayerSystem {
 
     fn run(
         &mut self,
-        (rl, player, player_cam, pos, pos3d, cam, mut model, mut vel, mut offset): Self::SystemData,
+        (rl, player, player_cam, pos, pos3d, mut orient, cam, mut model, mut vel, mut offset): Self::SystemData,
     ) {
         use raylib::consts::{KeyboardKey::*, MouseButton::*};
         let camera = cam.get(player_cam.0).unwrap();
@@ -199,19 +191,24 @@ impl<'a> System<'a> for PlayerSystem {
                 camera.fov,
             );
             let mouse_ray = rl.get_mouse_ray(rl.get_mouse_position(), rl_cam);
+            // TODO: rename t
             let t = mouse_ray.position.z / mouse_ray.direction.z;
-            let ray_hit = mouse_ray.position - mouse_ray.direction.scale_by(t);
-            let difference = ray_hit - player_pos.to_vec3();
-            let difference = difference.scale_by(1.0 / difference.length());
-            player_vel.0.x = difference.x * player.speed;
-            player_vel.0.y = difference.y * player.speed;
+            let Vector3 { x, y, z } = mouse_ray.position - mouse_ray.direction.scale_by(t);
+            let mouse_direction = vec2(x, y) - player_pos.0;
+            let max_speed_distance = 2.0; //TODO: remove magic constant
+            player_vel.0 = mouse_direction.normalized() * player.speed.min(
+                mouse_direction.length() * player.speed / max_speed_distance
+            );
 
             let model = model.get_mut(player.entity).unwrap();
-            let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
-            if difference.x > 0.0 {
-                new_rotation += 180.0;
+            if let Some(orientation) = orient.get_mut(player.entity) {
+                let mut new_rotation = (mouse_direction.y / mouse_direction.x).atan() / PI * 180.0;
+                if mouse_direction.x > 0.0 {
+                    new_rotation += 180.0;
+                }
+                orientation.0 = new_rotation;
+                model.z_rotation = new_rotation;
             }
-            model.z_rotation = new_rotation;
         }
     }
 
@@ -237,44 +234,40 @@ impl<'a> System<'a> for Physics2DSystem {
         for _ in (&dynamics, &statics).join() {
             panic!("There's a naughty static body that really feels dynamic inside.");
         }
-
-        for (_, pos_d, vel, circle_d) in (&dynamics, &pos, &mut vel, &circles).join() {
-            for (_, pos_s, circle_s) in (&statics, &pos, &circles).join() {
-                if (pos_d.0 + vel.0).distance_to(pos_s.0) < (circle_d.radius + circle_s.radius) {
-                    let diff = pos_s.0 - pos_d.0;
-                    let collinear_part = diff.scale_by(vel.0.dot(diff));
-                    vel.0 -= collinear_part;
+        for (ent_a, _, pos_a, vel_a, circle_a) in (&ents, &dynamics, &pos, &mut vel, &circles).join() {
+            //unsafe { for (ent_b, _, pos_b, vel_b, circle_b) in (&ents, &dynamics, &pos, &mut vel, &circles).join() { if ent_a != ent_b {} } }
+            for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
+                if (pos_a.0 + vel_a.0).distance_to(pos_b.0) < (circle_a.radius + circle_b.radius) {
+                    let diff = pos_b.0 - pos_a.0;
+                    let collinear_part = diff.scale_by(vel_a.0.dot(diff));
+                    vel_a.0 -= collinear_part;
                 }
             }
-            for (_, pos_s, square_s) in (&statics, &pos, &squares).join() {
-                let half_side = square_s.side_length / 2.0;
-                let difference: Vector2 = pos_d.0 - pos_s.0;
-                let abference: Vector2 = vec2(difference.x.abs(), difference.y.abs());
-                let bob = abference - vec2(0.5,0.5);
-                if (abference.y < half_side) {
-                    if (abference.x - circle_d.radius < half_side) {
-                        vel.0.x -= (abference.x - circle_d.radius - half_side) * difference.x.signum();
+            for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
+                let half_side = square_b.side_length / 2.0;
+                let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2 = vec2(diff.x.abs(), diff.y.abs());
+                if abs_diff.x <= half_side {
+                    if abs_diff.y - circle_a.radius < half_side {
+                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum();
                     }
-                } else if (abference.x < half_side) {
-                    if (abference.y - circle_d.radius < half_side) {
-                        vel.0.y -= (abference.y - circle_d.radius - half_side) * difference.y.signum();
+                } else if abs_diff.y <= half_side {
+                    if abs_diff.x - circle_a.radius < half_side {
+                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum();
                     }
-                } else if (bob.length() < circle_d.radius) {
-                    let sigference: Vector2 = vec2(difference.x.signum(), difference.y.signum());
-                    vel.0 -= bob.normalized().scale_by(bob.length() - circle_d.radius) * sigference;
+                }
+            }
+            for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
+                let half_side = square_b.side_length / 2.0;
+                let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2 = vec2(diff.x.abs(), diff.y.abs());
+                let corner_dist = abs_diff - vec2(half_side, half_side);
+                if corner_dist.length() < circle_a.radius {
+                    let sigference: Vector2 = vec2(diff.x.signum(), diff.y.signum());
+                    vel_a.0 -= corner_dist.normalized().scale_by(corner_dist.length() - circle_a.radius) * sigference;
                 }
             }
         }
-
-        // let boi: Entity;
-        // let igi: Position;
-        // for (entity_a, pos_a, stat, circle_a) in (&ents, &pos, &statics, &circles).join() {
-        //     for (entity_b, pos_b, dynamic, circle_b) in (&ents, &pos, &dynamics, &circles).join() {
-        //         if entity_a != entity_b && (pos_a.0.distance_to(pos_b.0) < (circle_a.radius + circle_b.radius)) {
-        //             println!("{:?} is colliding with {:?}!", entity_a, entity_b);
-        //         }
-        //     }
-        // }
     }
 }
 
@@ -311,17 +304,18 @@ impl<'a> System<'a> for DunGenSystem {
                             .with(
                                 match maybe_direction {
                                     None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
-                                    Some(direction) => Model3D::from_index(4).
-                                        with_tint(Color::DARKGRAY).with_z_rotation(
-                                        match direction {
-                                            WallDirection::North => 0.0,
-                                            WallDirection::South => 180.0,
-                                            WallDirection::East => 270.0,
-                                            WallDirection::West => 90.0,
-                                        }
-                                    ),
+                                    Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
                                 }
                             )
+                            .with(Orientation(
+                                match maybe_direction {
+                                    None => 0.0,
+                                    Some(WallDirection::North) => 0.0,
+                                    Some(WallDirection::South) => 180.0,
+                                    Some(WallDirection::East) => 270.0,
+                                    Some(WallDirection::West) => 90.0,
+                                }
+                            ))
                             .with(StaticBody)
                             .with(SquareCollider { side_length: 1.0 })
                             .build();

@@ -132,15 +132,12 @@ impl DungGen {
             // Assume it does not
             let mut valid = true;
             // Check for intersection
-            for x in xmin..=xmax {
+            'outer: for x in xmin..=xmax {
                 for y in ymin..=ymax {
                     if self.world.contains_key(&(x, y)) {
                         valid = false;
-                        break;
+                        break 'outer;
                     }
-                }
-                if !valid {
-                    break;
                 }
             }
             // If an intersection is found, go back to step 1

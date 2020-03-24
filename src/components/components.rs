@@ -36,6 +36,15 @@ impl Position {
     pub fn new() -> Position {
         Position(vec2(0.0, 0.0))
     }
+    pub fn to_vec3(self) -> Vector3 {
+        Vector3::new(self.0.x, self.0.y, 0.0)
+    }
+}
+
+impl From<&Position> for Vector2 {
+    fn from(pos: &Position) -> Vector2 {
+        pos.0
+    }
 }
 
 #[derive(Component, Debug)]
@@ -48,27 +57,17 @@ impl Velocity {
     }
 }
 
-#[derive(Component)]
-#[storage(VecStorage)]
-pub struct Agent;
-
 impl From<&Position> for Vector3 {
     fn from(pos: &Position) -> Vector3 {
         Vector3::new(pos.0.x, pos.0.y, 0.0)
     }
 }
 
-impl Position {
-    pub fn to_vec3(self) -> Vector3 {
-        Vector3::new(self.0.x, self.0.y, 0.0)
-    }
-}
+#[derive(Component)]
+pub struct Orientation(pub f32);
 
-impl From<&Position> for Vector2 {
-    fn from(pos: &Position) -> Vector2 {
-        pos.0
-    }
-}
+#[derive(Component)]
+pub struct Agent;
 
 #[derive(Component)]
 pub struct StaticBody;
@@ -182,6 +181,7 @@ pub struct FloorTile;
 pub fn register_components(world: &mut World) {
     world.register::<Position>();
     world.register::<Position3D>();
+    world.register::<Orientation>();
     world.register::<Velocity>();
     world.register::<Camera>();
     world.register::<Target>();
