@@ -66,8 +66,8 @@ impl AssetManager {
         return self;
     }
 
-    pub fn load_display_settings(mut self) -> DisplaySettings {
-        let ds_path = self.paths.display_settings_path;
+    pub fn load_display_settings(&mut self) -> DisplaySettings {
+        let ds_path = self.paths.display_settings_path.clone();
         if fs::metadata(ds_path.as_str()).is_ok() {
             let data = fs::read_to_string(ds_path.as_str()).unwrap();
             self.loaded_at_time.insert(ds_path,SystemTime::now());

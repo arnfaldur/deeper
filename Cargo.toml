@@ -9,10 +9,17 @@ edition = "2018"
 [dependencies]
 # dung_gen
 rand = "0.7"
-ena = "0.13.1"
+ena  = "0.13.1"
 
 # graphics and input
-raylib = { git = "https://github.com/deltaphc/raylib-rs", branch = "master" }
+cgmath        = "0.17"
+winit         = "0.22"
+wgpu          = "0.4.0"
+futures       = "0.3"
+env_logger    = "0.7"
+glsl-to-spirv = "0.1"
+zerocopy = "0.3"
+
 
 # json stuff
 serde = { version = "1.0", features = ["derive"] }
@@ -20,3 +27,4 @@ serde_json = "1.0"
 
 # ECS
 specs = { version = "0.16.1", features = ["specs-derive"] }
+
