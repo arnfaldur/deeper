@@ -247,11 +247,21 @@ impl<'a> System<'a> for Physics2DSystem {
                 }
             }
             for (_, pos_s, square_s) in (&statics, &pos, &squares).join() {
-                let thing: Vector2 = pos_d.0 - pos_s.0;
-                if (pos_d.0 + vel.0).distance_to(pos_s.0) < (circle_d.radius + square_s.side_length) {
-                    let diff = pos_s.0 - pos_d.0;
-                    let collinear_part = diff.scale_by(vel.0.dot(diff));
-                    vel.0 -= collinear_part;
+                let half_side = square_s.side_length / 2.0;
+                let difference: Vector2 = pos_d.0 - pos_s.0;
+                let abference: Vector2 = vec2(difference.x.abs(), difference.y.abs());
+                let bob = abference - vec2(0.5,0.5);
+                if (abference.y < half_side) {
+                    if (abference.x - circle_d.radius < half_side) {
+                        vel.0.x -= (abference.x - circle_d.radius - half_side) * difference.x.signum();
+                    }
+                } else if (abference.x < half_side) {
+                    if (abference.y - circle_d.radius < half_side) {
+                        vel.0.y -= (abference.y - circle_d.radius - half_side) * difference.y.signum();
+                    }
+                } else if (bob.length() < circle_d.radius) {
+                    let sigference: Vector2 = vec2(difference.x.signum(), difference.y.signum());
+                    vel.0 -= bob.normalized().scale_by(bob.length() - circle_d.radius) * sigference;
                 }
             }
         }
@@ -313,7 +323,7 @@ impl<'a> System<'a> for DunGenSystem {
                                 }
                             )
                             .with(StaticBody)
-                            .with(SquareCollider { side_length: 0.5 })
+                            .with(SquareCollider { side_length: 1.0 })
                             .build();
                     }
                 }
