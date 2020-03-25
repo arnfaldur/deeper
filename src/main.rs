@@ -32,8 +32,10 @@ use crate::graphics::{Vertex, create_vertices, Model, Mesh};
 use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor};
 use cgmath::{Vector2, Vector3};
 
+use zerocopy::{AsBytes};
 
-fn main() {
+
+async fn run_async() {
     let mut ass_man = AssetManager::new();
     let ds = ass_man.load_display_settings();
 
@@ -52,9 +54,9 @@ fn main() {
     let adapter = wgpu::Adapter::request(
         &wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::Default,
-            backends: wgpu::BackendBit::PRIMARY,
-        }
-    ).unwrap();
+        },
+        wgpu::BackendBit::PRIMARY,
+    ).await.unwrap();
 
     let (device, mut queue) = adapter.request_device(
         &wgpu::DeviceDescriptor {
@@ -63,7 +65,7 @@ fn main() {
             },
             limits: Default::default()
         }
-    );
+    ).await;
 
     let context = graphics::Context::new(&device);
 
@@ -72,7 +74,7 @@ fn main() {
         format: graphics::COLOR_FORMAT,
         width: size.width as u32,
         height: size.height as u32,
-        present_mode: wgpu::PresentMode::Vsync,
+        present_mode: wgpu::PresentMode::Mailbox,
     };
 
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
@@ -93,10 +95,11 @@ fn main() {
 
     let vertex_buf =
         //device.create_buffer_with_data(vertex_data.as_bytes(), wgpu::BufferUsage::VERTEX);
-        device.create_buffer_mapped::<Vertex>(
-            indexed_vertices.len(),
+        device.create_buffer_with_data(
+            indexed_vertices.as_bytes(),
             wgpu::BufferUsage::VERTEX,
-        ).fill_from_slice(indexed_vertices.as_slice());
+        );
+            //.fill_from_slice(indexed_vertices.as_slice());
 
 
     let size = 256u32;
@@ -110,23 +113,22 @@ fn main() {
     let texels = graphics::create_texels(size as usize);
 
     let temp_buf =
-        device.create_buffer_mapped::<u8>(texels.len(), wgpu::BufferUsage::COPY_SRC)
-        .fill_from_slice(texels.as_slice());
+        device.create_buffer_with_data(texels.as_bytes(), wgpu::BufferUsage::COPY_SRC);
 
    init_encoder.copy_buffer_to_texture(
-        wgpu::BufferCopyView {
-            buffer: &temp_buf,
-            offset: 0,
-            row_pitch: 4 * size,
-            image_height: 0,
-        },
-        wgpu::TextureCopyView {
+       wgpu::BufferCopyView {
+           buffer: &temp_buf,
+           offset: 0,
+           bytes_per_row: 4 * size,
+           rows_per_image: 0
+       },
+       wgpu::TextureCopyView {
             texture: &context.texture,
             mip_level: 0,
             array_layer: 0,
             origin: wgpu::Origin3d::ZERO,
         },
-    texture_extent,
+       texture_extent,
     );
 
     let init_command_buf = init_encoder.finish();
@@ -154,11 +156,7 @@ fn main() {
     register_components(&mut world);
 
     let mut model_array = vec![
-        Model {
-            meshes: vec![Mesh {
-                num_vertices: indexed_vertices.len(), vertex_buffer: vertex_buf, offset: [0.0, 0.0, 0.0]
-            }]
-        },
+        graphics::Context::load_model_from_obj(&device, "assets/Models/plane.obj")
     ];
 
     // initialize dispacher with all game systems
@@ -214,7 +212,6 @@ fn main() {
             Event::MainEventsCleared => {
                 dispatcher.dispatch(&mut world);
                 window.request_redraw();
-                println!("boop");
             },
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 unimplemented!();
@@ -229,3 +226,6 @@ fn main() {
     });
 }
 
+fn main() {
+    futures::executor::block_on(run_async());
+}

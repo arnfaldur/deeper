@@ -14,11 +14,13 @@ ena  = "0.13.1"
 # graphics and input
 cgmath        = "0.17"
 winit         = "0.22"
-wgpu          = "0.4.0"
+wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
 futures       = "0.3"
 env_logger    = "0.7"
 glsl-to-spirv = "0.1"
 zerocopy = "0.3"
+wavefront_obj = "*"
+lazy_static = "1.4.0"
 
 
 # json stuff

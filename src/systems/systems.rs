@@ -1,6 +1,7 @@
 use specs::prelude::*;
 use std::f32::consts::PI;
 use std::ops::Mul;
+use zerocopy::{AsBytes};
 
 extern crate cgmath;
 use cgmath::{ Vector2, Vector3 };
@@ -81,20 +82,38 @@ impl<'a> System<'a> for GraphicsSystem {
     );
 
     fn run(&mut self, (active_cam, camera, target, pos3d, pos, models): Self::SystemData) {
-        let frame = self.swap_chain.get_next_texture();
 
-        let mx_total = graphics::generate_matrix(self.sc_desc.width as f32 / self.sc_desc.height as f32, 0.0);
+        println!("Enter run.");
+        let frame = self.swap_chain.get_next_texture().unwrap();
+
+        let mx_total = graphics::generate_matrix(
+            self.sc_desc.width as f32 / self.sc_desc.height as f32,
+            0.0
+        );
+
+
         let mx_ref: &[f32; 16] = mx_total.as_ref();
 
-        let new_uniform_buf = self.device.create_buffer_mapped::<f32>(
-            16,
+        let new_uniform_buf = self.device.create_buffer_with_data(
+            mx_ref.as_bytes(),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-        ).fill_from_slice(mx_ref.as_ref());
+        );
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor{ todo: 0});
+        let mut encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor{ todo: 0 }
+        );
 
-        encoder.copy_buffer_to_buffer(&new_uniform_buf, 0, &self.context.uniform_buf, 0, 16 * 4);
+        println!("Before buffer copy");
 
+        encoder.copy_buffer_to_buffer(
+            &new_uniform_buf,
+            0,
+            &self.context.uniform_buf,
+            0,
+            16 * 4
+        );
+
+        println!("Before render pass");
         {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -110,17 +129,25 @@ impl<'a> System<'a> for GraphicsSystem {
             rpass.set_pipeline(&self.context.pipeline);
             rpass.set_bind_group(0, &self.context.bind_group, &[]);
 
+            println!("Before model draw");
             for (_, model) in (&pos, &models).join() {
                 for mesh in &self.model_array[model.idx].meshes {
-                    rpass.set_vertex_buffers(0, &[(&mesh.vertex_buffer, 0)]);
+                    println!("Before setting bind group");
+                    rpass.set_bind_group(1, &mesh.bind_group, &[]);
+                    println!("Before setting vertex buffers");
+                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    println!("Before draw");
                     rpass.draw(0..mesh.num_vertices as u32, 0..1)
                 }
             }
         }
+        println!("After render pass");
 
         let command_buf = encoder.finish();
 
+        println!("Before submit");
         self.queue.submit(&[command_buf]);
+        println!("After submit");
     }
 
     fn setup(&mut self, world: &mut World) {
@@ -128,7 +155,6 @@ impl<'a> System<'a> for GraphicsSystem {
 }
 
 pub struct PlayerSystem {
-    // Note(Jökull): Yeah, I know. This is just while we're feeling out what is the
     //               responsibility of the input handling system exactly
     last_mouse_pos: Vector2<f32>,
 }
@@ -277,37 +303,37 @@ impl<'a> System<'a> for DunGenSystem {
                             }
                             WallType::WALL_NORTH => {
                                 ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        //.with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(0.0)
-                                    )
+                                    //.with(Model3D::from_index(0)
+                                    //    //.with_tint(Color::DARKGRAY)
+                                    //    .with_z_rotation(0.0)
+                                    //)
                                     .with(StaticBody)
                                     .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_SOUTH => {
                                 ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        //.with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(180.0)
-                                    )
+                                    //.with(Model3D::from_index(0)
+                                    //    //.with_tint(Color::DARKGRAY)
+                                    //    .with_z_rotation(180.0)
+                                    //)
                                     .with(StaticBody)
                                     .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_EAST => {
                                 ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        //.with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(-90.0)
-                                    )
+                                    //.with(Model3D::from_index(0)
+                                    //    //.with_tint(Color::DARKGRAY)
+                                    //    .with_z_rotation(-90.0)
+                                    //)
                                     .with(StaticBody)
                                     .with(CircleCollider { radius: 0.5 })
                             }
                             WallType::WALL_WEST => {
                                 ent.with(WallTile)
-                                    .with(Model3D::from_index(0)
-                                        //.with_tint(Color::DARKGRAY)
-                                        .with_z_rotation(90.0)
-                                    )
+                                    //.with(Model3D::from_index(0)
+                                    //    //.with_tint(Color::DARKGRAY)
+                                    //    .with_z_rotation(90.0)
+                                    //)
                                     .with(StaticBody)
                                     .with(CircleCollider { radius: 0.5 })
                             }
