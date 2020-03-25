@@ -70,9 +70,12 @@ fn main() {
     let mut model_array = vec![
         rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/walltest.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/sphere2.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj")
+            .unwrap(),
+        rl.load_model(&thread, "./assets/Models/walltest.obj")
+            .unwrap(),
+        rl.load_model(&thread, "./assets/Models/sphere2.obj")
+            .unwrap(),
     ];
 
     for model in &mut model_array {
@@ -89,7 +92,12 @@ fn main() {
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
-        .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem"])
+        .with(AIFollowSystem, "AIFollowSystem", &[])
+        .with(
+            Physics2DSystem,
+            "Physics2DSystem",
+            &["PlayerSystem", "AIFollowSystem"],
+        )
         .with(
             MovementSystem,
             "MovementSystem",
@@ -129,12 +137,21 @@ fn main() {
     world.insert(PlayerCamera(player_camera));
 
     for enemy in 0..32 {
-        world.create_entity()
-            .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
+        world
+            .create_entity()
+            .with(Position(vec2(
+                (player_start.0 + get_random_value(-10, 10)) as f32,
+                (player_start.1 + get_random_value(-5, 5)) as f32,
+            )))
+            .with(Speed(0.02))
             .with(Orientation(0.0))
             .with(Velocity::new())
             .with(DynamicBody)
-            .with(AIFollow { target: player, minimum_distance: 1.0 })
+            .with(CircleCollider { radius: 0.5 })
+            .with(AIFollow {
+                target: player,
+                minimum_distance: 1.0,
+            })
             .with(Model3D::from_index(4).with_scale(0.5))
             .build();
     }

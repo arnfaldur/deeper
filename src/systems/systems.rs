@@ -73,7 +73,10 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Model3D>,
     );
 
-    fn run(&mut self, (mut rl, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData) {
+    fn run(
+        &mut self,
+        (mut rl, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData,
+    ) {
         let fps = 1.0 / rl.get_frame_time();
         let mut d2: RaylibDrawHandle = rl.begin_drawing(&self.thread);
 
@@ -196,9 +199,10 @@ impl<'a> System<'a> for PlayerSystem {
             let Vector3 { x, y, z } = mouse_ray.position - mouse_ray.direction.scale_by(t);
             let mouse_direction = vec2(x, y) - player_pos.0;
             let max_speed_distance = 2.0; //TODO: remove magic constant
-            player_vel.0 = mouse_direction.normalized() * player.speed.min(
-                mouse_direction.length() * player.speed / max_speed_distance
-            );
+            player_vel.0 = mouse_direction.normalized()
+                * player
+                .speed
+                .min(mouse_direction.length() * player.speed / max_speed_distance);
 
             let model = model.get_mut(player.entity).unwrap();
             if let Some(orientation) = orient.get_mut(player.entity) {
@@ -217,6 +221,34 @@ impl<'a> System<'a> for PlayerSystem {
     }
 }
 
+pub(crate) struct AIFollowSystem;
+
+impl<'a> System<'a> for AIFollowSystem {
+    type SystemData = (
+        ReadStorage<'a, AIFollow>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        ReadStorage<'a, Speed>,
+    );
+
+    fn run(&mut self, (follow, pos, mut vel, speed): Self::SystemData) {
+        for (follow, hunter, vel, speed) in (&follow, &pos, &mut vel, &speed).join() {
+            if let Some(hunted) = pos.get(follow.target) {
+                let difference = hunted.0 - hunter.0;
+                let direction = difference.normalized();
+                let distance = difference.length();
+                vel.0 = direction
+                    * speed.0
+                    * if distance > follow.minimum_distance {
+                    1.0
+                } else {
+                    0.0
+                };
+            }
+        }
+    }
+}
+
 pub struct Physics2DSystem;
 
 impl<'a> System<'a> for Physics2DSystem {
@@ -231,11 +263,35 @@ impl<'a> System<'a> for Physics2DSystem {
     );
 
     fn run(&mut self, (ents, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
+        // TODO: Move these to a EntityValidationSystem or something like that
         for _ in (&dynamics, &statics).join() {
             panic!("There's a naughty static body that really feels dynamic inside.");
         }
-        for (ent_a, _, pos_a, vel_a, circle_a) in (&ents, &dynamics, &pos, &mut vel, &circles).join() {
-            //unsafe { for (ent_b, _, pos_b, vel_b, circle_b) in (&ents, &dynamics, &pos, &mut vel, &circles).join() { if ent_a != ent_b {} } }
+        for _ in (&dynamics, !&vel).join() {
+            panic!("A dynamic entity has no velocity!");
+        }
+        for (ent_a, _, pos_a, circle_a) in (&ents, &dynamics, &pos, &circles).join() {
+            for (ent_b, _, pos_b, circle_b) in (&ents, &dynamics, &pos, &circles).join() {
+                if ent_a != ent_b {
+                    let collision_distance = circle_a.radius + circle_b.radius;
+                    // get post move locations
+                    let delta_a = pos_a.0 + vel.get(ent_a).unwrap().0;
+                    let delta_b = pos_b.0 + vel.get(ent_b).unwrap().0;
+                    // vector from ent_a to ent_b
+                    let position_delta = delta_a - delta_b;
+                    // how much are we colliding?
+                    let collision_depth = collision_distance - position_delta.length();
+                    if 0.0 < collision_depth {
+                        // normalize the vector to scale and reflect
+                        let collision_direction = position_delta.normalized();
+                        // get_mut is necessary to appease the borrow checker
+                        vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0;
+                        vel.get_mut(ent_b).unwrap().0 += collision_direction * -collision_depth / 2.0;
+                    }
+                }
+            }
+        }
+        for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
                 if (pos_a.0 + vel_a.0).distance_to(pos_b.0) < (circle_a.radius + circle_b.radius) {
                     let diff = pos_b.0 - pos_a.0;
@@ -264,7 +320,10 @@ impl<'a> System<'a> for Physics2DSystem {
                 let corner_dist = abs_diff - vec2(half_side, half_side);
                 if corner_dist.length() < circle_a.radius {
                     let sigference: Vector2 = vec2(diff.x.signum(), diff.y.signum());
-                    vel_a.0 -= corner_dist.normalized().scale_by(corner_dist.length() - circle_a.radius) * sigference;
+                    vel_a.0 -= corner_dist
+                        .normalized()
+                        .scale_by(corner_dist.length() - circle_a.radius)
+                        * sigference;
                 }
             }
         }
@@ -291,31 +350,29 @@ impl<'a> System<'a> for DunGenSystem {
                     None => (),
                     Some(WallType::NOTHING) => (),
                     Some(WallType::FLOOR) => {
-                        world.create_entity()
+                        world
+                            .create_entity()
                             .with(Position(vec2(x as f32, y as f32)))
                             .with(FloorTile)
                             .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
                             .build();
                     }
                     Some(WallType::WALL(maybe_direction)) => {
-                        world.create_entity()
+                        world
+                            .create_entity()
                             .with(Position(vec2(x as f32, y as f32)))
                             .with(WallTile)
-                            .with(
-                                match maybe_direction {
-                                    None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
-                                    Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
-                                }
-                            )
-                            .with(Orientation(
-                                match maybe_direction {
-                                    None => 0.0,
-                                    Some(WallDirection::North) => 0.0,
-                                    Some(WallDirection::South) => 180.0,
-                                    Some(WallDirection::East) => 270.0,
-                                    Some(WallDirection::West) => 90.0,
-                                }
-                            ))
+                            .with(match maybe_direction {
+                                None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
+                                Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
+                            })
+                            .with(Orientation(match maybe_direction {
+                                None => 0.0,
+                                Some(WallDirection::North) => 0.0,
+                                Some(WallDirection::South) => 180.0,
+                                Some(WallDirection::East) => 270.0,
+                                Some(WallDirection::West) => 90.0,
+                            }))
                             .with(StaticBody)
                             .with(SquareCollider { side_length: 1.0 })
                             .build();

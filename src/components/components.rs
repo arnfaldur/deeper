@@ -67,6 +67,9 @@ impl From<&Position> for Vector3 {
 pub struct Orientation(pub f32);
 
 #[derive(Component)]
+pub struct Speed(pub f32);
+
+#[derive(Component)]
 pub struct Agent;
 
 #[derive(Component)]
@@ -183,6 +186,7 @@ pub fn register_components(world: &mut World) {
     world.register::<Position3D>();
     world.register::<Orientation>();
     world.register::<Velocity>();
+    world.register::<Speed>();
     world.register::<Camera>();
     world.register::<Target>();
     world.register::<SphericalOffset>();

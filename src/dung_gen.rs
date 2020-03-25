@@ -289,25 +289,37 @@ impl DungGen {
                     //let SW = self.world.get(&(x-1,y-1));
 
                     if N == WallType::WALL(None) || N == WallType::NOTHING {
-                        if S == WallType::FLOOR && E == WallType::WALL(None) && W == WallType::WALL(None) {
+                        if S == WallType::FLOOR
+                            && E == WallType::WALL(None)
+                            && W == WallType::WALL(None)
+                        {
                             walls_north.push(loc);
                             continue;
                         }
                     }
                     if S == WallType::WALL(None) || S == WallType::NOTHING {
-                        if N == WallType::FLOOR && E == WallType::WALL(None) && W == WallType::WALL(None) {
+                        if N == WallType::FLOOR
+                            && E == WallType::WALL(None)
+                            && W == WallType::WALL(None)
+                        {
                             walls_south.push(loc);
                             continue;
                         }
                     }
                     if E == WallType::WALL(None) || E == WallType::NOTHING {
-                        if W == WallType::FLOOR && N == WallType::WALL(None) && S == WallType::WALL(None) {
+                        if W == WallType::FLOOR
+                            && N == WallType::WALL(None)
+                            && S == WallType::WALL(None)
+                        {
                             walls_east.push(loc);
                             continue;
                         }
                     }
                     if W == WallType::WALL(None) || W == WallType::NOTHING {
-                        if E == WallType::FLOOR && N == WallType::WALL(None) && S == WallType::WALL(None) {
+                        if E == WallType::FLOOR
+                            && N == WallType::WALL(None)
+                            && S == WallType::WALL(None)
+                        {
                             walls_west.push(loc);
                             continue;
                         }
@@ -317,16 +329,20 @@ impl DungGen {
         }
 
         for n in walls_north {
-            self.world.insert(n, WallType::WALL(Some(WallDirection::North)));
+            self.world
+                .insert(n, WallType::WALL(Some(WallDirection::North)));
         }
         for s in walls_south {
-            self.world.insert(s, WallType::WALL(Some(WallDirection::South)));
+            self.world
+                .insert(s, WallType::WALL(Some(WallDirection::South)));
         }
         for e in walls_east {
-            self.world.insert(e, WallType::WALL(Some(WallDirection::East)));
+            self.world
+                .insert(e, WallType::WALL(Some(WallDirection::East)));
         }
         for w in walls_west {
-            self.world.insert(w, WallType::WALL(Some(WallDirection::West)));
+            self.world
+                .insert(w, WallType::WALL(Some(WallDirection::West)));
         }
 
         return self;
