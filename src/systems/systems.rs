@@ -11,8 +11,14 @@ impl<'a> System<'a> for MovementSystem {
     type SystemData = (WriteStorage<'a, Position>, ReadStorage<'a, Velocity>);
 
     fn run(&mut self, (mut pos, vel): Self::SystemData) {
+        let mut rng = thread_rng();
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.0 += vel.0;
+            let velo: Vector2 = vel.0;
+            let (randx, randy): (f32, f32) = (
+                rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0),
+                rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0)
+            );
+            pos.0 += vec2(velo.x + randx, velo.y + randy);
         }
     }
 }
@@ -299,20 +305,8 @@ impl<'a> System<'a> for Physics2DSystem {
                     vel_a.0 -= collinear_part;
                 }
             }
-            for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
-                let half_side = square_b.side_length / 2.0;
-                let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
-                let abs_diff: Vector2 = vec2(diff.x.abs(), diff.y.abs());
-                if abs_diff.x <= half_side {
-                    if abs_diff.y - circle_a.radius < half_side {
-                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum();
-                    }
-                } else if abs_diff.y <= half_side {
-                    if abs_diff.x - circle_a.radius < half_side {
-                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum();
-                    }
-                }
-            }
+        }
+        for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
                 let half_side = square_b.side_length / 2.0;
                 let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
@@ -325,12 +319,25 @@ impl<'a> System<'a> for Physics2DSystem {
                         .scale_by(corner_dist.length() - circle_a.radius)
                         * sigference;
                 }
+                let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2 = vec2(diff.x.abs(), diff.y.abs());
+                if abs_diff.x <= half_side {
+                    if abs_diff.y < half_side + circle_a.radius {
+                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum();
+                    }
+                }
+                if abs_diff.y <= half_side {
+                    if abs_diff.x < half_side + circle_a.radius {
+                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum();
+                    }
+                }
             }
         }
     }
 }
 
 use crate::dung_gen::{DungGen, WallDirection};
+use rand::{thread_rng, Rng};
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
@@ -344,41 +351,47 @@ impl<'a> System<'a> for DunGenSystem {
     fn setup(&mut self, world: &mut World) {
         use crate::dung_gen::WallType;
 
-        for x in 0..=self.dungeon.width {
-            for y in 0..=self.dungeon.height {
-                match self.dungeon.world.get(&(x, y)) {
-                    None => (),
-                    Some(WallType::NOTHING) => (),
-                    Some(WallType::FLOOR) => {
-                        world
-                            .create_entity()
-                            .with(Position(vec2(x as f32, y as f32)))
-                            .with(FloorTile)
-                            .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
-                            .build();
-                    }
-                    Some(WallType::WALL(maybe_direction)) => {
-                        world
-                            .create_entity()
-                            .with(Position(vec2(x as f32, y as f32)))
-                            .with(WallTile)
-                            .with(match maybe_direction {
-                                None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
-                                Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
-                            })
-                            .with(Orientation(match maybe_direction {
-                                None => 0.0,
-                                Some(WallDirection::North) => 0.0,
-                                Some(WallDirection::South) => 180.0,
-                                Some(WallDirection::East) => 270.0,
-                                Some(WallDirection::West) => 90.0,
-                            }))
-                            .with(StaticBody)
-                            .with(SquareCollider { side_length: 1.0 })
-                            .build();
-                    }
+        for (&(x, y), &wall_type) in self.dungeon.world.iter() {
+            match wall_type {
+                WallType::Floor => {
+                    world
+                        .create_entity()
+                        .with(Position(vec2(x as f32, y as f32)))
+                        .with(FloorTile)
+                        .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
+                        .build();
                 }
+                WallType::Wall(maybe_direction) => {
+                    world
+                        .create_entity()
+                        .with(Position(vec2(x as f32, y as f32)))
+                        .with(WallTile)
+                        .with(match maybe_direction {
+                            None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
+                            Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
+                        })
+                        .with(Orientation(match maybe_direction {
+                            None => 0.0,
+                            Some(WallDirection::North) => 0.0,
+                            Some(WallDirection::South) => 180.0,
+                            Some(WallDirection::East) => 270.0,
+                            Some(WallDirection::West) => 90.0,
+                        }))
+                        .with(StaticBody)
+                        .with(SquareCollider { side_length: 1.0 })
+                        .build();
+                }
+                WallType::LadderDown => {
+                    world
+                        .create_entity()
+                        .with(Position(vec2(x as f32, y as f32)))
+                        .with(FloorTile)
+                        .with(Model3D::from_index(5).with_tint(Color::DARKGRAY))
+                        .build();
+                }
+                WallType::LadderUp => (),
+                WallType::Nothing => (),
             }
-        }
+        };
     }
 }

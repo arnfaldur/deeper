@@ -47,6 +47,12 @@ impl From<&Position> for Vector2 {
     }
 }
 
+impl From<&Position> for Vector3 {
+    fn from(pos: &Position) -> Vector3 {
+        Vector3::new(pos.0.x, pos.0.y, 0.0)
+    }
+}
+
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct Velocity(pub Vector2);
@@ -57,10 +63,8 @@ impl Velocity {
     }
 }
 
-impl From<&Position> for Vector3 {
-    fn from(pos: &Position) -> Vector3 {
-        Vector3::new(pos.0.x, pos.0.y, 0.0)
-    }
+impl From<&Velocity> for Vector2 {
+    fn from(vel: &Velocity) -> Vector2 { vel.0 }
 }
 
 #[derive(Component)]
