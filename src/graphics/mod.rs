@@ -5,40 +5,67 @@ use lazy_static::lazy_static;
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
+
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes)]
 pub struct Vertex {
     pub pos: [f32; 3],
+    pub normal: [f32; 3],
     pub tex_coord: [f32; 2],
 }
 
-fn vertex(pos: [f32;3], tex_coord: [f32;2]) -> Vertex {
-    Vertex { pos, tex_coord }
+#[repr(C)]
+#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+pub struct GlobalUniforms {
+    pub projection_view_matrix: [[f32; 4]; 4],
+    pub eye_position: [f32; 4],
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes)]
 pub struct LocalUniforms {
-    model_matrix: [[f32; 4]; 4],
+    pub model_matrix: [[f32; 4]; 4],
+    pub color: [f32; 3],
 }
 
 impl LocalUniforms {
     pub fn new() -> Self {
         use cgmath::SquareMatrix;
-        Self { model_matrix: cgmath::Matrix4::identity().into() }
+        Self { model_matrix: cgmath::Matrix4::identity().into(), color: [1.0, 1.0, 1.0]}
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+pub struct DirectionalLight {
+    pub direction : [f32; 4],
+    pub ambient   : [f32; 4],
+    pub color     : [f32; 4],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, AsBytes, FromBytes, Default)]
+pub struct PointLight {
+    pub position : [f32; 4],
+    pub color    : [f32; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+pub struct Lights {
+    pub directional_light : DirectionalLight,
+    pub point_lights      : [PointLight; MAX_NR_OF_POINT_LIGHTS],
 }
 
 pub struct Mesh {
     pub num_vertices   : usize,
     pub vertex_buffer  : wgpu::Buffer,
-    pub uniform_buffer : wgpu::Buffer,
     pub offset         : [f32; 3],
-    pub bind_group     : wgpu::BindGroup,
 }
 
 pub struct Model {
-    pub meshes : Vec<Mesh>,
+    pub meshes: Vec<Mesh>,
 }
 
 use std::path::Path;
@@ -46,58 +73,59 @@ use wavefront_obj::obj;
 use std::fs::File;
 use std::io::Read;
 use wgpu::BufferDescriptor;
+use cgmath::Vector3;
 
-// Based on vange-rs
 pub struct Context {
+    pub device: wgpu::Device,
     pub uniform_buf: wgpu::Buffer,
+    pub lights_buf: wgpu::Buffer,
+
+    pub local_bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group_layout: wgpu::BindGroupLayout,
+
     pub bind_group: wgpu::BindGroup,
+
     pub pipeline_layout: wgpu::PipelineLayout,
     pub pipeline: wgpu::RenderPipeline,
-    pub texture: wgpu::Texture,
+
+    pub depth_view: wgpu::TextureView,
 }
 
 const FRAG_SRC: &str = include_str!("../../shaders/debug.frag");
 const VERT_SRC: &str = include_str!("../../shaders/debug.vert");
 
-//fn generate_local_bind_group_layout_desc() -> wgpu::BindGroupLayoutDescriptor<'static> {
-//    wgpu::BindGroupLayoutDescriptor {
-//        bindings: &[
-//            wgpu::BindGroupLayoutEntry {
-//                binding: 0,
-//                visibility: wgpu::ShaderStage::all(),
-//                ty: wgpu::BindingType::UniformBuffer { dynamic: false }
-//            }
-//        ]
-//    }
-//}
-
 impl Context {
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new(device: wgpu::Device) -> Self {
+
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: 1920,
+                height: 1080,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        });
+
+        let depth_view = depth_texture.create_default_view();
 
         let bind_group_layout = device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
                 bindings: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStage::all(),
+                        visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                         ty: wgpu::BindingType::UniformBuffer { dynamic: false } // TODO: ?
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStage::FRAGMENT,
-                        ty: wgpu::BindingType::SampledTexture {
-                            multisampled: false,
-                            // component_type: wgpu::TextureComponentType::Float,
-                            dimension: wgpu::TextureViewDimension::D2,
-                            component_type: wgpu::TextureComponentType::Float,
-                        }
+                        ty: wgpu::BindingType::UniformBuffer { dynamic: false } // TODO: ?
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStage::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler { comparison: false }
-                    }
                 ],
             }
         );
@@ -114,44 +142,19 @@ impl Context {
             }
         );
 
-        let mx_total = generate_matrix( 1.0, 0.0);
-        let mx_ref : &[f32; 16] = mx_total.as_ref();
+        let global_uniforms : GlobalUniforms = Default::default();
 
         let uniform_buf = device.create_buffer_with_data(
-            mx_ref.as_bytes(),
+            global_uniforms.as_bytes(),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            lod_min_clamp: -100.0,
-            lod_max_clamp: 100.0,
-            compare: None
-        });
-        let size = 256u32;
+        let lights : Lights = Default::default();
 
-        let texture_extent = wgpu::Extent3d {
-            width: size,
-            height: size,
-            depth: 1,
-        };
-
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: texture_extent,
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
-        });
-
-        let texture_view = texture.create_default_view();
+        let lights_buf = device.create_buffer_with_data(
+            lights.as_bytes(),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        );
 
         let mut bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
@@ -160,23 +163,24 @@ impl Context {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &uniform_buf,
-                        range: 0..64,
+                        range: 0..std::mem::size_of::<GlobalUniforms>() as u64,
                     },
                 },
                 wgpu::Binding {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::Binding {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &lights_buf,
+                        range: 0..std::mem::size_of::<Lights>() as u64,
+                    }
+                }
             ],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&bind_group_layout, &local_bind_group_layout]
-        });
+        let pipeline_layout = device.create_pipeline_layout(
+            &wgpu::PipelineLayoutDescriptor {
+                bind_group_layouts: &[&bind_group_layout, &local_bind_group_layout]
+            }
+        );
 
         use glsl_to_spirv::ShaderType;
         let vs = glsl_to_spirv::compile(VERT_SRC, ShaderType::Vertex).unwrap();
@@ -209,7 +213,15 @@ impl Context {
                 color_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
-            depth_stencil_state: None,
+            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+                format: DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
+                stencil_back : wgpu::StencilStateFaceDescriptor::IGNORE,
+                stencil_read_mask: !0,
+                stencil_write_mask: !0,
+            }),
             index_format: wgpu::IndexFormat::Uint16,
             vertex_buffers: &[wgpu::VertexBufferDescriptor{
                 stride: std::mem::size_of::<Vertex>() as u64,
@@ -221,9 +233,14 @@ impl Context {
                         shader_location: 0,
                     },
                     wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
+                        format: wgpu::VertexFormat::Float3,
                         offset: 3 * 4,
                         shader_location: 1,
+                    },
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Float2,
+                        offset: 6 * 4,
+                        shader_location: 2,
                     }
                 ]
             }],
@@ -232,10 +249,20 @@ impl Context {
             alpha_to_coverage_enabled: false
         });
 
-        Context {uniform_buf, bind_group_layout, bind_group, pipeline_layout, pipeline, texture }
+        Context {
+            device,
+            uniform_buf,
+            lights_buf,
+            local_bind_group_layout,
+            bind_group_layout,
+            bind_group,
+            pipeline_layout,
+            pipeline,
+            depth_view
+        }
     }
 
-    pub fn load_model_from_obj(device: &wgpu::Device, path: &str) -> Model {
+    pub fn load_model_from_obj(&self, path: &str) -> Model {
         let mut f = File::open(Path::new(path))
             .expect("Failed to load obj file");
         let mut buf = String::new();
@@ -244,24 +271,7 @@ impl Context {
         let obj_set = obj::parse(buf)
             .expect("Failed to parse obj file");
 
-        let bind_group_layout = 
-            device.create_bind_group_layout(
-                &wgpu::BindGroupLayoutDescriptor {
-                    bindings: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
-                            ty: wgpu::BindingType::UniformBuffer { dynamic: false }
-                        }
-                    ]
-                }
-            );
-
         let mut meshes = vec!();
-
-        let mut encoder = device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor{ todo: 0 }
-        );
 
         for obj in &obj_set.objects {
 
@@ -290,51 +300,23 @@ impl Context {
                     };
                     let v = Vertex {
                         pos: [pos.x as f32, pos.y as f32, pos.z as f32],
+                        normal: [normal.x as f32, normal.y as f32, normal.z as f32],
                         tex_coord: [tc.u as f32, tc.v as f32]
                     };
                     vertices.push(v);
                 }
             }
 
-            let vertex_buf = device.create_buffer_with_data(
+            let vertex_buf = self.device.create_buffer_with_data(
                 vertices.as_bytes(),
                 wgpu::BufferUsage::VERTEX,
-            );
-
-            //let uniform_buf =
-            //    device.create_buffer_mapped::<LocalUniforms>(
-            //        1,
-            //        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            //    ).fill_from_slice(&[LocalUniforms::new()]);
-            //
-
-            let uniform_buf = device.create_buffer(&BufferDescriptor {
-                size: 64,
-                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
-            });
-
-            let bind_group = device.create_bind_group(
-                &wgpu::BindGroupDescriptor {
-                    layout: &bind_group_layout,
-                    bindings: &[
-                        wgpu::Binding {
-                            binding: 0,
-                            resource: wgpu::BindingResource::Buffer {
-                                buffer: &uniform_buf,
-                                range: 0..64,
-                            }
-                        },
-                    ],
-                }
             );
 
             meshes.push(
                 Mesh {
                     num_vertices: vertices.len(),
                     vertex_buffer: vertex_buf,
-                    uniform_buffer: uniform_buf,
                     offset: [0.0, 0.0, 0.0],
-                    bind_group
                 }
             );
         }
@@ -367,59 +349,15 @@ pub fn create_texels(size: usize) -> Vec<u8> {
         .collect()
 }
 
-pub fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
-    let vertex_data = [
-        // top (0, 0, 1)
-        vertex([-1.0, -1.0, 1.0], [0.0, 0.0]),
-        vertex([1.0, -1.0, 1.0], [1.0, 0.0]),
-        vertex([1.0, 1.0, 1.0], [1.0, 1.0]),
-        vertex([-1.0, 1.0, 1.0], [0.0, 1.0]),
-        // bottom (0, 0, -1)
-        vertex([-1.0, 1.0, -1.0], [1.0, 0.0]),
-        vertex([1.0, 1.0, -1.0], [0.0, 0.0]),
-        vertex([1.0, -1.0, -1.0], [0.0, 1.0]),
-        vertex([-1.0, -1.0, -1.0], [1.0, 1.0]),
-        // right (1, 0, 0)
-        vertex([1.0, -1.0, -1.0], [0.0, 0.0]),
-        vertex([1.0, 1.0, -1.0], [1.0, 0.0]),
-        vertex([1.0, 1.0, 1.0], [1.0, 1.0]),
-        vertex([1.0, -1.0, 1.0], [0.0, 1.0]),
-        // left (-1, 0, 0)
-        vertex([-1.0, -1.0, 1.0], [1.0, 0.0]),
-        vertex([-1.0, 1.0, 1.0], [0.0, 0.0]),
-        vertex([-1.0, 1.0, -1.0], [0.0, 1.0]),
-        vertex([-1.0, -1.0, -1.0], [1.0, 1.0]),
-        // front (0.0, 1, 0)
-        vertex([1.0, 1.0, -1.0], [1.0, 0.0]),
-        vertex([-1.0, 1.0, -1.0], [0.0, 0.0]),
-        vertex([-1.0, 1.0, 1.0], [0.0, 1.0]),
-        vertex([1.0, 1.0, 1.0], [1.0, 1.0]),
-        // back (0, -1, 0)
-        vertex([1.0, -1.0, 1.0], [0.0, 0.0]),
-        vertex([-1.0, -1.0, 1.0], [1.0, 0.0]),
-        vertex([-1.0, -1.0, -1.0], [1.0, 1.0]),
-        vertex([1.0, -1.0, -1.0], [0.0, 1.0]),
-    ];
-
-
-
-    let index_data: &[u16] = &[
-        0, 1, 2, 2, 3, 0, // top
-        4, 5, 6, 6, 7, 4, // bottom
-        8, 9, 10, 10, 11, 8, // right
-        12, 13, 14, 14, 15, 12, // left
-        16, 17, 18, 18, 19, 16, // front
-        20, 21, 22, 22, 23, 20, // back
-    ];
-
-    (vertex_data.to_vec(), index_data.to_vec())
+pub fn to_pos3<T>(vec: cgmath::Vector3<T>) -> cgmath::Point3<T> {
+    cgmath::Point3::new(vec.x, vec.y, vec.z)
 }
 
 fn pos3(x: f32, y: f32, z: f32) -> cgmath::Point3<f32> {
     cgmath::Point3::new(x, y, z)
 }
 
-pub(crate) fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
+pub fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
     let mx_projection = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 10.0);
     let mx_view = cgmath::Matrix4::look_at(
         pos3(5.0  * t.cos(), 5.0 * t.sin(), 3.0),
@@ -433,4 +371,68 @@ pub(crate) fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32
         0.0, 0.0, 0.5, 1.0,
     );
     return mx_correction * mx_projection * mx_view;
+}
+
+pub fn project_screen_to_world(
+    screen: cgmath::Vector3<f32>,
+    view_projection: cgmath::Matrix4<f32>,
+    viewport: cgmath::Vector4<i32>,
+) -> Option<cgmath::Vector3<f32>> {
+    use cgmath::SquareMatrix;
+    if let Some(inv_view_projection) = view_projection.invert() {
+        let world = cgmath::Vector4::new(
+            (screen.x - (viewport.x as f32)) / (viewport.z as f32) * 2.0 - 1.0,
+            // Screen Origin is Top Left    (Mouse Origin is Top Left)
+            // (screen.y - (viewport.y as f32)) / (viewport.w as f32) * 2.0 - 1.0,
+            // Screen Origin is Bottom Left (Mouse Origin is Top Left)
+            (1.0 - (screen.y - (viewport.y as f32)) / (viewport.w as f32)) * 2.0 - 1.0, screen.z * 2.0 - 1.0,
+            1.0);
+        let world = inv_view_projection * world;
+
+        if world.w != 0.0 {
+            Some(world.truncate() * (1.0 / world.w))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+pub fn project_world_to_screen(
+    world: cgmath::Vector3<f32>,
+    view_projection: cgmath::Matrix4<f32>,
+    viewport: cgmath::Vector4<i32>,
+) -> Option<cgmath::Vector3<f32>> {
+    let screen = view_projection * world.extend(1.0);
+
+    if screen.w != 0.0 {
+        let mut screen = screen.truncate() * (1.0 / screen.w);
+
+        screen.x = (screen.x + 1.0) * 0.5 * (viewport.z as f32) + (viewport.x as f32);
+        // Screen Origin is Top Left    (Mouse Origin is Top Left)
+        // screen.y = (screen.y + 1.0) * 0.5 * (viewport.w as f32) + (viewport.y as f32);
+        // Screen Origin is Bottom Left (Mouse Origin is Top Left)
+        screen.y = (1.0 - screen.y) * 0.5 * (viewport.w as f32) + (viewport.y as f32);
+
+        // This is only correct when glDepthRangef(0.0f, 1.0f)
+        screen.z = (screen.z + 1.0) * 0.5;
+
+        Some(screen)
+    } else {
+        None
+    }
+}
+
+pub fn length(vector: Vector3<f32>) -> f32  {
+    return (vector.x * vector.x + vector.y * vector.y + vector.z * vector.z).sqrt();
+}
+
+pub fn correction_matrix() -> cgmath::Matrix4<f32> {
+    cgmath::Matrix4::new(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, -1.0, 0.0, 0.0,
+        0.0, 0.0, 0.5, 0.0,
+        0.0, 0.0, 0.5, 1.0,
+    )
 }

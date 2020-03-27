@@ -6,6 +6,7 @@ mod dung_gen;
 use dung_gen::DungGen;
 
 mod graphics;
+mod input;
 
 mod components;
 mod systems;
@@ -28,17 +29,31 @@ use winit::dpi::{PhysicalSize};
 use winit::event::{Event, WindowEvent};
 
 use std::{mem, slice};
-use crate::graphics::{Vertex, create_vertices, Model, Mesh};
-use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor};
+use crate::graphics::{Vertex, Model, Mesh};
+use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor, CommandEncoder};
 use cgmath::{Vector2, Vector3};
 
 use zerocopy::{AsBytes};
+use crate::input::{EventBucket, InputState};
 
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
     let ds = ass_man.load_display_settings();
 
+    let dungeon = DungGen::new()
+        .width(60)
+        .height(60)
+        .n_rooms(10)
+        .room_min(5)
+        .room_range(5)
+        .generate();
+
+    let player_start = dungeon
+        .room_centers
+        .choose(&mut rand::thread_rng())
+        .unwrap()
+        .clone();
 
     let event_loop = EventLoop::new();
 
@@ -67,8 +82,6 @@ async fn run_async() {
         }
     ).await;
 
-    let context = graphics::Context::new(&device);
-
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         format: graphics::COLOR_FORMAT,
@@ -79,84 +92,56 @@ async fn run_async() {
 
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-    let mut init_encoder =
-        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0});
+    let context = graphics::Context::new(device);
 
-    let vertex_size = mem::size_of::<Vertex>();
-    let (vertex_data, index_data) = create_vertices();
-
-    let indexed_vertices = {
-        let mut verts = vec!();
-        for idx in &index_data {
-            verts.push(vertex_data[*idx as usize]);
-        }
-        verts
-    };
-
-    let vertex_buf =
-        //device.create_buffer_with_data(vertex_data.as_bytes(), wgpu::BufferUsage::VERTEX);
-        device.create_buffer_with_data(
-            indexed_vertices.as_bytes(),
-            wgpu::BufferUsage::VERTEX,
-        );
-            //.fill_from_slice(indexed_vertices.as_slice());
-
-
-    let size = 256u32;
-
-    let texture_extent = wgpu::Extent3d {
-        width: size,
-        height: size,
-        depth: 1,
-    };
-
-    let texels = graphics::create_texels(size as usize);
-
-    let temp_buf =
-        device.create_buffer_with_data(texels.as_bytes(), wgpu::BufferUsage::COPY_SRC);
-
-   init_encoder.copy_buffer_to_texture(
-       wgpu::BufferCopyView {
-           buffer: &temp_buf,
-           offset: 0,
-           bytes_per_row: 4 * size,
-           rows_per_image: 0
-       },
-       wgpu::TextureCopyView {
-            texture: &context.texture,
-            mip_level: 0,
-            array_layer: 0,
-            origin: wgpu::Origin3d::ZERO,
-        },
-       texture_extent,
+    let mut init_encoder = context.device.create_command_encoder(
+        &wgpu::CommandEncoderDescriptor { todo: 0 }
     );
 
-    let init_command_buf = init_encoder.finish();
+    let mut lights : graphics::Lights = Default::default();
 
-    queue.submit(&[init_command_buf]);
+    lights.directional_light = graphics::DirectionalLight {
+        direction: [1.0, 0.8, 0.8, 0.0],
+        ambient: [0.1, 0.1, 0.1, 1.0],
+        color: [0.2, 0.2, 0.3, 1.0],
+    };
 
+    for (i, &(x,y)) in dungeon.room_centers.iter().enumerate() {
+        if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
+        lights.point_lights[i] = graphics::PointLight {
+            position: [x as f32, y as f32, 2.0, 1.0],
+            color: [1.0, 0.5, 0.25, 1.0],
+        };
+    }
+
+    let temp_buf = context.device.create_buffer_with_data(
+        lights.as_bytes(),
+        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+    );
+
+    init_encoder.copy_buffer_to_buffer(
+        &temp_buf,
+        0,
+        &context.lights_buf,
+        0,
+        std::mem::size_of::<graphics::Lights>() as u64,
+    );
+
+    let command_buffer = init_encoder.finish();
+
+    queue.submit(&[command_buffer]);
     // End graphics shit
 
-    let dungeon = DungGen::new()
-        .width(60)
-        .height(60)
-        .n_rooms(10)
-        .room_min(5)
-        .room_range(5)
-        .generate();
-
-    let player_start = dungeon
-        .room_centers
-        .choose(&mut rand::thread_rng())
-        .unwrap()
-        .clone();
 
     let mut world = World::new();
 
     register_components(&mut world);
 
     let mut model_array = vec![
-        graphics::Context::load_model_from_obj(&device, "assets/Models/plane.obj")
+        context.load_model_from_obj("assets/Models/plane.obj"),
+        context.load_model_from_obj("assets/Models/cube.obj"),
+        context.load_model_from_obj("assets/Models/sphere.obj"),
+        context.load_model_from_obj("assets/Models/Arissa/arissa.obj"),
     ];
 
     // initialize dispacher with all game systems
@@ -175,17 +160,18 @@ async fn run_async() {
             &["MovementSystem"],
         )
         .with_thread_local(GraphicsSystem::new(
-            context, model_array, sc_desc, swap_chain, device, queue
+            model_array, sc_desc, swap_chain, queue
         ))
         .build();
 
     let player = world
         .create_entity()
         .with(Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)))
+        //.with(Position(Vector2::new(0.0, 0.0)))
         .with(DynamicBody)
         .with(CircleCollider { radius: 0.5 })
         .with(Velocity::new())
-        .with(Model3D::from_index(0).with_scale(0.5))
+        .with(Model3D::from_index(&context, 3).with_scale(0.5))
         .build();
 
     let player_camera = world
@@ -202,26 +188,33 @@ async fn run_async() {
     world.insert(Player::from_entity(player));
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
+    world.insert(context);
 
+    let event_bucket = input::EventBucket { 0: vec![] };
+    world.insert(event_bucket);
+    let input_state = InputState::new();
+    world.insert(input_state);
     // Setup world
     dispatcher.setup(&mut world);
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
         match event {
             Event::MainEventsCleared => {
                 dispatcher.dispatch(&mut world);
-                window.request_redraw();
             },
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                unimplemented!();
+                //unimplemented!();
             },
-            Event::RedrawRequested(_) => {},
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
-            _ => {}
+            Event::WindowEvent { event, .. } => {
+                world.get_mut::<InputState>().unwrap().update_from_event(&event);
+            }
+            _ => {
+                *control_flow = ControlFlow::Poll;
+            }
         }
     });
 }

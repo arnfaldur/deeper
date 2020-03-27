@@ -14,6 +14,7 @@ use specs::{
 use specs::prelude::*;
 
 use std::f32::consts::PI;
+use crate::graphics;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -130,13 +131,49 @@ pub struct Model3D {
     pub scale: f32,
     pub z_rotation: f32,
     pub tint: Vector3<f32>,
+
+    pub bind_group: wgpu::BindGroup,
+    pub uniform_buffer: wgpu::Buffer,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
-    pub fn new() -> Self { Self { idx: 0, offset: Vector3::new(0.0, 0.0, 0.0), tint: Vector3::new(1.0, 1.0, 1.0), scale: 1.0, z_rotation: 0.0 } }
-    pub fn from_index(index: usize) -> Model3D {
-        let mut m = Self::new();
+    pub fn new(context: &graphics::Context) -> Self {
+        
+        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+
+        let uniform_buf = context.device.create_buffer(&wgpu::BufferDescriptor {
+            size: uniforms_size,
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
+        });
+        
+        let bind_group = context.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &context.local_bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..uniforms_size,
+                        }
+                    },
+                ],
+            }
+        );
+        
+        Self { 
+            idx: 0, 
+            offset: Vector3::new(0.0, 0.0, 0.0), 
+            tint: Vector3::new(1.0, 1.0, 1.0),
+            bind_group,
+            scale: 1.0, 
+            z_rotation: 0.0,
+            uniform_buffer: uniform_buf,
+        } 
+    }
+    pub fn from_index(context: &graphics::Context, index: usize) -> Model3D {
+        let mut m = Self::new(context);
         m.idx = index;
         return m;
     }
