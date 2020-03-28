@@ -1,11 +1,14 @@
 extern crate specs;
+extern crate cgmath;
+
+use cgmath::{Vector2, Vector3};
 
 use specs::{Component, VecStorage, WorldExt};
 
-use raylib::prelude::*;
 use specs::prelude::*;
 
 use std::f32::consts::PI;
+use crate::graphics;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -30,41 +33,21 @@ pub struct PlayerCamera(pub Entity);
 
 #[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]
-pub struct Position(pub Vector2);
+pub struct Position(pub Vector2<f32>);
 
 impl Position {
-    pub fn new() -> Position {
-        Position(vec2(0.0, 0.0))
-    }
-    pub fn to_vec3(self) -> Vector3 {
+    pub fn new() -> Position { Position(Vector2::new(0.0, 0.0)) }
+    pub fn to_vec3(self) -> Vector3<f32> {
         Vector3::new(self.0.x, self.0.y, 0.0)
-    }
-}
-
-impl From<&Position> for Vector2 {
-    fn from(pos: &Position) -> Vector2 {
-        pos.0
-    }
-}
-
-impl From<&Position> for Vector3 {
-    fn from(pos: &Position) -> Vector3 {
-        Vector3::new(pos.0.x, pos.0.y, 0.0)
     }
 }
 
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
-pub struct Velocity(pub Vector2);
+pub struct Velocity(pub Vector2<f32>);
 
 impl Velocity {
-    pub fn new() -> Velocity {
-        Velocity(vec2(0.0, 0.0))
-    }
-}
-
-impl From<&Velocity> for Vector2 {
-    fn from(vel: &Velocity) -> Vector2 { vel.0 }
+    pub fn new() -> Velocity { Velocity(Vector2::new(0.0, 0.0)) }
 }
 
 #[derive(Component)]
@@ -101,14 +84,14 @@ pub struct AIFollow {
 #[derive(Component)]
 pub struct Camera {
     pub fov: f32,
-    pub up: Vector3,
+    pub up: Vector3<f32>,
 }
 
 #[derive(Component)]
 pub struct Target(pub Entity);
 
 #[derive(Component)]
-pub struct Position3D(pub Vector3);
+pub struct Position3D(pub Vector3<f32>);
 
 #[derive(Component)]
 pub struct SphericalOffset {
@@ -139,29 +122,57 @@ impl SphericalOffset {
 #[derive(Component)]
 pub struct Model3D {
     pub idx: usize,
-    pub offset: Vector3,
+    pub offset: Vector3<f32>,
     pub scale: f32,
     pub z_rotation: f32,
-    pub tint: Color,
+    pub tint: Vector3<f32>,
+
+    pub bind_group: wgpu::BindGroup,
+    pub uniform_buffer: wgpu::Buffer,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
-    pub fn new() -> Self {
+    pub fn new(context: &graphics::Context) -> Self {
+
+        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+
+        let uniform_buf = context.device.create_buffer(&wgpu::BufferDescriptor {
+            size: uniforms_size,
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
+        });
+
+        let bind_group = context.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &context.local_bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..uniforms_size,
+                        }
+                    },
+                ],
+            }
+        );
+
         Self {
             idx: 0,
-            offset: Vector3::zero(),
-            tint: Color::WHITE,
+            offset: Vector3::new(0.0, 0.0, 0.0),
+            tint: Vector3::new(1.0, 1.0, 1.0),
+            bind_group,
             scale: 1.0,
             z_rotation: 0.0,
+            uniform_buffer: uniform_buf,
         }
     }
-    pub fn from_index(index: usize) -> Model3D {
-        let mut m = Self::new();
+    pub fn from_index(context: &graphics::Context, index: usize) -> Model3D {
+        let mut m = Self::new(context);
         m.idx = index;
         return m;
     }
-    pub fn with_offset(mut self, offset: Vector3) -> Model3D {
+    pub fn with_offset(mut self, offset: Vector3<f32>) -> Model3D {
         self.offset = offset;
         self
     }
@@ -173,7 +184,7 @@ impl Model3D {
         self.z_rotation = z_rotation;
         self
     }
-    pub fn with_tint(mut self, tint: Color) -> Self {
+    pub fn with_tint(mut self, tint: Vector3<f32>) -> Self {
         self.tint = tint;
         self
     }

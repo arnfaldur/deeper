@@ -299,21 +299,7 @@ impl DungGen {
                 //let SW = self.world.get(&(x-1,y-1));
                 for &(a, b, c, d, typ) in [
                     (S, E, N, W, WallType::Wall(Some(WallDirection::North))),
-                    (E, N, W, S, WallType::Wall(Some(WallDirection::West)))
-                    (N, W, S, E, WallType::Wall(Some(WallDirection::South))),
-                    (W, S, E, N, WallType::Wall(Some(WallDirection::East))),
-                ].iter() {
-                    if a == WallType::Floor
-                        && b == WallType::Wall(None)
-                        && c == WallType::Wall(None)
-                        && d == WallType::Wall(None)
-                    {
-                        directed_walls.push((loc, typ));
-                    }
-                }
-                for &(a, b, c, d, typ) in [
-                    (S, E, N, W, WallType::Wall(Some(WallDirection::North))),
-                    (E, N, W, S, WallType::Wall(Some(WallDirection::West)))
+                    (E, N, W, S, WallType::Wall(Some(WallDirection::West))),
                     (N, W, S, E, WallType::Wall(Some(WallDirection::South))),
                     (W, S, E, N, WallType::Wall(Some(WallDirection::East))),
                 ].iter() {

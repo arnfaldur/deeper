@@ -1,8 +1,12 @@
-use raylib::prelude::*;
 use specs::prelude::*;
 use std::f32::consts::PI;
 use std::ops::Mul;
+use zerocopy::{AsBytes};
 
+extern crate cgmath;
+use cgmath::{prelude::*, Vector2, Vector3};
+
+use crate::graphics;
 use crate::components::components::*;
 
 pub struct MovementSystem;
@@ -13,12 +17,12 @@ impl<'a> System<'a> for MovementSystem {
     fn run(&mut self, (mut pos, vel): Self::SystemData) {
         let mut rng = thread_rng();
         for (pos, vel) in (&mut pos, &vel).join() {
-            let velo: Vector2 = vel.0;
+            let velo: Vector2<f32> = vel.0;
             let (randx, randy): (f32, f32) = (
                 rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0),
                 rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0)
             );
-            pos.0 += vec2(velo.x + randx, velo.y + randy);
+            pos.0 += Vector2::new(velo.x + randx, velo.y + randy);
         }
     }
 }
@@ -43,35 +47,29 @@ impl<'a> System<'a> for SphericalFollowSystem {
     }
 }
 
-extern crate raylib;
-
-use raylib::shaders::Shader;
-
 pub struct GraphicsSystem {
-    pub thread: RaylibThread,
-    pub model_array: Vec<Model>,
-    pub l_shader: Shader,
-    mat_model_loc: i32,
-    eye_position_loc: i32,
+    pub model_array: Vec<graphics::Model>,
+    pub sc_desc: wgpu::SwapChainDescriptor,
+    pub swap_chain: wgpu::SwapChain,
+    pub queue: wgpu::Queue,
 }
 
 impl GraphicsSystem {
-    pub fn new(thread: RaylibThread, model_array: Vec<Model>, l_shader: Shader) -> Self {
-        Self {
-            thread,
-            model_array,
-            l_shader,
-            mat_model_loc: 0,
-            eye_position_loc: 0,
-        }
+    pub fn new(
+        model_array: Vec<graphics::Model>,
+        sc_desc: wgpu::SwapChainDescriptor,
+        swap_chain: wgpu::SwapChain,
+        queue: wgpu::Queue,
+    ) -> Self {
+        Self { model_array, sc_desc, swap_chain, queue }
     }
 }
 
 impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
-        WriteExpect<'a, RaylibHandle>,
+        ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, ActiveCamera>,
-        ReadStorage<'a, crate::components::components::Camera>,
+        ReadStorage<'a, Camera>,
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Position>,
@@ -79,144 +77,218 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Model3D>,
     );
 
-    fn run(
-        &mut self,
-        (mut rl, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData,
-    ) {
-        let fps = 1.0 / rl.get_frame_time();
-        let mut d2: RaylibDrawHandle = rl.begin_drawing(&self.thread);
+    fn run(&mut self, (context, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData) {
+        let frame = self.swap_chain.get_next_texture().unwrap();
 
-        d2.clear_background(Color::BLACK);
+        let cam = camera.get(active_cam.0)
+            .expect("No valid active camera entity");
+
+        let cam_pos = pos3d.get(active_cam.0)
+            .expect("Camera entity has no 3D position");
+
+        let cam_target =
+            pos.get(target.get(active_cam.0).unwrap().0).unwrap().to_vec3();
+
+        let mx_correction = graphics::correction_matrix();
+
+        let mx_view = cgmath::Matrix4::look_at(
+            graphics::to_pos3(cam_pos.0),
+            graphics::to_pos3(cam_target),
+            cgmath::Vector3::unit_z(),
+        );
+        let mx_projection = cgmath::perspective(
+            cgmath::Deg(cam.fov),
+            self.sc_desc.width as f32 / self.sc_desc.height as f32,
+            1.0,
+            1000.0,
+        );
+
+        let mx = mx_correction * mx_projection * mx_view;
+
+        let global_uniforms = graphics::GlobalUniforms {
+            projection_view_matrix: mx.into(),
+            eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
+        };
+
+        let new_uniform_buf = context.device.create_buffer_with_data(
+            global_uniforms.as_bytes(),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+        );
+
+        let mut encoder = context.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor{ todo: 0 }
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &new_uniform_buf,
+            0,
+            &context.uniform_buf,
+            0,
+            16 * 4
+        );
+
+        let mut uniforms = vec!();
+
+        for (pos, model, rotation) in (&pos, &models, (&orient).maybe()).join() {
+            let mut matrix = Matrix4::from_scale(model.scale);
+            if let Some(rot) = rotation {
+                matrix = Matrix4::from_angle_z(cgmath::Deg(rot.0)) * matrix;
+            }
+            matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
+            let local_uniforms = graphics::LocalUniforms {
+                model_matrix: matrix.into(),
+                color: model.tint.into(),
+            };
+            uniforms.push(local_uniforms);
+        }
+
+        let temp_buf = context.device.create_buffer_with_data(
+            uniforms.as_bytes(),
+            wgpu::BufferUsage::COPY_SRC,
+        );
+
+        for (i, (pos, model)) in (&pos, &models).join().enumerate() {
+            encoder.copy_buffer_to_buffer(
+                &temp_buf,
+                (i * std::mem::size_of::<graphics::LocalUniforms>()) as u64,
+                &model.uniform_buffer,
+                0,
+                std::mem::size_of::<graphics::LocalUniforms>() as u64,
+            );
+        }
 
         {
-            let active_camera = camera.get(active_cam.0).unwrap();
-            let active_target = target.get(active_cam.0).unwrap();
-            let camera_position = pos3d.get(active_cam.0).unwrap().0;
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor{
+                    attachment: &context.depth_view,
+                    depth_load_op: wgpu::LoadOp::Clear,
+                    depth_store_op: wgpu::StoreOp::Store,
+                    clear_depth: 1.0,
+                    stencil_load_op: wgpu::LoadOp::Clear,
+                    stencil_store_op: wgpu::StoreOp::Store,
+                    clear_stencil: 0
+                }),
+            });
 
-            self.l_shader
-                .set_shader_value(self.eye_position_loc, camera_position);
+            rpass.set_pipeline(&context.pipeline);
+            rpass.set_bind_group(0, &context.bind_group, &[]);
 
-            let mut d3 = d2.begin_mode_3D(Camera3D::perspective(
-                camera_position,
-                pos.get(active_target.0).unwrap().to_vec3(),
-                active_camera.up,
-                active_camera.fov,
-            ));
-
-            for (pos, model, orient) in (&pos, &models, (&orient).maybe()).join() {
-                let model_pos = pos.clone().to_vec3() + model.offset;
-
-                let orientation = if let Some(o) = orient { o.0 } else { 0.0 };
-                self.l_shader.set_shader_value_matrix(
-                    self.mat_model_loc,
-                    Matrix::scale(model.scale, model.scale, model.scale)
-                        .mul(Matrix::rotate(
-                            Vector3::new(0.0, 0.0, 1.0),
-                            PI * orientation / 180.0,
-                        ))
-                        .mul(Matrix::translate(model_pos.x, model_pos.y, model_pos.z)),
-                );
-
-                d3.draw_model_ex(
-                    &self.model_array[model.idx],
-                    model_pos,
-                    Vector3::new(0.0, 0.0, 1.0),
-                    orientation,
-                    Vector3::new(model.scale, model.scale, model.scale),
-                    model.tint,
-                );
+            for (_, model) in (&pos, &models).join() {
+                for mesh in &self.model_array[model.idx].meshes {
+                    rpass.set_bind_group(1, &model.bind_group, &[]);
+                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
+                }
             }
         }
 
-        d2.draw_text("deeper", 12, 12, 30, Color::WHITE);
-        d2.draw_text(&format!("FPS {}", fps), 12, 46, 18, Color::WHITE);
+        let command_buf = encoder.finish();
+
+        self.queue.submit(&[command_buf]);
     }
 
     fn setup(&mut self, world: &mut World) {
-        self.mat_model_loc = self.l_shader.get_shader_location("matModel");
-        self.eye_position_loc = self.l_shader.get_shader_location("eyePosition");
-
-        println!("GraphicsSystem setup!");
     }
 }
 
 pub struct PlayerSystem {
     // Note(Jökull): Yeah, I know. This is just while we're feeling out what is the
     //               responsibility of the input handling system exactly
-    last_mouse_pos: Vector2,
+    last_mouse_pos: Vector2<f32>,
 }
 
 impl PlayerSystem {
-    pub fn new() -> Self {
-        Self {
-            last_mouse_pos: Vector2::zero(),
-        }
-    }
+    pub fn new() -> Self { Self { last_mouse_pos: Vector2::new(0.0, 0.0) } }
 }
 
 // Note(Jökull): Is this really just the input handler?
 impl<'a> System<'a> for PlayerSystem {
     type SystemData = (
-        ReadExpect<'a, RaylibHandle>,
+        ReadExpect<'a, graphics::Context>,
+        ReadExpect<'a, InputState>,
         ReadExpect<'a, Player>,
         ReadExpect<'a, PlayerCamera>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Position3D>,
+        ReadStorage<'a, Camera>,
         WriteStorage<'a, Orientation>,
-        ReadStorage<'a, crate::components::components::Camera>,
         WriteStorage<'a, Model3D>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(
-        &mut self,
-        (rl, player, player_cam, pos, pos3d, mut orient, cam, mut model, mut vel, mut offset): Self::SystemData,
-    ) {
-        use raylib::consts::{KeyboardKey::*, MouseButton::*};
+    fn run(&mut self, (context, input, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut vel, mut offset): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
 
-        let mouse_delta = rl.get_mouse_position() - self.last_mouse_pos;
-        self.last_mouse_pos = rl.get_mouse_position();
+        //let mouse_delta = rl.get_mouse_position() - self.last_mouse_pos;
+        let mouse_pos = input.mouse.pos;
+        let mouse_delta = input.mouse.pos - self.last_mouse_pos;
+        self.last_mouse_pos = input.mouse.pos;
 
-        if rl.is_mouse_button_down(MOUSE_MIDDLE_BUTTON) {
+        if input.mouse.middle.down {
             camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
             camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
             camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
         }
 
         let mut player_vel = vel.get_mut(player.entity).unwrap();
-        player_vel.0 = vec2(0.0, 0.0);
+        let player_pos = pos.get(player.entity).unwrap();
+        let mut player_orient = orient.get_mut(player.entity)
+            .expect("We have no direction in life.");
+        player_vel.0 = Vector2::new(0.0, 0.0);
 
-        if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
+        if input.mouse.left.down {
             // Note(Jökull): We need a better solution for this
-            let player_pos = pos.get(player.entity).unwrap();
-            let rl_cam = raylib::camera::Camera::perspective(
-                camera_pos.0,
-                player_pos.to_vec3(),
-                camera.up,
-                camera.fov,
-            );
-            let mouse_ray = rl.get_mouse_ray(rl.get_mouse_position(), rl_cam);
-            // TODO: rename t
-            let t = mouse_ray.position.z / mouse_ray.direction.z;
-            let Vector3 { x, y, z } = mouse_ray.position - mouse_ray.direction.scale_by(t);
-            let mouse_direction = vec2(x, y) - player_pos.0;
-            let max_speed_distance = 2.0; //TODO: remove magic constant
-            player_vel.0 = mouse_direction.normalized()
-                * player
-                .speed
-                .min(mouse_direction.length() * player.speed / max_speed_distance);
 
-            let model = model.get_mut(player.entity).unwrap();
-            if let Some(orientation) = orient.get_mut(player.entity) {
-                let mut new_rotation = (mouse_direction.y / mouse_direction.x).atan() / PI * 180.0;
-                if mouse_direction.x > 0.0 {
+            let mx_view = cgmath::Matrix4::look_at(
+                graphics::to_pos3(camera_pos.0),
+                graphics::to_pos3(player_pos.to_vec3()),
+                cgmath::Vector3::unit_z(),
+            );
+            let mx_projection = cgmath::perspective(
+                cgmath::Deg(camera.fov),
+                1920f32 / 1080f32,
+                1.0,
+                1000.0,
+            );
+            let mx_correction = cgmath::Matrix4::new(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, -1.0, 0.0, 0.0,
+                0.0, 0.0, 0.5, 0.0,
+                0.0, 0.0, 0.5, 1.0,
+            );
+
+            if let Some(mouse_world_pos) = project_screen_to_world(
+                Vector3::new(mouse_pos.x, 1080.0 - mouse_pos.y, 1.0),
+                mx_correction * mx_projection * mx_view,
+                Vector4::new(0,0,1920,1080),
+            ) {
+
+                let ray_delta = mouse_world_pos - camera_pos.0;
+                let t = mouse_world_pos.z / ray_delta.z;
+                let ray_hit = mouse_world_pos - ray_delta * t;
+
+                let difference = (ray_hit - player_pos.to_vec3());
+
+                let difference = difference * (1.0 / graphics::length(difference));
+                player_vel.0.x = difference.x * player.speed * 10.0;
+                player_vel.0.y = difference.y * player.speed * 10.0;
+
+                let model = model.get_mut(player.entity).unwrap();
+                let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
+                if difference.x > 0.0 {
                     new_rotation += 180.0;
                 }
-                orientation.0 = new_rotation;
+                player_orient.0 = new_rotation;
                 model.z_rotation = new_rotation;
             }
         }
@@ -241,8 +313,8 @@ impl<'a> System<'a> for AIFollowSystem {
         for (follow, hunter, vel, speed) in (&follow, &pos, &mut vel, &speed).join() {
             if let Some(hunted) = pos.get(follow.target) {
                 let difference = hunted.0 - hunter.0;
-                let direction = difference.normalized();
-                let distance = difference.length();
+                let direction = difference.normalize();
+                let distance = difference.magnitude();
                 vel.0 = direction
                     * speed.0
                     * if distance > follow.minimum_distance {
@@ -286,10 +358,10 @@ impl<'a> System<'a> for Physics2DSystem {
                     // vector from ent_a to ent_b
                     let position_delta = delta_a - delta_b;
                     // how much are we colliding?
-                    let collision_depth = collision_distance - position_delta.length();
+                    let collision_depth = collision_distance - position_delta.magnitude();
                     if 0.0 < collision_depth {
                         // normalize the vector to scale and reflect
-                        let collision_direction = position_delta.normalized();
+                        let collision_direction = position_delta.normalize();
                         // get_mut is necessary to appease the borrow checker
                         vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0;
                         vel.get_mut(ent_b).unwrap().0 += collision_direction * -collision_depth / 2.0;
@@ -299,9 +371,9 @@ impl<'a> System<'a> for Physics2DSystem {
         }
         for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
-                if (pos_a.0 + vel_a.0).distance_to(pos_b.0) < (circle_a.radius + circle_b.radius) {
+                if (pos_a.0 + vel_a.0 - pos_b.0).magnitude() < (circle_a.radius + circle_b.radius) {
                     let diff = pos_b.0 - pos_a.0;
-                    let collinear_part = diff.scale_by(vel_a.0.dot(diff));
+                    let collinear_part = diff * (vel_a.0.dot(diff));
                     vel_a.0 -= collinear_part;
                 }
             }
@@ -309,18 +381,16 @@ impl<'a> System<'a> for Physics2DSystem {
         for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
                 let half_side = square_b.side_length / 2.0;
-                let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
-                let abs_diff: Vector2 = vec2(diff.x.abs(), diff.y.abs());
-                let corner_dist = abs_diff - vec2(half_side, half_side);
-                if corner_dist.length() < circle_a.radius {
-                    let sigference: Vector2 = vec2(diff.x.signum(), diff.y.signum());
-                    vel_a.0 -= corner_dist
-                        .normalized()
-                        .scale_by(corner_dist.length() - circle_a.radius)
-                        * sigference;
+                let diff: Vector2<f32> = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
+                let corner_dist = abs_diff - Vector2::new(half_side, half_side);
+                if corner_dist.magnitude() < circle_a.radius {
+                    let sigference: Vector2<f32> = Vector2::new(diff.x.signum(), diff.y.signum());
+                    let vel_change = sigference.mul_element_wise(corner_dist.normalize()) * (corner_dist.magnitude() - circle_a.radius);
+                    vel_a.0 -= vel_change;
                 }
-                let diff: Vector2 = pos_a.0 + vel_a.0 - pos_b.0;
-                let abs_diff: Vector2 = vec2(diff.x.abs(), diff.y.abs());
+                let diff: Vector2<f32> = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
                 if abs_diff.x <= half_side {
                     if abs_diff.y < half_side + circle_a.radius {
                         vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum();
@@ -336,6 +406,9 @@ impl<'a> System<'a> for Physics2DSystem {
     }
 }
 
+use self::cgmath::{Matrix4, Vector4};
+use crate::input::InputState;
+use crate::graphics::{project_screen_to_world, LocalUniforms};
 use crate::dung_gen::{DungGen, WallDirection};
 use rand::{thread_rng, Rng};
 
@@ -354,22 +427,30 @@ impl<'a> System<'a> for DunGenSystem {
         for (&(x, y), &wall_type) in self.dungeon.world.iter() {
             match wall_type {
                 WallType::Floor => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                        Model3D::from_index(&context, 1)
+                    };
                     world
                         .create_entity()
-                        .with(Position(vec2(x as f32, y as f32)))
+                        .with(Position(Vector2::new(x as f32, y as f32)))
                         .with(FloorTile)
-                        .with(Model3D::from_index(1).with_tint(Color::DARKGRAY))
+                        .with(model.with_tint(Vector3::new(0.1, 0.1, 0.1)))
                         .build();
                 }
                 WallType::Wall(maybe_direction) => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                        match maybe_direction {
+                            None => Model3D::from_index(&context, 0).with_tint(Vector3::new(0.2,0.2,0.2)),
+                            Some(_) => Model3D::from_index(&context, 3).with_tint(Vector3::new(0.1,0.1,0.1)),
+                        }
+                    };
                     world
                         .create_entity()
-                        .with(Position(vec2(x as f32, y as f32)))
+                        .with(Position(Vector2::new(x as f32, y as f32)))
                         .with(WallTile)
-                        .with(match maybe_direction {
-                            None => Model3D::from_index(0).with_tint(Color::DARKGRAY),
-                            Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
-                        })
+                        .with(model)
                         .with(Orientation(match maybe_direction {
                             Some(WallDirection::South) => 180.0,
                             Some(WallDirection::East) => 270.0,
@@ -381,11 +462,15 @@ impl<'a> System<'a> for DunGenSystem {
                         .build();
                 }
                 WallType::LadderDown => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                            Model3D::from_index(&context, 5).with_tint(Vector3::new(0.1,0.1,0.1))
+                    };
                     world
                         .create_entity()
-                        .with(Position(vec2(x as f32, y as f32)))
+                        .with(Position(Vector2::new(x as f32, y as f32)))
                         .with(FloorTile)
-                        .with(Model3D::from_index(5).with_tint(Color::LIGHTGRAY))
+                        .with(model)
                         .build();
                 }
                 WallType::LadderUp => (),
