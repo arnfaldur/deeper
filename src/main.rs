@@ -1,9 +1,7 @@
 mod loader;
-
 use loader::AssetManager;
 
 mod dung_gen;
-
 use dung_gen::DungGen;
 
 mod graphics;
@@ -20,8 +18,8 @@ use rand::seq::SliceRandom;
 use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
-use winit::dpi::PhysicalSize;
-use winit::event::{Event, WindowEvent};
+use winit::dpi::{PhysicalSize};
+use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 
 use std::{mem, slice};
 use crate::graphics::{Vertex, Model, Mesh};
@@ -230,14 +228,19 @@ async fn run_async() {
         match event {
             Event::MainEventsCleared => {
                 dispatcher.dispatch(&mut world);
-            }
+            },
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 //unimplemented!();
+            },
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
+            | Event::WindowEvent  {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput {
+                        virtual_keycode: Some(VirtualKeyCode::Escape), ..
+                    }, ..
+                }, ..
             }
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => *control_flow = ControlFlow::Exit,
+                => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { event, .. } => {
                 world.get_mut::<InputState>().unwrap().update_from_event(&event);
             }
