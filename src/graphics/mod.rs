@@ -226,22 +226,10 @@ impl Context {
             vertex_buffers: &[wgpu::VertexBufferDescriptor{
                 stride: std::mem::size_of::<Vertex>() as u64,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float3,
-                        offset: 0,
-                        shader_location: 0,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float3,
-                        offset: 3 * 4,
-                        shader_location: 1,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
-                        offset: 6 * 4,
-                        shader_location: 2,
-                    }
+                attributes: &wgpu::vertex_attr_array![
+                    0 => Float3,
+                    1 => Float3,
+                    2 => Float2
                 ]
             }],
             sample_count: 1,
@@ -263,49 +251,14 @@ impl Context {
     }
 
     pub fn load_model_from_obj(&self, path: &str) -> Model {
-        let mut f = File::open(Path::new(path))
-            .expect("Failed to load obj file");
-        let mut buf = String::new();
-        f.read_to_string(&mut buf);
+        let mut vertex_lists = vertex_lists_from_obj(path).unwrap();
+        return self.load_model_from_vertex_lists(&vertex_lists);
+    }
 
-        let obj_set = obj::parse(buf)
-            .expect("Failed to parse obj file");
-
+    pub fn load_model_from_vertex_lists(&self, vertex_lists: &Vec<Vec<Vertex>>) -> Model {
         let mut meshes = vec!();
 
-        for obj in &obj_set.objects {
-
-            let mut vertices = vec!();
-
-            for g in &obj.geometry {
-                let mut indices = vec!();
-
-                g.shapes.iter().for_each(|shape| {
-                    if let obj::Primitive::Triangle(v1, v2, v3) = shape.primitive {
-                        indices.push(v1);
-                        indices.push(v2);
-                        indices.push(v3);
-                    }
-                });
-
-                for idx in &indices {
-                    let pos = obj.vertices[idx.0];
-                    let normal = match idx.2 {
-                        Some(i) => obj.normals[i],
-                        _ => obj::Normal{ x: 0.0, y: 0.0, z: 0.0}
-                    };
-                    let tc = match idx.1 {
-                        Some(i) => obj.tex_vertices[i],
-                        _ => obj::TVertex{ u: 0.0, v: 0.0, w: 0.0}
-                    };
-                    let v = Vertex {
-                        pos: [pos.x as f32, pos.y as f32, pos.z as f32],
-                        normal: [normal.x as f32, normal.y as f32, normal.z as f32],
-                        tex_coord: [tc.u as f32, tc.v as f32]
-                    };
-                    vertices.push(v);
-                }
-            }
+        for vertices in vertex_lists {
 
             let vertex_buf = self.device.create_buffer_with_data(
                 vertices.as_bytes(),
@@ -323,6 +276,62 @@ impl Context {
 
         Model { meshes }
     }
+
+}
+
+pub fn vertex_lists_from_obj(path: &str) -> Result<Vec<Vec<Vertex>>, String> {
+    let mut f;
+
+    if let Ok(file) = File::open(Path::new(path)) {
+        f = file;
+    } else {
+        return Err(format!("[graphics] : File {} could not be opened.", path));
+    };
+
+    let mut buf = String::new();
+    f.read_to_string(&mut buf);
+
+    let obj_set = obj::parse(buf)
+        .expect("Failed to parse obj file");
+
+    let mut vertex_lists = vec!();
+
+    for obj in &obj_set.objects {
+
+        let mut vertices = vec!();
+
+        for g in &obj.geometry {
+            let mut indices = vec!();
+
+            g.shapes.iter().for_each(|shape| {
+                if let obj::Primitive::Triangle(v1, v2, v3) = shape.primitive {
+                    indices.push(v1);
+                    indices.push(v2);
+                    indices.push(v3);
+                }
+            });
+
+            for idx in &indices {
+                let pos = obj.vertices[idx.0];
+                let normal = match idx.2 {
+                    Some(i) => obj.normals[i],
+                    _ => obj::Normal{ x: 0.0, y: 0.0, z: 0.0}
+                };
+                let tc = match idx.1 {
+                    Some(i) => obj.tex_vertices[i],
+                    _ => obj::TVertex{ u: 0.0, v: 0.0, w: 0.0}
+                };
+                let v = Vertex {
+                    pos: [pos.x as f32, pos.y as f32, pos.z as f32],
+                    normal: [normal.x as f32, normal.y as f32, normal.z as f32],
+                    tex_coord: [tc.u as f32, tc.v as f32]
+                };
+                vertices.push(v);
+            }
+        }
+        vertex_lists.push(vertices);
+    }
+    Ok(vertex_lists)
 
 }
 

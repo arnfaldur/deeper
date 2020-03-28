@@ -19,7 +19,7 @@ use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::dpi::{PhysicalSize};
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 
 use std::{mem, slice};
 use crate::graphics::{Vertex, Model, Mesh};
@@ -229,10 +229,15 @@ async fn run_async() {
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 //unimplemented!();
             },
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => *control_flow = ControlFlow::Exit,
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
+            | Event::WindowEvent  {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput {
+                        virtual_keycode: Some(VirtualKeyCode::Escape), ..
+                    }, ..
+                }, ..
+            }
+                => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { event, .. } => {
                 world.get_mut::<InputState>().unwrap().update_from_event(&event);
             }

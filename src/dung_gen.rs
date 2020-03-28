@@ -10,9 +10,10 @@ use crate::dung_gen::WallDirection::North;
 use specs::rayon::iter::Either;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub enum WallType {
+pub enum TileType {
     Wall(Option<WallDirection>),
     Floor,
+    Nothing,
     LadderDown,
     LadderUp,
 }
@@ -51,7 +52,7 @@ pub struct DungGen {
     // made public to position player currently
     pub room_centers: Vec<(i32, i32)>,
     // The result of the algorithm is stored here
-    pub world: HashMap<(i32, i32), WallType>,
+    pub world: HashMap<(i32, i32), TileType>,
 }
 
 // (Internal screaming)
@@ -82,7 +83,7 @@ impl DungGen {
             room_range: 11,
             n_rooms: 10,
             room_centers: vec![],
-            world: HashMap::<(i32, i32), WallType>::new(),
+            world: HashMap::<(i32, i32), TileType>::new(),
         }
     }
 
@@ -109,7 +110,7 @@ impl DungGen {
         return self;
     }
 
-    pub fn world(mut self, world: HashMap<(i32, i32), WallType>) -> DungGen {
+    pub fn world(mut self, world: HashMap<(i32, i32), TileType>) -> DungGen {
         self.world = world;
         return self;
     }
@@ -164,18 +165,18 @@ impl DungGen {
             // Lay down floor
             for x in xmin..=xmax {
                 for y in ymin..=ymax {
-                    self.world.insert((x, y), WallType::Floor);
+                    self.world.insert((x, y), TileType::Floor);
                 }
             }
 
             // Set walls on the outside of the room
             for x in xmin - 1..=xmax + 1 {
-                self.world.insert((x, ymin - 1), WallType::Wall(None));
-                self.world.insert((x, ymax + 1), WallType::Wall(None));
+                self.world.insert((x, ymin - 1), TileType::Wall(None));
+                self.world.insert((x, ymax + 1), TileType::Wall(None));
             }
             for y in ymin - 1..=ymax + 1 {
-                self.world.insert((xmin - 1, y), WallType::Wall(None));
-                self.world.insert((xmax + 1, y), WallType::Wall(None));
+                self.world.insert((xmin - 1, y), TileType::Wall(None));
+                self.world.insert((xmax + 1, y), TileType::Wall(None));
             }
 
             // Add the center of the generated room to the list
@@ -209,7 +210,7 @@ impl DungGen {
                 }
             }
 
-            // If there are none reamining, we are done.
+            // If there are none remaining, we are done.
             if remaining.len() == 0 {
                 break;
             }
@@ -242,13 +243,13 @@ impl DungGen {
 
             for x in x_start..=x_end + 1 {
                 if x <= x_end {
-                    self.world.insert((x, y_start), WallType::Floor);
+                    self.world.insert((x, y_start), TileType::Floor);
                 }
                 if let None = self.world.get(&(x, y_start + 1)) {
-                    self.world.insert((x, y_start + 1), WallType::Wall(None));
+                    self.world.insert((x, y_start + 1), TileType::Wall(None));
                 }
                 if let None = self.world.get(&(x, y_start - 1)) {
-                    self.world.insert((x, y_start - 1), WallType::Wall(None));
+                    self.world.insert((x, y_start - 1), TileType::Wall(None));
                 }
             }
 
@@ -261,13 +262,13 @@ impl DungGen {
 
             for y in y_start..=y_end + 1 {
                 if y <= y_end {
-                    self.world.insert((x_end, y), WallType::Floor);
+                    self.world.insert((x_end, y), TileType::Floor);
                 }
                 if let None = self.world.get(&(x_end + 1, y)) {
-                    self.world.insert((x_end + 1, y), WallType::Wall(None));
+                    self.world.insert((x_end + 1, y), TileType::Wall(None));
                 }
                 if let None = self.world.get(&(x_end - 1, y)) {
-                    self.world.insert((x_end - 1, y), WallType::Wall(None));
+                    self.world.insert((x_end - 1, y), TileType::Wall(None));
                 }
             }
 
@@ -276,37 +277,30 @@ impl DungGen {
             comps.union(*keys.get(&r1).unwrap(), *keys.get(&r2).unwrap());
         }
 
-        for x in 0..self.width {
-            for y in 0..self.width {
-                if let None = self.world.get(&(x, y)) {
-                    self.world.insert((x, y), WallType::Wall(None));
-                }
-            }
-        }
-
+        // Determine the orientation of walls to assign the correct model and rotation
         let mut directed_walls = vec![];
 
         for (&(x, y), &wall_type) in self.world.iter() {
             let loc = (x, y);
-            if let WallType::Wall(_) = wall_type {
-                let N = *self.world.get(&(x, y + 1)).unwrap_or(&WallType::Wall(None));
-                let W = *self.world.get(&(x - 1, y)).unwrap_or(&WallType::Wall(None));
-                let S = *self.world.get(&(x, y - 1)).unwrap_or(&WallType::Wall(None));
-                let E = *self.world.get(&(x + 1, y)).unwrap_or(&WallType::Wall(None));
+            if let TileType::Wall(_) = wall_type {
+                let N = *self.world.get(&(x, y + 1)).unwrap_or(&TileType::Wall(None));
+                let W = *self.world.get(&(x - 1, y)).unwrap_or(&TileType::Wall(None));
+                let S = *self.world.get(&(x, y - 1)).unwrap_or(&TileType::Wall(None));
+                let E = *self.world.get(&(x + 1, y)).unwrap_or(&TileType::Wall(None));
                 //let NE = self.world.get(&(x+1,y+1));
                 //let NW = self.world.get(&(x-1,y+1));
                 //let SE = self.world.get(&(x+1,y-1));
                 //let SW = self.world.get(&(x-1,y-1));
                 for &(a, b, c, d, typ) in [
-                    (S, E, N, W, WallType::Wall(Some(WallDirection::North))),
-                    (E, N, W, S, WallType::Wall(Some(WallDirection::West))),
-                    (N, W, S, E, WallType::Wall(Some(WallDirection::South))),
-                    (W, S, E, N, WallType::Wall(Some(WallDirection::East))),
+                    (S, E, N, W, TileType::Wall(Some(WallDirection::North))),
+                    (E, N, W, S, TileType::Wall(Some(WallDirection::West))),
+                    (N, W, S, E, TileType::Wall(Some(WallDirection::South))),
+                    (W, S, E, N, TileType::Wall(Some(WallDirection::East))),
                 ].iter() {
-                    if a == WallType::Floor
-                        && b == WallType::Wall(None)
-                        && c == WallType::Wall(None)
-                        && d == WallType::Wall(None)
+                    if a == TileType::Floor
+                        && b == TileType::Wall(None)
+                        && c == TileType::Wall(None)
+                        && d == TileType::Wall(None)
                     {
                         directed_walls.push((loc, typ));
                     }
@@ -318,12 +312,20 @@ impl DungGen {
             self.world.insert(loc, typ);
         }
 
+        // Mark the rest of the world as consisting of nothing
+        for x in 0..self.width {
+            for y in 0..self.width {
+                if let None = self.world.get(&(x, y)) {
+                    self.world.insert((x, y), TileType::Nothing);
+                }
+            }
+        }
 
         // Step 4.5: make a thing
 
         let mut rng = thread_rng();
         let ladder_loc = rng.gen_range(0, self.room_centers.len());
-        self.world.insert(self.room_centers[ladder_loc], WallType::LadderDown);
+        self.world.insert(self.room_centers[ladder_loc], TileType::LadderDown);
 
         return self;
     }
@@ -334,8 +336,8 @@ impl DungGen {
                 match self.world.get(&(x, y)) {
                     None => print!("  "),
                     Some(&value) => match value {
-                        WallType::Wall(None) => print!("# "),
-                        WallType::Floor => print!(". "),
+                        TileType::Wall(None) => print!("# "),
+                        TileType::Floor => print!(". "),
                         _ => print!("? "),
                     },
                 }

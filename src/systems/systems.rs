@@ -125,7 +125,7 @@ impl<'a> System<'a> for GraphicsSystem {
             0,
             &context.uniform_buf,
             0,
-            16 * 4
+            std::mem::size_of::<graphics::GlobalUniforms>() as u64,
         );
 
         let mut uniforms = vec!();
@@ -159,6 +159,7 @@ impl<'a> System<'a> for GraphicsSystem {
         }
 
         {
+            let tic = SystemTime::now();
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -420,6 +421,7 @@ use crate::input::InputState;
 use crate::graphics::{project_screen_to_world, LocalUniforms};
 use crate::dung_gen::{DungGen, WallDirection};
 use rand::{thread_rng, Rng};
+use std::time::SystemTime;
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
@@ -431,23 +433,41 @@ impl<'a> System<'a> for DunGenSystem {
     fn run(&mut self, (): Self::SystemData) {}
 
     fn setup(&mut self, world: &mut World) {
-        use crate::dung_gen::WallType;
+        use crate::dung_gen::TileType;
 
         for (&(x, y), &wall_type) in self.dungeon.world.iter() {
             let pos = Vector2::new(x as f32, y as f32);
-            let pos_arr = Vector3::new(x as f32, y as f32, 0.0);
+            let pos3d = Vector3::new(x as f32, y as f32, 0.0);
 
             let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
             let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
 
             match wall_type {
-                WallType::Floor => {
+                TileType::Nothing => {
                     let model = {
                         let context = world.read_resource::<graphics::Context>();
                         StaticModel::new(
                             &context,
                             1,
-                            pos_arr,
+                            Vector3::new(x as f32, y as f32, 1.0),
+                            1.0,
+                            0.0,
+                            DARK_GRAY,
+                        )
+                    };
+                    world
+                        .create_entity()
+                        // .with(Position(pos)) ?
+                        .with(model)
+                        .build();
+                },
+                TileType::Floor => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                        StaticModel::new(
+                            &context,
+                            1,
+                            pos3d,
                             1.0,
                             0.0,
                             DARK_GRAY,
@@ -460,7 +480,7 @@ impl<'a> System<'a> for DunGenSystem {
                         .with(model)
                         .build();
                 }
-                WallType::Wall(maybe_direction) => {
+                TileType::Wall(maybe_direction) => {
                     let dir = match maybe_direction {
                         Some(WallDirection::South) => 180.0,
                         Some(WallDirection::East) => 270.0,
@@ -473,7 +493,7 @@ impl<'a> System<'a> for DunGenSystem {
                             None => StaticModel::new(
                                 &context,
                                 0,
-                                pos_arr,
+                                pos3d,
                                 1.0,
                                 0.0,
                                 LIGHT_GRAY,
@@ -481,7 +501,7 @@ impl<'a> System<'a> for DunGenSystem {
                             Some(_) => StaticModel::new(
                                 &context,
                                 3,
-                                pos_arr,
+                                pos3d,
                                 1.0,
                                 dir,
                                 DARK_GRAY,
@@ -498,13 +518,13 @@ impl<'a> System<'a> for DunGenSystem {
                         .with(SquareCollider { side_length: 1.0 })
                         .build();
                 }
-                WallType::LadderDown => {
+                TileType::LadderDown => {
                     let model = {
                         let context = world.read_resource::<graphics::Context>();
                         StaticModel::new(
                             &context,
                             5,
-                            pos_arr,
+                            pos3d,
                             1.0,
                             0.0,
                             DARK_GRAY,
@@ -517,7 +537,7 @@ impl<'a> System<'a> for DunGenSystem {
                         .with(model)
                         .build();
                 }
-                WallType::LadderUp => (),
+                TileType::LadderUp => (),
             }
         };
     }
