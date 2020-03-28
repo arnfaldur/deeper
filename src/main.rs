@@ -1,10 +1,11 @@
 mod loader;
-
 use loader::AssetManager;
 
 mod dung_gen;
-
 use dung_gen::DungGen;
+
+mod graphics;
+mod input;
 
 mod components;
 mod systems;
@@ -12,16 +13,27 @@ mod systems;
 use crate::components::components::*;
 use crate::systems::systems::*;
 
+use std::f32::consts::PI;
 use rand::seq::SliceRandom;
-use raylib::prelude::*;
 use specs::prelude::*;
+
+use winit::event_loop::{EventLoop, ControlFlow};
+use winit::dpi::{PhysicalSize};
+use winit::event::{Event, WindowEvent};
+
+use std::{mem, slice};
+use crate::graphics::{Vertex, Model, Mesh};
+use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor, CommandEncoder};
+use cgmath::{Vector2, Vector3};
+
+use zerocopy::{AsBytes};
+use crate::input::{EventBucket, InputState};
 use rand::{thread_rng, Rng};
 
-const FRAG_SRC: &str = include_str!("../shaders/test.frag");
-const VERT_SRC: &str = include_str!("../shaders/test.vert");
 
-fn main() {
-    let ass_man = AssetManager::new();
+async fn run_async() {
+    let mut ass_man = AssetManager::new();
+    let ds = ass_man.load_display_settings();
 
     let dungeon = DungGen::new()
         .width(60)
@@ -33,71 +45,107 @@ fn main() {
 
     let player_start = dungeon
         .room_centers
-        .choose(&mut rand::thread_rng()).unwrap().clone();
+        .choose(&mut rand::thread_rng())
+        .unwrap()
+        .clone();
 
-    let ds = ass_man.load_display_settings();
+    let event_loop = EventLoop::new();
 
-    let (mut rl, thread) = raylib::init()
-        .size(ds.screen_width, ds.screen_height)
-        .resizable()
-        .title("deeper")
-        .build();
+    let size = PhysicalSize { width: ds.screen_width, height: ds.screen_height };
 
-    rl.set_target_fps(ds.fps);
+    let mut builder = winit::window::WindowBuilder::new()
+        .with_title("deeper")
+        .with_inner_size(size);
+    let window = builder.build(&event_loop).unwrap();
+
+    let surface = wgpu::Surface::create(&window);
+
+    let adapter = wgpu::Adapter::request(
+        &wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::Default,
+        },
+        wgpu::BackendBit::PRIMARY,
+    ).await.unwrap();
+
+    let (device, mut queue) = adapter.request_device(
+        &wgpu::DeviceDescriptor {
+            extensions: wgpu::Extensions {
+                anisotropic_filtering: false
+            },
+            limits: Default::default()
+        }
+    ).await;
+
+    let mut sc_desc = wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        format: graphics::COLOR_FORMAT,
+        width: size.width as u32,
+        height: size.height as u32,
+        present_mode: wgpu::PresentMode::Mailbox,
+    };
+
+    let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+
+    let context = graphics::Context::new(device);
+
+    let mut init_encoder = context.device.create_command_encoder(
+        &wgpu::CommandEncoderDescriptor { todo: 0 }
+    );
+
+    let mut lights : graphics::Lights = Default::default();
+
+    lights.directional_light = graphics::DirectionalLight {
+        direction: [1.0, 0.8, 0.8, 0.0],
+        ambient: [0.1, 0.1, 0.1, 1.0],
+        color: [0.2, 0.2, 0.3, 1.0],
+    };
+
+    for (i, &(x,y)) in dungeon.room_centers.iter().enumerate() {
+        if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
+        lights.point_lights[i] = graphics::PointLight {
+            position: [x as f32, y as f32, 2.0, 1.0],
+            color: [1.0, 0.5, 0.25, 1.0],
+        };
+    }
+
+    let temp_buf = context.device.create_buffer_with_data(
+        lights.as_bytes(),
+        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+    );
+
+    init_encoder.copy_buffer_to_buffer(
+        &temp_buf,
+        0,
+        &context.lights_buf,
+        0,
+        std::mem::size_of::<graphics::Lights>() as u64,
+    );
+
+    let command_buffer = init_encoder.finish();
+
+    queue.submit(&[command_buffer]);
+    // End graphics shit
+
 
     let mut world = World::new();
 
     register_components(&mut world);
 
-    let mut l_shader = rl.load_shader_code(&thread, Some(VERT_SRC), Some(FRAG_SRC));
-
-    for i in 0..dungeon.room_centers.len() {
-        let center = dungeon.room_centers[i];
-        let prefix = format!("uPointLights[{}]", i);
-        let is_lit_loc = l_shader.get_shader_location(&format!("{}.is_lit", prefix));
-        let radius_loc = l_shader.get_shader_location(&format!("{}.radius", prefix));
-        let position_loc = l_shader.get_shader_location(&format!("{}.position", prefix));
-        let color_loc = l_shader.get_shader_location(&format!("{}.color", prefix));
-
-        l_shader.set_shader_value(is_lit_loc, 1);
-        l_shader.set_shader_value(radius_loc, 1000.0);
-        l_shader.set_shader_value(position_loc, vec3(center.0 as f32, center.1 as f32, 1.0));
-        let color = Vector4::new(0.9, 0.4, 0.1, 1.0);
-        l_shader.set_shader_value(color_loc, color);
-    }
-
     let mut model_array = vec![
-        rl.load_model(&thread, "./assets/Models/cube.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
-        rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj")
-            .unwrap(),
-        rl.load_model(&thread, "./assets/Models/walltest.obj")
-            .unwrap(),
-        rl.load_model(&thread, "./assets/Models/sphere2.obj")
-            .unwrap(),
-        rl.load_model(&thread, "./assets/Models/StairsDown.obj").unwrap(),
+        context.load_model_from_obj("assets/Models/cube.obj"),
+        context.load_model_from_obj("assets/Models/plane.obj"),
+        context.load_model_from_obj("assets/Models/Arissa/arissa.obj"),
+        context.load_model_from_obj("assets/Models/walltest.obj"),
+        context.load_model_from_obj("assets/Models/sphere2.obj"),
+        context.load_model_from_obj("assets/Models/StairsDown.obj"),
     ];
-
-    for model in &mut model_array {
-        let materials = model.materials_mut();
-        let material = &mut materials[0];
-
-        material.shader = *l_shader.as_ref();
-    }
-
-    // Relinquish the raylib handle to the world
-    world.insert(rl);
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
         .with(AIFollowSystem, "AIFollowSystem", &[])
-        .with(
-            Physics2DSystem,
-            "Physics2DSystem",
-            &["PlayerSystem", "AIFollowSystem"],
-        )
+        .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem", "AIFollowSystem"])
         .with(
             MovementSystem,
             "MovementSystem",
@@ -108,39 +156,37 @@ fn main() {
             "SphericalFollowSystem",
             &["MovementSystem"],
         )
-        .with_thread_local(GraphicsSystem::new(thread, model_array, l_shader))
+        .with_thread_local(GraphicsSystem::new(
+            model_array, sc_desc, swap_chain, queue
+        ))
         .build();
 
     let player = world
         .create_entity()
-        .with(Position(vec2(player_start.0 as f32, player_start.1 as f32)))
+        .with(Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)))
         .with(Orientation(0.0))
         .with(Velocity::new())
         .with(DynamicBody)
         .with(CircleCollider { radius: 0.3 })
-        .with(Model3D::from_index(2).with_scale(0.5))
+        .with(Model3D::from_index(&context, 2).with_scale(0.5))
         .build();
 
     let player_camera = world
         .create_entity()
         .with(components::components::Camera {
-            up: Vector3::new(0.0, 0.0, 1.0),
+            up: Vector3::unit_z(),
             fov: 25.0,
         })
         .with(Target(player))
-        .with(Position3D(vec3(0.0, 0.0, 0.0)))
+        .with(Position3D(Vector3::new(0.0, 0.0, 0.0)))
         .with(SphericalOffset::new())
         .build();
-
-    world.insert(Player::from_entity(player));
-    world.insert(ActiveCamera(player_camera));
-    world.insert(PlayerCamera(player_camera));
 
     let mut rng = thread_rng();
     for enemy in 0..16 {
         let (randx, randy): (f32, f32) = rng.gen();
         world.create_entity()
-            .with(Position(vec2(
+            .with(Position(Vector2::new(
                 player_start.0 as f32 + (randx) * 4.0,
                 player_start.1 as f32 + (randy) * 4.0,
             )))
@@ -153,20 +199,48 @@ fn main() {
                 target: player,
                 minimum_distance: 1.0,
             })
-            .with(Model3D::from_index(4).with_scale(0.1))
+            .with(Model3D::from_index(&context, 4).with_scale(0.1))
             .build();
     }
 
+    world.insert(Player::from_entity(player));
+    world.insert(ActiveCamera(player_camera));
+    world.insert(PlayerCamera(player_camera));
+    world.insert(context);
+
+
+    let event_bucket = input::EventBucket { 0: vec![] };
+    world.insert(event_bucket);
+    let input_state = InputState::new();
+    world.insert(input_state);
+
+
+
     // Setup world
     dispatcher.setup(&mut world);
-    // Main game loop
-    while !window_should_close(&world) {
-        // Should be the only thing in the loop, before the loop is completely removed
-        dispatcher.dispatch(&mut world);
-    }
+
+    event_loop.run(move |event, _, control_flow| {
+        match event {
+            Event::MainEventsCleared => {
+                dispatcher.dispatch(&mut world);
+            },
+            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+                //unimplemented!();
+            },
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            Event::WindowEvent { event, .. } => {
+                world.get_mut::<InputState>().unwrap().update_from_event(&event);
+            }
+            _ => {
+                *control_flow = ControlFlow::Poll;
+            }
+        }
+    });
 }
 
-fn window_should_close(world: &World) -> bool {
-    let rl = world.read_resource::<RaylibHandle>();
-    return rl.window_should_close();
+fn main() {
+    futures::executor::block_on(run_async());
 }
