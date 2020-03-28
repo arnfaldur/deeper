@@ -1,5 +1,4 @@
 mod loader;
-//
 use loader::AssetManager;
 
 mod dung_gen;
@@ -10,18 +9,12 @@ mod input;
 
 mod components;
 mod systems;
-use components::*;
+
 use crate::components::components::*;
 use crate::systems::systems::*;
 
 use std::f32::consts::PI;
 use rand::seq::SliceRandom;
-use std::ops::{Add, Mul};
-use std::process::exit;
-
-use specs::prelude::*;
-use specs::{DispatcherBuilder, WorldExt, Builder, System, AccessorCow, RunningTime};
-use specs::Component;
 use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
@@ -35,6 +28,7 @@ use cgmath::{Vector2, Vector3};
 
 use zerocopy::{AsBytes};
 use crate::input::{EventBucket, InputState};
+use rand::{thread_rng, Rng};
 
 
 async fn run_async() {
@@ -138,17 +132,20 @@ async fn run_async() {
     register_components(&mut world);
 
     let mut model_array = vec![
-        context.load_model_from_obj("assets/Models/plane.obj"),
         context.load_model_from_obj("assets/Models/cube.obj"),
-        context.load_model_from_obj("assets/Models/sphere.obj"),
+        context.load_model_from_obj("assets/Models/plane.obj"),
         context.load_model_from_obj("assets/Models/Arissa/arissa.obj"),
+        context.load_model_from_obj("assets/Models/walltest.obj"),
+        context.load_model_from_obj("assets/Models/sphere2.obj"),
+        context.load_model_from_obj("assets/Models/StairsDown.obj"),
     ];
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
-        .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem"])
+        .with(AIFollowSystem, "AIFollowSystem", &[])
+        .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem", "AIFollowSystem"])
         .with(
             MovementSystem,
             "MovementSystem",
@@ -167,11 +164,11 @@ async fn run_async() {
     let player = world
         .create_entity()
         .with(Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)))
-        //.with(Position(Vector2::new(0.0, 0.0)))
-        .with(DynamicBody)
-        .with(CircleCollider { radius: 0.5 })
+        .with(Orientation(0.0))
         .with(Velocity::new())
-        .with(Model3D::from_index(&context, 3).with_scale(0.5))
+        .with(DynamicBody)
+        .with(CircleCollider { radius: 0.3 })
+        .with(Model3D::from_index(&context, 2).with_scale(0.5))
         .build();
 
     let player_camera = world
@@ -185,15 +182,40 @@ async fn run_async() {
         .with(SphericalOffset::new())
         .build();
 
+    let mut rng = thread_rng();
+    for enemy in 0..16 {
+        let (randx, randy): (f32, f32) = rng.gen();
+        world.create_entity()
+            .with(Position(Vector2::new(
+                player_start.0 as f32 + (randx) * 4.0,
+                player_start.1 as f32 + (randy) * 4.0,
+            )))
+            .with(Speed(0.02))
+            .with(Orientation(0.0))
+            .with(Velocity::new())
+            .with(DynamicBody)
+            .with(CircleCollider { radius: 0.1 })
+            .with(AIFollow {
+                target: player,
+                minimum_distance: 1.0,
+            })
+            .with(Model3D::from_index(&context, 4).with_scale(0.1))
+            .build();
+    }
+
     world.insert(Player::from_entity(player));
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
     world.insert(context);
 
+
     let event_bucket = input::EventBucket { 0: vec![] };
     world.insert(event_bucket);
     let input_state = InputState::new();
     world.insert(input_state);
+
+
+
     // Setup world
     dispatcher.setup(&mut world);
 

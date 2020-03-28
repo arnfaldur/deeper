@@ -5,6 +5,7 @@ use zerocopy::{AsBytes};
 
 extern crate cgmath;
 use cgmath::{ Vector2, Vector3 };
+use cgmath::prelude::*;
 
 use crate::graphics;
 use crate::components::components::*;
@@ -15,8 +16,14 @@ impl<'a> System<'a> for MovementSystem {
     type SystemData = (WriteStorage<'a, Position>, ReadStorage<'a, Velocity>);
 
     fn run(&mut self, (mut pos, vel): Self::SystemData) {
+        let mut rng = thread_rng();
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.0 += vel.0;
+            let velo: Vector2<f32> = vel.0;
+            let (randx, randy): (f32, f32) = (
+                rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0),
+                rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0)
+            );
+            pos.0 += Vector2::new(velo.x + randx, velo.y + randy);
         }
     }
 }
@@ -39,13 +46,6 @@ impl<'a> System<'a> for SphericalFollowSystem {
             pos3d.0.z += follow.radius * follow.phi.sin();
         }
     }
-}
-
-struct CameraSystem;
-
-impl<'a> System<'a> for CameraSystem {
-    type SystemData = (WriteStorage<'a, Camera>, ReadStorage<'a, Position3D>);
-    fn run(&mut self, (camera, pos): Self::SystemData) {}
 }
 
 pub struct GraphicsSystem {
@@ -74,11 +74,11 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Position>,
+        ReadStorage<'a, Orientation>,
         ReadStorage<'a, Model3D>,
     );
 
-    fn run(&mut self, (context, active_cam, camera, target, pos3d, pos, models): Self::SystemData) {
-
+    fn run(&mut self, (context, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData) {
         let frame = self.swap_chain.get_next_texture().unwrap();
 
         let cam = camera.get(active_cam.0)
@@ -130,12 +130,14 @@ impl<'a> System<'a> for GraphicsSystem {
 
         let mut uniforms = vec!();
 
-        for (pos, model) in (&pos, &models).join() {
+        for (pos, model, rotation) in (&pos, &models, (&orient).maybe()).join() {
             use cgmath::SquareMatrix;
             use cgmath::Quaternion;
             use cgmath::Euler;
             let mut matrix = Matrix4::from_scale(model.scale);
-            matrix = Matrix4::from_angle_z(cgmath::Deg(model.z_rotation)) * matrix;
+            if let Some(rot) = rotation {
+                matrix = Matrix4::from_angle_z(cgmath::Deg(rot.0)) * matrix;
+            }
             matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
             let local_uniforms = graphics::LocalUniforms {
                 model_matrix: matrix.into(),
@@ -166,7 +168,7 @@ impl<'a> System<'a> for GraphicsSystem {
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color { r: 0.1, g: 0.2, b: 0.3, a: 1.0 }
+                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }
                 }],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor{
                     attachment: &context.depth_view,
@@ -194,7 +196,6 @@ impl<'a> System<'a> for GraphicsSystem {
         let command_buf = encoder.finish();
 
         self.queue.submit(&[command_buf]);
-
     }
 
     fn setup(&mut self, world: &mut World) {
@@ -202,6 +203,7 @@ impl<'a> System<'a> for GraphicsSystem {
 }
 
 pub struct PlayerSystem {
+    // Note(Jökull): Yeah, I know. This is just while we're feeling out what is the
     //               responsibility of the input handling system exactly
     last_mouse_pos: Vector2<f32>,
 }
@@ -220,12 +222,13 @@ impl<'a> System<'a> for PlayerSystem {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Camera>,
+        WriteStorage<'a, Orientation>,
         WriteStorage<'a, Model3D>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(&mut self, (context, input, player, player_cam, pos, pos3d, cam, mut model, mut vel, mut offset): Self::SystemData) {
+    fn run(&mut self, (context, input, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut vel, mut offset): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
@@ -243,6 +246,8 @@ impl<'a> System<'a> for PlayerSystem {
 
         let mut player_vel = vel.get_mut(player.entity).unwrap();
         let player_pos = pos.get(player.entity).unwrap();
+        let mut player_orient = orient.get_mut(player.entity)
+            .expect("We have no direction in life.");
         player_vel.0 = Vector2::new(0.0, 0.0);
 
         if input.mouse.left.down {
@@ -287,6 +292,7 @@ impl<'a> System<'a> for PlayerSystem {
                 if difference.x > 0.0 {
                     new_rotation += 180.0;
                 }
+                player_orient.0 = new_rotation;
                 model.z_rotation = new_rotation;
             }
         }
@@ -294,6 +300,34 @@ impl<'a> System<'a> for PlayerSystem {
 
     fn setup(&mut self, world: &mut World) {
         println!("PlayerSystem setup!");
+    }
+}
+
+pub(crate) struct AIFollowSystem;
+
+impl<'a> System<'a> for AIFollowSystem {
+    type SystemData = (
+        ReadStorage<'a, AIFollow>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        ReadStorage<'a, Speed>,
+    );
+
+    fn run(&mut self, (follow, pos, mut vel, speed): Self::SystemData) {
+        for (follow, hunter, vel, speed) in (&follow, &pos, &mut vel, &speed).join() {
+            if let Some(hunted) = pos.get(follow.target) {
+                let difference = hunted.0 - hunter.0;
+                let direction = difference.normalize();
+                let distance = difference.magnitude();
+                vel.0 = direction
+                    * speed.0
+                    * if distance > follow.minimum_distance {
+                    1.0
+                } else {
+                    0.0
+                };
+            }
+        }
     }
 }
 
@@ -311,40 +345,76 @@ impl<'a> System<'a> for Physics2DSystem {
     );
 
     fn run(&mut self, (ents, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
-
-        //for _ in (&dynamics, &statics).join() {
-        //    println!("There's a naughty static body that really feels dynamic inside.");
-        //    exit(0);
-        //}
-
-        //for (_, pos_d, vel, circle_d) in (&dynamics, &pos, &mut vel, &circles).join() {
-        //    for (_, pos_s, circle_s) in (&statics, &pos, &circles).join() {
-        //        if nalgebra::distance((pos_d.0 + vel.0), (pos_s.0)) < (circle_d.radius + circle_s.radius) {
-
-        //            let diff = pos_s.0 - pos_d.0;
-        //            let collinear_part = diff.scale_by(vel.0.dot(diff));
-        //            vel.0 -= collinear_part;
-        //        }
-        //    }
-        //}
-
-        // let boi: Entity;
-        // let igi: Position;
-        // for (entity_a, pos_a, stat, circle_a) in (&ents, &pos, &statics, &circles).join() {
-        //     for (entity_b, pos_b, dynamic, circle_b) in (&ents, &pos, &dynamics, &circles).join() {
-        //         if entity_a != entity_b && (pos_a.0.distance_to(pos_b.0) < (circle_a.radius + circle_b.radius)) {
-        //             println!("{:?} is colliding with {:?}!", entity_a, entity_b);
-        //         }
-        //     }
-        // }
+        // TODO: Move these to a EntityValidationSystem or something like that
+        for _ in (&dynamics, &statics).join() {
+            panic!("There's a naughty static body that really feels dynamic inside.");
+        }
+        for _ in (&dynamics, !&vel).join() {
+            panic!("A dynamic entity has no velocity!");
+        }
+        for (ent_a, _, pos_a, circle_a) in (&ents, &dynamics, &pos, &circles).join() {
+            for (ent_b, _, pos_b, circle_b) in (&ents, &dynamics, &pos, &circles).join() {
+                if ent_a != ent_b {
+                    let collision_distance = circle_a.radius + circle_b.radius;
+                    // get post move locations
+                    let delta_a = pos_a.0 + vel.get(ent_a).unwrap().0;
+                    let delta_b = pos_b.0 + vel.get(ent_b).unwrap().0;
+                    // vector from ent_a to ent_b
+                    let position_delta = delta_a - delta_b;
+                    // how much are we colliding?
+                    let collision_depth = collision_distance - position_delta.magnitude();
+                    if 0.0 < collision_depth {
+                        // normalize the vector to scale and reflect
+                        let collision_direction = position_delta.normalize();
+                        // get_mut is necessary to appease the borrow checker
+                        vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0;
+                        vel.get_mut(ent_b).unwrap().0 += collision_direction * -collision_depth / 2.0;
+                    }
+                }
+            }
+        }
+        for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
+            for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
+                if (pos_a.0 + vel_a.0 - pos_b.0).magnitude() < (circle_a.radius + circle_b.radius) {
+                    let diff = pos_b.0 - pos_a.0;
+                    let collinear_part = diff * (vel_a.0.dot(diff));
+                    vel_a.0 -= collinear_part;
+                }
+            }
+        }
+        for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
+            for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
+                let half_side = square_b.side_length / 2.0;
+                let diff: Vector2<f32> = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
+                let corner_dist = abs_diff - Vector2::new(half_side, half_side);
+                if corner_dist.magnitude() < circle_a.radius {
+                    let sigference: Vector2<f32> = Vector2::new(diff.x.signum(), diff.y.signum());
+                    let vel_change = sigference.mul_element_wise(corner_dist.normalize()) * (corner_dist.magnitude() - circle_a.radius);
+                    vel_a.0 -= vel_change;
+                }
+                let diff: Vector2<f32> = pos_a.0 + vel_a.0 - pos_b.0;
+                let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
+                if abs_diff.x <= half_side {
+                    if abs_diff.y < half_side + circle_a.radius {
+                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum();
+                    }
+                }
+                if abs_diff.y <= half_side {
+                    if abs_diff.x < half_side + circle_a.radius {
+                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum();
+                    }
+                }
+            }
+        }
     }
 }
 
-use crate::dung_gen::DungGen;
-use std::process::exit;
 use self::cgmath::{Matrix4, Vector4};
 use crate::input::InputState;
 use crate::graphics::{project_screen_to_world, LocalUniforms};
+use crate::dung_gen::{DungGen, WallDirection};
+use rand::{thread_rng, Rng};
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
@@ -358,83 +428,59 @@ impl<'a> System<'a> for DunGenSystem {
     fn setup(&mut self, world: &mut World) {
         use crate::dung_gen::WallType;
 
-        for x in 0..=self.dungeon.width {
-            for y in 0..=self.dungeon.height {
-                match self.dungeon.world.get(&(x, y)) {
-                    None => (),
-                    Some(&value) => {
-
-                        match value {
-                            WallType::FLOOR => {
-                                let model = {
-                                    let context = world.read_resource::<graphics::Context>();
-                                    Model3D::from_index(&context, 0).with_tint(Vector3::new(0.2, 0.2, 0.2))
-                                };
-                                let mut ent = world.create_entity()
-                                    .with(Position(Vector2::new(x as f32, y as f32)))
-                                    .with(FloorTile)
-                                    .with(model).build(); //.with_tint(Color::DARKGRAY))
-                            },
-                            WallType::WALL => {
-                                let model = {
-                                    let context = world.read_resource::<graphics::Context>();
-                                    Model3D::from_index(&context, 1).with_tint(Vector3::new(0.5, 0.5, 0.5))
-                                };
-                                let mut ent = world.create_entity()
-                                    .with(Position(Vector2::new(x as f32, y as f32)))
-                                    .with(WallTile)
-                                    .with(StaticBody)
-                                    .with(CircleCollider { radius: 0.5 })
-                                    .with(model).build();
-                            },
-                            _ => (),
-                            //WallType::WALL_NORTH => {
-                            //    ent.with(WallTile)
-                            //        //.with(Model3D::from_index(0)
-                            //        //    //.with_tint(Color::DARKGRAY)
-                            //        //    .with_z_rotation(0.0)
-                            //        //)
-                            //        .with(StaticBody)
-                            //        .with(CircleCollider { radius: 0.5 })
-                            //}
-                            //WallType::WALL_SOUTH => {
-                            //    ent.with(WallTile)
-                            //        //.with(Model3D::from_index(0)
-                            //        //    //.with_tint(Color::DARKGRAY)
-                            //        //    .with_z_rotation(180.0)
-                            //        //)
-                            //        .with(StaticBody)
-                            //        .with(CircleCollider { radius: 0.5 })
-                            //}
-                            //WallType::WALL_EAST => {
-                            //    ent.with(WallTile)
-                            //        //.with(Model3D::from_index(0)
-                            //        //    //.with_tint(Color::DARKGRAY)
-                            //        //    .with_z_rotation(-90.0)
-                            //        //)
-                            //        .with(StaticBody)
-                            //        .with(CircleCollider { radius: 0.5 })
-                            //}
-                            //WallType::WALL_WEST => {
-                            //    ent.with(WallTile)
-                            //        //.with(Model3D::from_index(0)
-                            //        //    //.with_tint(Color::DARKGRAY)
-                            //        //    .with_z_rotation(90.0)
-                            //        //)
-                            //        .with(StaticBody)
-                            //        .with(CircleCollider { radius: 0.5 })
-                            //}
-                            //WallType::NOTHING => {
-                            //    ent
-                            //}
-                            //WallType::DEBUG => {
-                            //    ent
-                            //}
-                        }
-                    }
+        for (&(x, y), &wall_type) in self.dungeon.world.iter() {
+            match wall_type {
+                WallType::Floor => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                        Model3D::from_index(&context, 1)
+                    };
+                    world
+                        .create_entity()
+                        .with(Position(Vector2::new(x as f32, y as f32)))
+                        .with(FloorTile)
+                        .with(model.with_tint(Vector3::new(0.1, 0.1, 0.1)))
+                        .build();
                 }
+                WallType::Wall(maybe_direction) => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                        match maybe_direction {
+                            None => Model3D::from_index(&context, 0).with_tint(Vector3::new(0.2,0.2,0.2)),
+                            Some(_) => Model3D::from_index(&context, 3).with_tint(Vector3::new(0.1,0.1,0.1)),
+                        }
+                    };
+                    world
+                        .create_entity()
+                        .with(Position(Vector2::new(x as f32, y as f32)))
+                        .with(WallTile)
+                        .with(model)
+                        .with(Orientation(match maybe_direction {
+                            None => 0.0,
+                            Some(WallDirection::North) => 0.0,
+                            Some(WallDirection::South) => 180.0,
+                            Some(WallDirection::East) => 270.0,
+                            Some(WallDirection::West) => 90.0,
+                        }))
+                        .with(StaticBody)
+                        .with(SquareCollider { side_length: 1.0 })
+                        .build();
+                }
+                WallType::LadderDown => {
+                    let model = {
+                        let context = world.read_resource::<graphics::Context>();
+                            Model3D::from_index(&context, 5).with_tint(Vector3::new(0.1,0.1,0.1))
+                    };
+                    world
+                        .create_entity()
+                        .with(Position(Vector2::new(x as f32, y as f32)))
+                        .with(FloorTile)
+                        .with(model)
+                        .build();
+                }
+                WallType::LadderUp => (),
+                WallType::Nothing => (),
             }
-        }
+        };
     }
 }
-

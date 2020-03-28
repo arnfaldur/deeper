@@ -3,13 +3,7 @@ extern crate cgmath;
 
 use cgmath::{Vector2, Vector3};
 
-use specs::{
-    WorldExt,
-    Builder,
-    System,
-    Component,
-    VecStorage,
-};
+use specs::{Component, VecStorage, WorldExt};
 
 use specs::prelude::*;
 
@@ -23,7 +17,12 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn from_entity(entity: Entity) -> Self { return Self { entity, speed: 0.05 }; }
+    pub fn from_entity(entity: Entity) -> Self {
+        return Self {
+            entity,
+            speed: 0.05,
+        };
+    }
 }
 
 pub struct ActiveCamera(pub Entity);
@@ -38,6 +37,9 @@ pub struct Position(pub Vector2<f32>);
 
 impl Position {
     pub fn new() -> Position { Position(Vector2::new(0.0, 0.0)) }
+    pub fn to_vec3(self) -> Vector3<f32> {
+        Vector3::new(self.0.x, self.0.y, 0.0)
+    }
 }
 
 #[derive(Component, Debug)]
@@ -49,20 +51,13 @@ impl Velocity {
 }
 
 #[derive(Component)]
-#[storage(VecStorage)]
+pub struct Orientation(pub f32);
+
+#[derive(Component)]
+pub struct Speed(pub f32);
+
+#[derive(Component)]
 pub struct Agent;
-
-//impl From<&Position> for Vector3<f32> {
-//    fn from(pos: &Position) -> Vector3<f32> {
-//        Vector3::new(pos.0.x, pos.0.y, 0.0)
-//    }
-//}
-
-impl Position {
-    pub fn to_vec3(self) -> Vector3<f32> {
-        Vector3::new(self.0.x, self.0.y, 0.0)
-    }
-}
 
 #[derive(Component)]
 pub struct StaticBody;
@@ -139,14 +134,14 @@ pub struct Model3D {
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
-        
+
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
         let uniform_buf = context.device.create_buffer(&wgpu::BufferDescriptor {
             size: uniforms_size,
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
         });
-        
+
         let bind_group = context.device.create_bind_group(
             &wgpu::BindGroupDescriptor {
                 layout: &context.local_bind_group_layout,
@@ -161,16 +156,16 @@ impl Model3D {
                 ],
             }
         );
-        
-        Self { 
-            idx: 0, 
-            offset: Vector3::new(0.0, 0.0, 0.0), 
+
+        Self {
+            idx: 0,
+            offset: Vector3::new(0.0, 0.0, 0.0),
             tint: Vector3::new(1.0, 1.0, 1.0),
             bind_group,
-            scale: 1.0, 
+            scale: 1.0,
             z_rotation: 0.0,
             uniform_buffer: uniform_buf,
-        } 
+        }
     }
     pub fn from_index(context: &graphics::Context, index: usize) -> Model3D {
         let mut m = Self::new(context);
@@ -201,11 +196,12 @@ pub struct WallTile;
 #[derive(Component)]
 pub struct FloorTile;
 
-
 pub fn register_components(world: &mut World) {
     world.register::<Position>();
     world.register::<Position3D>();
+    world.register::<Orientation>();
     world.register::<Velocity>();
+    world.register::<Speed>();
     world.register::<Camera>();
     world.register::<Target>();
     world.register::<SphericalOffset>();
