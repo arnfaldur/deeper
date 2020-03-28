@@ -357,6 +357,10 @@ fn pos3(x: f32, y: f32, z: f32) -> cgmath::Point3<f32> {
     cgmath::Point3::new(x, y, z)
 }
 
+pub fn to_vec2<T>(vec3: cgmath::Vector3<T>) -> cgmath::Vector2<T> {
+    cgmath::Vector2::new(vec3.x, vec3.y)
+}
+
 pub fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
     let mx_projection = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 10.0);
     let mx_view = cgmath::Matrix4::look_at(

@@ -60,7 +60,7 @@ pub struct Orientation(pub f32);
 pub struct Speed(pub f32);
 
 #[derive(Component)]
-pub struct Agent;
+pub struct Acceleration(pub f32);
 
 #[derive(Component)]
 pub struct StaticBody;
@@ -79,10 +79,16 @@ pub struct SquareCollider {
 }
 
 #[derive(Component)]
+pub struct Agent;
+
+#[derive(Component)]
 pub struct AIFollow {
     pub target: Entity,
     pub minimum_distance: f32,
 }
+
+#[derive(Component)]
+pub struct Destination(pub Vector2<f32>);
 
 #[derive(Component)]
 pub struct Camera {
@@ -248,6 +254,7 @@ pub fn register_components(world: &mut World) {
     world.register::<Orientation>();
     world.register::<Velocity>();
     world.register::<Speed>();
+    world.register::<Acceleration>();
     world.register::<Camera>();
     world.register::<Target>();
     world.register::<SphericalOffset>();
@@ -260,4 +267,5 @@ pub fn register_components(world: &mut World) {
     world.register::<CircleCollider>();
     world.register::<SquareCollider>();
     world.register::<AIFollow>();
+    world.register::<Destination>();
 }

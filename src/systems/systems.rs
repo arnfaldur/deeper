@@ -1,9 +1,10 @@
 use specs::prelude::*;
 use std::f32::consts::PI;
 use std::ops::Mul;
-use zerocopy::{AsBytes};
+use zerocopy::AsBytes;
 
 extern crate cgmath;
+
 use cgmath::{prelude::*, Vector2, Vector3};
 
 use crate::graphics;
@@ -117,7 +118,7 @@ impl<'a> System<'a> for GraphicsSystem {
         );
 
         let mut encoder = context.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor{ todo: 0 }
+            &wgpu::CommandEncoderDescriptor { todo: 0 }
         );
 
         encoder.copy_buffer_to_buffer(
@@ -125,7 +126,7 @@ impl<'a> System<'a> for GraphicsSystem {
             0,
             &context.uniform_buf,
             0,
-            16 * 4
+            16 * 4,
         );
 
         let mut uniforms = vec!();
@@ -165,16 +166,16 @@ impl<'a> System<'a> for GraphicsSystem {
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }
+                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
                 }],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor{
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
                     attachment: &context.depth_view,
                     depth_load_op: wgpu::LoadOp::Clear,
                     depth_store_op: wgpu::StoreOp::Store,
                     clear_depth: 1.0,
                     stencil_load_op: wgpu::LoadOp::Clear,
                     stencil_store_op: wgpu::StoreOp::Store,
-                    clear_stencil: 0
+                    clear_stencil: 0,
                 }),
             });
 
@@ -203,8 +204,7 @@ impl<'a> System<'a> for GraphicsSystem {
         self.queue.submit(&[command_buf]);
     }
 
-    fn setup(&mut self, world: &mut World) {
-    }
+    fn setup(&mut self, world: &mut World) {}
 }
 
 pub struct PlayerSystem {
@@ -220,7 +220,6 @@ impl PlayerSystem {
 // Note(Jökull): Is this really just the input handler?
 impl<'a> System<'a> for PlayerSystem {
     type SystemData = (
-        ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, InputState>,
         ReadExpect<'a, Player>,
         ReadExpect<'a, PlayerCamera>,
@@ -229,11 +228,11 @@ impl<'a> System<'a> for PlayerSystem {
         ReadStorage<'a, Camera>,
         WriteStorage<'a, Orientation>,
         WriteStorage<'a, Model3D>,
-        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Destination>,
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(&mut self, (context, input, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut vel, mut offset): Self::SystemData) {
+    fn run(&mut self, (input, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut dest, mut offset): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
@@ -249,11 +248,10 @@ impl<'a> System<'a> for PlayerSystem {
             camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
         }
 
-        let mut player_vel = vel.get_mut(player.entity).unwrap();
-        let player_pos = pos.get(player.entity).unwrap();
+        let player_pos = pos.get(player.entity)
+            .expect("I have no place in this world.");
         let mut player_orient = orient.get_mut(player.entity)
             .expect("We have no direction in life.");
-        player_vel.0 = Vector2::new(0.0, 0.0);
 
         if input.mouse.left.down {
             // Note(Jökull): We need a better solution for this
@@ -269,28 +267,19 @@ impl<'a> System<'a> for PlayerSystem {
                 1.0,
                 1000.0,
             );
-            let mx_correction = cgmath::Matrix4::new(
-                1.0, 0.0, 0.0, 0.0,
-                0.0, -1.0, 0.0, 0.0,
-                0.0, 0.0, 0.5, 0.0,
-                0.0, 0.0, 0.5, 1.0,
-            );
 
             if let Some(mouse_world_pos) = project_screen_to_world(
                 Vector3::new(mouse_pos.x, 1080.0 - mouse_pos.y, 1.0),
-                mx_correction * mx_projection * mx_view,
-                Vector4::new(0,0,1920,1080),
+                graphics::correction_matrix() * mx_projection * mx_view,
+                Vector4::new(0, 0, 1920, 1080),
             ) {
+                let ray_delta: Vector3<f32> = mouse_world_pos - camera_pos.0;
+                let t: f32 = mouse_world_pos.z / ray_delta.z;
+                let ray_hit = to_vec2(mouse_world_pos - ray_delta * t);
 
-                let ray_delta = mouse_world_pos - camera_pos.0;
-                let t = mouse_world_pos.z / ray_delta.z;
-                let ray_hit = mouse_world_pos - ray_delta * t;
+                dest.insert(player.entity, Destination(ray_hit));
 
-                let difference = (ray_hit - player_pos.to_vec3());
-
-                let difference = difference * (1.0 / graphics::length(difference));
-                player_vel.0.x = difference.x * player.speed * 10.0;
-                player_vel.0.y = difference.y * player.speed * 10.0;
+                let difference: Vector2<f32> = (ray_hit - player_pos.0).normalize();
 
                 let model = model.get_mut(player.entity).unwrap();
                 let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
@@ -312,26 +301,42 @@ pub(crate) struct AIFollowSystem;
 
 impl<'a> System<'a> for AIFollowSystem {
     type SystemData = (
+        Entities<'a>,
         ReadStorage<'a, AIFollow>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Destination>,
+    );
+
+    fn run(&mut self, (ents, follow, pos, mut dest): Self::SystemData) {
+        for (ent, follow, hunter) in (&ents, &follow, &pos).join() {
+            if let Some(hunted) = pos.get(follow.target) {
+                let difference = hunted.0 - hunter.0;
+                let distance = difference.magnitude();
+                if distance > follow.minimum_distance {
+                    dest.insert(ent, Destination(hunted.0));
+                } else {
+                    dest.remove(ent);
+                }
+            }
+        }
+    }
+}
+
+pub(crate) struct GoToDestinationSystem;
+
+impl<'a> System<'a> for GoToDestinationSystem {
+    type SystemData = (
+        ReadStorage<'a, Destination>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Speed>,
     );
 
-    fn run(&mut self, (follow, pos, mut vel, speed): Self::SystemData) {
-        for (follow, hunter, vel, speed) in (&follow, &pos, &mut vel, &speed).join() {
-            if let Some(hunted) = pos.get(follow.target) {
-                let difference = hunted.0 - hunter.0;
-                let direction = difference.normalize();
-                let distance = difference.magnitude();
-                vel.0 = direction
-                    * speed.0
-                    * if distance > follow.minimum_distance {
-                    1.0
-                } else {
-                    0.0
-                };
-            }
+    fn run(&mut self, (dest, pos, mut vel, speed): Self::SystemData) {
+        for (dest, hunter, vel, speed) in (&dest, &pos, &mut vel, &speed).join() {
+            let difference = dest.0 - hunter.0;
+            let direction = difference.normalize();
+            vel.0 = direction * speed.0 * 1.0;
         }
     }
 }
@@ -417,7 +422,7 @@ impl<'a> System<'a> for Physics2DSystem {
 
 use self::cgmath::{Matrix4, Vector4};
 use crate::input::InputState;
-use crate::graphics::{project_screen_to_world, LocalUniforms};
+use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
 use crate::dung_gen::{DungGen, WallDirection};
 use rand::{thread_rng, Rng};
 

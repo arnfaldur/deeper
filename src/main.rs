@@ -1,7 +1,9 @@
 mod loader;
+
 use loader::AssetManager;
 
 mod dung_gen;
+
 use dung_gen::DungGen;
 
 mod graphics;
@@ -18,7 +20,7 @@ use rand::seq::SliceRandom;
 use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
-use winit::dpi::{PhysicalSize};
+use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
 
 use std::{mem, slice};
@@ -26,7 +28,7 @@ use crate::graphics::{Vertex, Model, Mesh};
 use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor, CommandEncoder};
 use cgmath::{Vector2, Vector3};
 
-use zerocopy::{AsBytes};
+use zerocopy::AsBytes;
 use crate::input::{EventBucket, InputState};
 use rand::{thread_rng, Rng};
 
@@ -72,7 +74,7 @@ async fn run_async() {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false
             },
-            limits: Default::default()
+            limits: Default::default(),
         }
     ).await;
 
@@ -92,7 +94,7 @@ async fn run_async() {
         &wgpu::CommandEncoderDescriptor { todo: 0 }
     );
 
-    let mut lights : graphics::Lights = Default::default();
+    let mut lights: graphics::Lights = Default::default();
 
     lights.directional_light = graphics::DirectionalLight {
         direction: [1.0, 0.8, 0.8, 0.0],
@@ -100,7 +102,7 @@ async fn run_async() {
         color: [0.2, 0.2, 0.3, 1.0],
     };
 
-    for (i, &(x,y)) in dungeon.room_centers.iter().enumerate() {
+    for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
         if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
         lights.point_lights[i] = graphics::PointLight {
             position: [x as f32, y as f32, 2.0, 1.0],
@@ -147,7 +149,8 @@ async fn run_async() {
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
         .with(AIFollowSystem, "AIFollowSystem", &[])
-        .with(Physics2DSystem, "Physics2DSystem", &["PlayerSystem", "AIFollowSystem"])
+        .with(GoToDestinationSystem, "GoToDestinationSystem", &["AIFollowSystem"])
+        .with(Physics2DSystem, "Physics2DSystem", &["GoToDestinationSystem", "PlayerSystem", "AIFollowSystem"])
         .with(
             MovementSystem,
             "MovementSystem",
@@ -159,13 +162,15 @@ async fn run_async() {
             &["MovementSystem"],
         )
         .with_thread_local(GraphicsSystem::new(
-            model_array, sc_desc, swap_chain, queue
+            model_array, sc_desc, swap_chain, queue,
         ))
         .build();
 
     let player = world
         .create_entity()
         .with(Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)))
+        .with(Speed(0.05))
+        .with(Acceleration(0.01))
         .with(Orientation(0.0))
         .with(Velocity::new())
         .with(DynamicBody)
@@ -185,7 +190,7 @@ async fn run_async() {
         .build();
 
     let mut rng = thread_rng();
-    for enemy in 0..16 {
+    for _enemy in 0..64 {
         let (randx, randy): (f32, f32) = rng.gen();
         world.create_entity()
             .with(Position(Vector2::new(
@@ -193,6 +198,7 @@ async fn run_async() {
                 player_start.1 as f32 + (randy) * 4.0,
             )))
             .with(Speed(0.02))
+            .with(Acceleration(0.005))
             .with(Orientation(0.0))
             .with(Velocity::new())
             .with(DynamicBody)
@@ -217,7 +223,6 @@ async fn run_async() {
     world.insert(input_state);
 
 
-
     // Setup world
     dispatcher.setup(&mut world);
 
@@ -225,10 +230,10 @@ async fn run_async() {
         match event {
             Event::MainEventsCleared => {
                 dispatcher.dispatch(&mut world);
-            },
+            }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 //unimplemented!();
-            },
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
