@@ -75,9 +75,10 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Orientation>,
         ReadStorage<'a, Model3D>,
+        ReadStorage<'a, StaticModel>,
     );
 
-    fn run(&mut self, (context, active_cam, camera, target, pos3d, pos, orient, models): Self::SystemData) {
+    fn run(&mut self, (context, active_cam, camera, target, pos3d, pos, orient, models, static_model): Self::SystemData) {
         let frame = self.swap_chain.get_next_texture().unwrap();
 
         let cam = camera.get(active_cam.0)
@@ -180,9 +181,17 @@ impl<'a> System<'a> for GraphicsSystem {
             rpass.set_pipeline(&context.pipeline);
             rpass.set_bind_group(0, &context.bind_group, &[]);
 
-            for (_, model) in (&pos, &models).join() {
+            for (model) in (&static_model).join() {
+                rpass.set_bind_group(1, &model.bind_group, &[]);
                 for mesh in &self.model_array[model.idx].meshes {
-                    rpass.set_bind_group(1, &model.bind_group, &[]);
+                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
+                }
+            }
+
+            for (_, model) in (&pos, &models).join() {
+                rpass.set_bind_group(1, &model.bind_group, &[]);
+                for mesh in &self.model_array[model.idx].meshes {
                     rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
                     rpass.draw(0..mesh.num_vertices as u32, 0..1)
                 }
@@ -425,38 +434,66 @@ impl<'a> System<'a> for DunGenSystem {
         use crate::dung_gen::WallType;
 
         for (&(x, y), &wall_type) in self.dungeon.world.iter() {
+            let pos = Vector2::new(x as f32, y as f32);
+            let pos_arr = Vector3::new(x as f32, y as f32, 0.0);
+
+            let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
+            let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
+
             match wall_type {
                 WallType::Floor => {
                     let model = {
                         let context = world.read_resource::<graphics::Context>();
-                        Model3D::from_index(&context, 1)
+                        StaticModel::new(
+                            &context,
+                            1,
+                            pos_arr,
+                            1.0,
+                            0.0,
+                            DARK_GRAY,
+                        )
                     };
                     world
                         .create_entity()
-                        .with(Position(Vector2::new(x as f32, y as f32)))
+                        .with(Position(pos))
                         .with(FloorTile)
-                        .with(model.with_tint(Vector3::new(0.1, 0.1, 0.1)))
+                        .with(model)
                         .build();
                 }
                 WallType::Wall(maybe_direction) => {
+                    let dir = match maybe_direction {
+                        Some(WallDirection::South) => 180.0,
+                        Some(WallDirection::East) => 270.0,
+                        Some(WallDirection::West) => 90.0,
+                        _ => 0.0,
+                    };
                     let model = {
                         let context = world.read_resource::<graphics::Context>();
                         match maybe_direction {
-                            None => Model3D::from_index(&context, 0).with_tint(Vector3::new(0.2,0.2,0.2)),
-                            Some(_) => Model3D::from_index(&context, 3).with_tint(Vector3::new(0.1,0.1,0.1)),
+                            None => StaticModel::new(
+                                &context,
+                                0,
+                                pos_arr,
+                                1.0,
+                                0.0,
+                                LIGHT_GRAY,
+                            ),
+                            Some(_) => StaticModel::new(
+                                &context,
+                                3,
+                                pos_arr,
+                                1.0,
+                                dir,
+                                DARK_GRAY,
+                            ),
                         }
                     };
                     world
                         .create_entity()
-                        .with(Position(Vector2::new(x as f32, y as f32)))
+                        .with(Position(pos))
                         .with(WallTile)
                         .with(model)
-                        .with(Orientation(match maybe_direction {
-                            Some(WallDirection::South) => 180.0,
-                            Some(WallDirection::East) => 270.0,
-                            Some(WallDirection::West) => 90.0,
-                            _ => 0.0,
-                        }))
+                        .with(Orientation(dir))
                         .with(StaticBody)
                         .with(SquareCollider { side_length: 1.0 })
                         .build();
@@ -464,11 +501,18 @@ impl<'a> System<'a> for DunGenSystem {
                 WallType::LadderDown => {
                     let model = {
                         let context = world.read_resource::<graphics::Context>();
-                            Model3D::from_index(&context, 5).with_tint(Vector3::new(0.1,0.1,0.1))
+                        StaticModel::new(
+                            &context,
+                            5,
+                            pos_arr,
+                            1.0,
+                            0.0,
+                            DARK_GRAY,
+                        )
                     };
                     world
                         .create_entity()
-                        .with(Position(Vector2::new(x as f32, y as f32)))
+                        .with(Position(pos))
                         .with(FloorTile)
                         .with(model)
                         .build();
