@@ -1,5 +1,6 @@
 extern crate specs;
 extern crate cgmath;
+use zerocopy::{AsBytes, FromBytes};
 
 use cgmath::{Vector2, Vector3};
 
@@ -9,6 +10,8 @@ use specs::prelude::*;
 
 use std::f32::consts::PI;
 use crate::graphics;
+use crate::graphics::LocalUniforms;
+use self::cgmath::Matrix4;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -120,6 +123,49 @@ impl SphericalOffset {
 }
 
 #[derive(Component)]
+pub struct StaticModel {
+    pub idx: usize,
+    pub bind_group: wgpu::BindGroup,
+}
+
+impl StaticModel {
+    pub fn new(context: &graphics::Context, idx: usize, offset: Vector3<f32>, scale: f32, z_rotation: f32, tint: Vector3<f32>) -> Self {
+        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+
+        let mut matrix = Matrix4::from_scale(scale);
+        matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
+        matrix = Matrix4::from_translation(offset) * matrix;
+
+        let local_uniforms = graphics::LocalUniforms {
+            model_matrix: matrix.into(),
+            color: [tint.x, tint.y, tint.z],
+        };
+
+        let uniform_buf = context.device.create_buffer_with_data(
+            local_uniforms.as_bytes(),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        );
+
+        let bind_group = context.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &context.local_bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..uniforms_size,
+                        }
+                    },
+                ],
+            }
+        );
+
+        Self {idx, bind_group}
+    }
+}
+
+#[derive(Component)]
 pub struct Model3D {
     pub idx: usize,
     pub offset: Vector3<f32>,
@@ -206,6 +252,7 @@ pub fn register_components(world: &mut World) {
     world.register::<Target>();
     world.register::<SphericalOffset>();
     world.register::<Model3D>();
+    world.register::<StaticModel>();
     world.register::<WallTile>();
     world.register::<FloorTile>();
     world.register::<StaticBody>();
