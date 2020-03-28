@@ -367,15 +367,14 @@ impl<'a> System<'a> for DunGenSystem {
                         .with(Position(vec2(x as f32, y as f32)))
                         .with(WallTile)
                         .with(match maybe_direction {
-                            None => Model3D::from_index(0).with_tint(Color::LIGHTGRAY),
+                            None => Model3D::from_index(0).with_tint(Color::DARKGRAY),
                             Some(_) => Model3D::from_index(3).with_tint(Color::DARKGRAY),
                         })
                         .with(Orientation(match maybe_direction {
-                            None => 0.0,
-                            Some(WallDirection::North) => 0.0,
                             Some(WallDirection::South) => 180.0,
                             Some(WallDirection::East) => 270.0,
                             Some(WallDirection::West) => 90.0,
+                            _ => 0.0,
                         }))
                         .with(StaticBody)
                         .with(SquareCollider { side_length: 1.0 })
@@ -386,11 +385,10 @@ impl<'a> System<'a> for DunGenSystem {
                         .create_entity()
                         .with(Position(vec2(x as f32, y as f32)))
                         .with(FloorTile)
-                        .with(Model3D::from_index(5).with_tint(Color::DARKGRAY))
+                        .with(Model3D::from_index(5).with_tint(Color::LIGHTGRAY))
                         .build();
                 }
                 WallType::LadderUp => (),
-                WallType::Nothing => (),
             }
         };
     }

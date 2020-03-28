@@ -71,11 +71,13 @@ fn main() {
         rl.load_model(&thread, "./assets/Models/plane.obj").unwrap(),
         rl.load_model(&thread, "./assets/Models/Arissa/arissa.obj")
             .unwrap(),
-        rl.load_model(&thread, "./assets/Models/walltest.obj")
+        rl.load_model(&thread, "./assets/Models/LowPolyDungeonBasic/Wall.obj")
             .unwrap(),
         rl.load_model(&thread, "./assets/Models/sphere2.obj")
             .unwrap(),
         rl.load_model(&thread, "./assets/Models/StairsDown.obj").unwrap(),
+        rl.load_model(&thread, "./assets/Models/LowPolyDungeonBasic/CornerOpen.obj") .unwrap(),
+        rl.load_model(&thread, "./assets/Models/LowPolyDungeonBasic/CornerClosed.obj") .unwrap(),
     ];
 
     for model in &mut model_array {

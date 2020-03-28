@@ -7,10 +7,10 @@ use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
 use std::collections::HashMap;
 use self::rand::thread_rng;
 use crate::dung_gen::WallDirection::North;
+use specs::rayon::iter::Either;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum WallType {
-    Nothing,
     Wall(Option<WallDirection>),
     Floor,
     LadderDown,
@@ -20,9 +20,19 @@ pub enum WallType {
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum WallDirection {
     North,
+    West,
     South,
     East,
-    West,
+    NorthWest(CornerType),
+    SouthWest(CornerType),
+    SouthEast(CornerType),
+    NorthEast(CornerType),
+}
+
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub enum CornerType{
+    Open,
+    Closed,
 }
 
 pub struct DungGen {
@@ -269,7 +279,7 @@ impl DungGen {
         for x in 0..self.width {
             for y in 0..self.width {
                 if let None = self.world.get(&(x, y)) {
-                    self.world.insert((x, y), WallType::Nothing);
+                    self.world.insert((x, y), WallType::Wall(None));
                 }
             }
         }
@@ -279,23 +289,38 @@ impl DungGen {
         for (&(x, y), &wall_type) in self.world.iter() {
             let loc = (x, y);
             if let WallType::Wall(_) = wall_type {
-                let N = *self.world.get(&(x, y + 1)).unwrap_or(&WallType::Nothing);
-                let S = *self.world.get(&(x, y - 1)).unwrap_or(&WallType::Nothing);
-                let E = *self.world.get(&(x + 1, y)).unwrap_or(&WallType::Nothing);
-                let W = *self.world.get(&(x - 1, y)).unwrap_or(&WallType::Nothing);
+                let N = *self.world.get(&(x, y + 1)).unwrap_or(&WallType::Wall(None));
+                let W = *self.world.get(&(x - 1, y)).unwrap_or(&WallType::Wall(None));
+                let S = *self.world.get(&(x, y - 1)).unwrap_or(&WallType::Wall(None));
+                let E = *self.world.get(&(x + 1, y)).unwrap_or(&WallType::Wall(None));
                 //let NE = self.world.get(&(x+1,y+1));
                 //let NW = self.world.get(&(x-1,y+1));
                 //let SE = self.world.get(&(x+1,y-1));
                 //let SW = self.world.get(&(x-1,y-1));
                 for &(a, b, c, d, typ) in [
-                    (S, E, W, N, WallType::Wall(Some(WallDirection::North))),
-                    (N, E, W, S, WallType::Wall(Some(WallDirection::South))),
-                    (W, N, S, E, WallType::Wall(Some(WallDirection::East))),
-                    (E, N, S, W, WallType::Wall(Some(WallDirection::West)))].iter() {
+                    (S, E, N, W, WallType::Wall(Some(WallDirection::North))),
+                    (E, N, W, S, WallType::Wall(Some(WallDirection::West)))
+                    (N, W, S, E, WallType::Wall(Some(WallDirection::South))),
+                    (W, S, E, N, WallType::Wall(Some(WallDirection::East))),
+                ].iter() {
                     if a == WallType::Floor
                         && b == WallType::Wall(None)
                         && c == WallType::Wall(None)
-                        && (d == WallType::Wall(None) || d == WallType::Nothing)
+                        && d == WallType::Wall(None)
+                    {
+                        directed_walls.push((loc, typ));
+                    }
+                }
+                for &(a, b, c, d, typ) in [
+                    (S, E, N, W, WallType::Wall(Some(WallDirection::North))),
+                    (E, N, W, S, WallType::Wall(Some(WallDirection::West)))
+                    (N, W, S, E, WallType::Wall(Some(WallDirection::South))),
+                    (W, S, E, N, WallType::Wall(Some(WallDirection::East))),
+                ].iter() {
+                    if a == WallType::Floor
+                        && b == WallType::Wall(None)
+                        && c == WallType::Wall(None)
+                        && d == WallType::Wall(None)
                     {
                         directed_walls.push((loc, typ));
                     }
