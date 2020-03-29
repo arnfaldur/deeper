@@ -169,7 +169,7 @@ impl<'a> System<'a> for GraphicsSystem {
             matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
             let local_uniforms = graphics::LocalUniforms {
                 model_matrix: matrix.into(),
-                color: model.tint.into(),
+                material: model.material,
             };
             uniforms.push(local_uniforms);
         }
@@ -485,9 +485,6 @@ impl<'a> System<'a> for DunGenSystem {
             let pos = Vector2::new(x as f32, y as f32);
             let pos3d = Vector3::new(x as f32, y as f32, 0.0);
 
-            let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
-            let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
-
             let (cube_idx, plane_idx, wall_idx, stairs_down_idx) = {
                 let ass_man = world.read_resource::<loader::AssetManager>();
                 (
@@ -508,7 +505,7 @@ impl<'a> System<'a> for DunGenSystem {
                             Vector3::new(x as f32, y as f32, 1.0),
                             1.0,
                             0.0,
-                            DARK_GRAY,
+                            graphics::Material::dark_stone(),
                         )
                     };
                     world
@@ -526,7 +523,7 @@ impl<'a> System<'a> for DunGenSystem {
                             pos3d,
                             1.0,
                             0.0,
-                            DARK_GRAY,
+                            graphics::Material::dark_stone(),
                         )
                     };
                     world
@@ -552,7 +549,7 @@ impl<'a> System<'a> for DunGenSystem {
                                 pos3d,
                                 1.0,
                                 0.0,
-                                LIGHT_GRAY,
+                                graphics::Material::bright_stone(),
                             ),
                             Some(_) => StaticModel::new(
                                 &context,
@@ -560,7 +557,7 @@ impl<'a> System<'a> for DunGenSystem {
                                 pos3d,
                                 1.0,
                                 dir,
-                                DARK_GRAY,
+                                graphics::Material::dark_stone(),
                             ),
                         }
                     };
@@ -583,7 +580,7 @@ impl<'a> System<'a> for DunGenSystem {
                             pos3d,
                             1.0,
                             0.0,
-                            DARK_GRAY,
+                            graphics::Material::dark_stone(),
                         )
                     };
                     world

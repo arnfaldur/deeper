@@ -76,10 +76,10 @@ async fn run_async() {
 
     for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
         if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
-        lights.point_lights[i] = graphics::PointLight {
-            position: [x as f32, y as f32, 2.0, 1.0],
-            color: [1.0, 0.5, 0.25, 1.0],
-        };
+        lights.point_lights[i] = Default::default();
+        lights.point_lights[i].radius = 20.0;
+        lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
+        lights.point_lights[i].color = [0.6, 0.4, 0.1, 1.0];
     }
 
     let temp_buf = context.device.create_buffer_with_data(
@@ -170,7 +170,7 @@ async fn run_async() {
             })
             .with(Model3D::from_index(&context, ass_man.get_model_index("sphere2.obj").unwrap())
                 .with_scale(0.1)
-                .with_tint(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
+                .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen()))))
             .build();
     }
 

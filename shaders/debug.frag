@@ -3,6 +3,8 @@
 // TODO: Inject into shader
 #define MAX_NR_OF_POINT_LIGHTS 10
 
+const float PI = 3.14159265359;
+
 struct DirectionalLight {
     vec4 direction;
     vec4 ambient;
@@ -10,15 +12,15 @@ struct DirectionalLight {
 };
 
 struct PointLight {
+    float radius;
     vec4 position;
     vec4 color;
 };
 
 struct Material {
-    vec4 diffuse;
-    vec4 specular;
-
-    float shininess;
+    vec4  albedo;
+    float metallic;
+    float roughness;
 };
 
 layout(location = 0) in vec2 v_TexCoord;
@@ -38,6 +40,65 @@ layout(set = 0, binding = 1) uniform Lights {
     PointLight uPointLights[MAX_NR_OF_POINT_LIGHTS];
 };
 
+layout(set = 1, binding = 0) uniform Locals {
+    mat4 u_ModelMatrix;
+    Material material;
+};
+
+
+// The following color space functions are from
+// http://www.chilliant.com/rgb2hsv.html
+const float Epsilon = 1e-10;
+const vec3 HCYwts = vec3(0.299, 0.587, 0.114);
+
+vec3 HUEtoRGB(in float H)
+{
+    float R = abs(H * 6 - 3) - 1;
+    float G = 2 - abs(H * 6 - 2);
+    float B = 2 - abs(H * 6 - 4);
+    return clamp(vec3(R,G,B), 0.0, 1.0);
+}
+
+vec3 RGBtoHCV(vec3 RGB)
+{
+    // Based on work by Sam Hocevar and Emil Persson
+    vec4 P = (RGB.g < RGB.b) ? vec4(RGB.bg, -1.0, 2.0/3.0) : vec4(RGB.gb, 0.0, -1.0/3.0);
+    vec4 Q = (RGB.r < P.x) ? vec4(P.xyw, RGB.r) : vec4(RGB.r, P.yzx);
+    float C = Q.x - min(Q.w, Q.y);
+    float H = abs((Q.w - Q.y) / (6 * C + Epsilon) + Q.z);
+    return vec3(H, C, Q.x);
+}
+
+vec3 RGBtoHCY(vec3 RGB)
+{
+    // Corrected by David Schaeffer
+    vec3 HCV = RGBtoHCV(RGB);
+    float Y = dot(RGB, HCYwts);
+    float Z = dot(HUEtoRGB(HCV.x), HCYwts);
+    if (Y < Z)
+    {
+        HCV.y *= Z / (Epsilon + Y);
+    }
+    else
+    {
+        HCV.y *= (1 - Z) / (Epsilon + 1 - Y);
+    }
+    return vec3(HCV.x, HCV.y, Y);
+}
+// The weights of RGB contributions to luminance.
+// Should sum to unity.
+
+vec3 HCYtoRGB(vec3 HCY) {
+    vec3 RGB = HUEtoRGB(HCY.x);
+    float Z = dot(RGB, HCYwts);
+    if (HCY.z < Z) {
+        HCY.y *= HCY.z / Z;
+    } else if (Z < 1) {
+        HCY.y *= (1 - HCY.z) / (1 - Z);
+    }
+    return (RGB - Z) * HCY.y + HCY.z;
+}
+
 float fLightFalloff(float distance, float lightRadius, float scale) {
     //
     //           saturate(1 - (distance/lightRadius)^4)^2
@@ -49,6 +110,42 @@ float fLightFalloff(float distance, float lightRadius, float scale) {
     //
     distance = distance / scale;
     return pow(clamp(1 - pow(distance/lightRadius, 4), 0.0, 1.0),2) / (pow(distance, 2) + 1);
+}
+
+vec3 fFresnelSchlick(float cos_theta, vec3 F_0) {
+    return F_0 + (1.0 - F_0) * pow(1.0 - cos_theta, 5.0);
+}
+
+float fDistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a      = roughness*roughness;
+    float a2     = a*a;
+    float NdotH  = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+
+    float num   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return num / denom;
+}
+
+float fGeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float num   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return num / denom;
+}
+
+float fGeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = fGeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = fGeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
 }
 
 float fLambert(vec4 normal, vec4 lightDir) {
@@ -65,50 +162,92 @@ float fBlinnPhong(vec4 normal, vec4 lightDir, vec4 viewDir, float shininess) {
     return pow(max(dot(normal, halfway), 0.0), 3*shininess); // blinn-phong
 }
 
-vec4 fPointLightFactor(PointLight light, vec4 normal, Material material) {
-    vec4 toLight  = light.position - v_FragPos;
-    vec4 lightDir = normalize(toLight);
+//vec4 fPointLightFactor(PointLight light, vec4 normal, Material material) {
+//    vec4 toLight  = light.position - v_FragPos;
+//    vec4 lightDir = normalize(toLight);
+//
+//    float intensity = fLightFalloff(length(toLight), 20.0, 3.0);
+//
+//    vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
+//    vec4 specular = material.specular * fPhong(normal, lightDir, material.shininess);
+//    //vec4 specular = material.specular * fBlinnPhong(normal, lightDir, viewDir, material.shininess);
+//
+//    //return intensity * light.color * (diffuse + specular);
+//    return intensity * light.color * (diffuse + specular);
+//}
 
-    float intensity = fLightFalloff(length(toLight), 20.0, 3.0);
+//vec4 fDirectionalLightFactor(DirectionalLight light, vec4 normal, Material material) {
+//    vec4 lightDir = normalize(light.direction);
+//    vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
+//    vec4 specular = material.specular * fPhong(normal, lightDir, 64);
+//    // TODO: fix
+//    //vec4 specular = material.specular * fBlinnPhong(normal, light.direction, viewDir, material.shininess);
+//    return light.ambient * material.diffuse + light.color * (diffuse + specular);
+//}
 
-    vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
-    vec4 specular = material.specular * fPhong(normal, lightDir, material.shininess);
-    //vec4 specular = material.specular * fBlinnPhong(normal, lightDir, viewDir, material.shininess);
-
-    //return intensity * light.color * (diffuse + specular);
-    return intensity * light.color * (diffuse + specular);
-}
-
-vec4 fDirectionalLightFactor(DirectionalLight light, vec4 normal, Material material) {
-    vec4 lightDir = normalize(light.direction);
-    vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
-    vec4 specular = material.specular * fPhong(normal, lightDir, 64);
-    // TODO: fix
-    //vec4 specular = material.specular * fBlinnPhong(normal, light.direction, viewDir, material.shininess);
-    return light.ambient * material.diffuse + light.color * (diffuse + specular);
+float contrast(float a, float x) {
+    return clamp(a * (cos(x * PI + PI) + 1) / 2.0 + ((1-a)*x), 0.0, 1.0);
 }
 
 void main() {
     vec4 finalColor = vec4(0.0);
 
-    vec4 normal = normalize(v_Normal);
+    vec3 normal = normalize(v_Normal.xyz);
+    vec3 viewDir = normalize(u_Eye_Position.xyz - v_FragPos.xyz);
 
-    Material mat;
-    mat.diffuse = vec4(v_Color, 1.0);
-    mat.specular = vec4(1.0);
-    mat.shininess = 64;
+    Material mat = material;
+
+    vec3 F_0 = vec3(0.20);
+    F_0 = mix(F_0, vec3(mat.albedo), mat.metallic);
+
+    vec3 Lo = vec3(0.0);
 
     for(int i = 0; i < MAX_NR_OF_POINT_LIGHTS; i++) {
-        finalColor += fPointLightFactor(
-            uPointLights[i],
-            normal,
-            mat
-        );
+        PointLight light = uPointLights[i];
+        vec3 to_light = light.position.xyz - v_FragPos.xyz;
+        vec3 lightDir = normalize(to_light);
+        vec3 halfway = normalize(lightDir + viewDir);
+
+        float attenuation = fLightFalloff(length(to_light), 20.0, 2.0);
+        vec3 radiance = light.color.xyz * attenuation;
+
+        float NDF = fDistributionGGX(normal, halfway, mat.roughness);
+        float G = fGeometrySmith(normal, viewDir, lightDir, mat.roughness);
+        vec3 F = fFresnelSchlick(max(dot(halfway, viewDir), 0.0), F_0);
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - mat.metallic;
+
+        vec3 numerator = NDF * G * F;
+        float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
+        vec3 specular = numerator / max(denominator, 0.001);
+
+        float specular_falloff = fLightFalloff(length(to_light), 20.0, 4.0);
+        float NdotL = max(dot(normal, lightDir), 0.0);
+        Lo += (kD * vec3(mat.albedo) / PI + specular_falloff * specular) * radiance * NdotL;
+
+        //finalColor += fPointLightFactor(uPointLights[i], vec4(normal, 0.0), mat);
     }
 
-    finalColor += fDirectionalLightFactor(uDirectionalLight, normal, mat);
+    vec3 ambient = vec3(0.01) * vec3(mat.albedo);
+    vec3 color = ambient + Lo;
 
+
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0/2.2));
+
+    //finalColor += fDirectionalLightFactor(uDirectionalLight, vec4(normal, 0.0), mat);
+
+    //float brightness = length(color) / length(vec3(1.0));
+    //color = contrast(0.0, brightness) * normalize(color) * length(vec3(1.0));
     //finalColor += fPointLightFactor(uPointLights[0], normal, mat);
 
-    o_Target = finalColor;
+    color = RGBtoHCY(color);
+    color.z += 0.1;
+    color.z = contrast(1.5, color.z);
+    color = HCYtoRGB(color);
+
+    o_Target = vec4(color, 1.0);
+    // o_Target = vec4(vec3(mat.roughness), 1.0);
 }

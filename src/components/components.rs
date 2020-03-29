@@ -135,7 +135,7 @@ pub struct StaticModel {
 }
 
 impl StaticModel {
-    pub fn new(context: &graphics::Context, idx: usize, offset: Vector3<f32>, scale: f32, z_rotation: f32, tint: Vector3<f32>) -> Self {
+    pub fn new(context: &graphics::Context, idx: usize, offset: Vector3<f32>, scale: f32, z_rotation: f32, material: graphics::Material) -> Self {
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
         let mut matrix = Matrix4::from_scale(scale);
@@ -144,7 +144,7 @@ impl StaticModel {
 
         let local_uniforms = graphics::LocalUniforms {
             model_matrix: matrix.into(),
-            color: [tint.x, tint.y, tint.z],
+            material,
         };
 
         let uniform_buf = context.device.create_buffer_with_data(
@@ -177,7 +177,7 @@ pub struct Model3D {
     pub offset: Vector3<f32>,
     pub scale: f32,
     pub z_rotation: f32,
-    pub tint: Vector3<f32>,
+    pub material : graphics::Material,
 
     pub bind_group: wgpu::BindGroup,
     pub uniform_buffer: wgpu::Buffer,
@@ -212,32 +212,37 @@ impl Model3D {
         Self {
             idx: 0,
             offset: Vector3::new(0.0, 0.0, 0.0),
-            tint: Vector3::new(1.0, 1.0, 1.0),
+            material: graphics::Material::default(),
             bind_group,
             scale: 1.0,
             z_rotation: 0.0,
             uniform_buffer: uniform_buf,
         }
     }
+
     pub fn from_index(context: &graphics::Context, index: usize) -> Model3D {
         let mut m = Self::new(context);
         m.idx = index;
         return m;
     }
+
     pub fn with_offset(mut self, offset: Vector3<f32>) -> Model3D {
         self.offset = offset;
         self
     }
+
     pub fn with_scale(mut self, scale: f32) -> Self {
         self.scale = scale;
         self
     }
+
     pub fn with_z_rotation(mut self, z_rotation: f32) -> Self {
         self.z_rotation = z_rotation;
         self
     }
-    pub fn with_tint(mut self, tint: Vector3<f32>) -> Self {
-        self.tint = tint;
+
+    pub fn with_material(mut self, material: graphics::Material) -> Self {
+        self.material = material;
         self
     }
 }
