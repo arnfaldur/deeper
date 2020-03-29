@@ -65,6 +65,8 @@ async fn run_async() {
 
     let context = graphics::Context::new(&window).await;
 
+    ass_man.load_models(&context);
+
     let mut init_encoder = context.device.create_command_encoder(
         &wgpu::CommandEncoderDescriptor { todo: 0 }
     );
@@ -107,20 +109,12 @@ async fn run_async() {
 
     register_components(&mut world);
 
-    let mut model_array = vec![
-        context.load_model_from_obj("assets/Models/cube.obj"),
-        context.load_model_from_obj("assets/Models/plane.obj"),
-        context.load_model_from_obj("assets/Models/Arissa/arissa.obj"),
-        context.load_model_from_obj("assets/Models/LowPolyDungeonBasic/Wall.obj"),
-        context.load_model_from_obj("assets/Models/sphere2.obj"),
-        context.load_model_from_obj("assets/Models/StairsDown.obj"),
-        context.load_model_from_obj("assets/Models/LowPolyDungeonBasic/CornerOpen.obj"),
-        context.load_model_from_obj("assets/Models/LowPolyDungeonBasic/CornerClosed.obj"),
-    ];
+    use std::path::Path;
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
+        .with(HotLoaderSystem::new(), "HotLoaderSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
         .with(AIFollowSystem, "AIFollowSystem", &[])
         .with(GoToDestinationSystem, "GoToDestinationSystem", &["AIFollowSystem"])
@@ -135,7 +129,7 @@ async fn run_async() {
             "SphericalFollowSystem",
             &["MovementSystem"],
         )
-        .with_thread_local(GraphicsSystem::new(model_array))
+        .with_thread_local(GraphicsSystem)
         .build();
 
     let player = world
@@ -147,7 +141,7 @@ async fn run_async() {
         .with(Velocity::new())
         .with(DynamicBody)
         .with(CircleCollider { radius: 0.3 })
-        .with(Model3D::from_index(&context, 2).with_scale(0.5))
+        .with(Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
         .build();
 
     let player_camera = world
@@ -179,7 +173,7 @@ async fn run_async() {
                 target: player,
                 minimum_distance: 2.0 + rad,
             })
-            .with(Model3D::from_index(&context, 4)
+            .with(Model3D::from_index(&context, ass_man.get_model_index("sphere2.obj").unwrap())
                 .with_scale(rad)
                 .with_tint(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
             .build();
@@ -189,15 +183,12 @@ async fn run_async() {
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
     world.insert(context);
+    world.insert(ass_man);
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
 
-
-    let event_bucket = input::EventBucket { 0: vec![] };
-    world.insert(event_bucket);
     let input_state = InputState::new();
     world.insert(input_state);
-
 
     // Setup world
     dispatcher.setup(&mut world);
@@ -210,6 +201,7 @@ async fn run_async() {
                 world.write_resource::<FrameTime>().0 = frame_time.as_secs_f32();
                 *world.write_resource::<Instant>().deref_mut() = Instant::now();
                 dispatcher.dispatch(&mut world);
+                world.get_mut::<InputState>().unwrap().new_frame();
                 world.maintain();
             }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {

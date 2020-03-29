@@ -25,9 +25,10 @@ zerocopy = "0.3"
 wavefront_obj = "*"
 lazy_static = "1.4.0"
 
-# ron stuff
+# loader
 ron = "*"
 serde = { version = "1.0", features = ["derive"] }
+notify = "4.0.15"
 
 # ECS
 specs = { version = "0.16.1", features = ["specs-derive"] }

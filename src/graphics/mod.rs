@@ -304,7 +304,8 @@ impl Context {
         return depth_texture.create_default_view();
     }
 
-    pub fn load_model_from_obj(&self, path: &str) -> Model {
+    pub fn load_model_from_obj(&self, path: &Path) -> Model {
+        println!("jfjfjfjf {}", path.display());
         let mut vertex_lists = vertex_lists_from_obj(path).unwrap();
         return self.load_model_from_vertex_lists(&vertex_lists);
     }
@@ -333,13 +334,13 @@ impl Context {
 
 }
 
-pub fn vertex_lists_from_obj(path: &str) -> Result<Vec<Vec<Vertex>>, String> {
+pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
     let mut f;
 
-    if let Ok(file) = File::open(Path::new(path)) {
+    if let Ok(file) = File::open(path) {
         f = file;
     } else {
-        return Err(format!("[graphics] : File {} could not be opened.", path));
+        return Err(format!("[graphics] : File {} could not be opened.", path.display()));
     };
 
     let mut buf = String::new();
