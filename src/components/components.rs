@@ -4,9 +4,10 @@ use zerocopy::{AsBytes, FromBytes};
 
 use cgmath::{Vector2, Vector3};
 
-use specs::{Component, VecStorage, WorldExt};
 
+// TODO: Switch to legion? https://docs.rs/legion/0.2.1/legion/
 use specs::prelude::*;
+use specs::{Component, VecStorage};
 
 use std::f32::consts::PI;
 use crate::graphics;
@@ -33,6 +34,8 @@ pub struct ActiveCamera(pub Entity);
 pub struct PlayerCamera(pub Entity);
 
 // end entity pointers
+
+pub struct FrameTime(pub f32);
 
 #[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]

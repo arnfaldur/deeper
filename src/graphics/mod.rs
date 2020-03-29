@@ -353,6 +353,7 @@ impl Context {
     }
 
     pub fn load_model_from_obj(&self, path: &Path) -> Model {
+        println!("jfjfjfjf {}", path.display());
         let mut vertex_lists = vertex_lists_from_obj(path).unwrap();
         return self.load_model_from_vertex_lists(&vertex_lists);
     }
