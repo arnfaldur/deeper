@@ -316,7 +316,7 @@ impl<'a> System<'a> for AIFollowSystem {
                 if distance > follow.minimum_distance {
                     dest.insert(ent, Destination(hunted.0));
                 } else {
-                    dest.remove(ent);
+                    //dest.remove(ent);
                 }
             }
         }
@@ -331,13 +331,24 @@ impl<'a> System<'a> for GoToDestinationSystem {
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Speed>,
+        ReadStorage<'a, Acceleration>,
     );
 
-    fn run(&mut self, (dest, pos, mut vel, speed): Self::SystemData) {
-        for (dest, hunter, vel, speed) in (&dest, &pos, &mut vel, &speed).join() {
-            let difference = dest.0 - hunter.0;
-            let direction = difference.normalize();
-            vel.0 = direction * speed.0 * 1.0;
+    fn run(&mut self, (dest, pos, mut vel, speed, acc): Self::SystemData) {
+        for (dest, hunter, vel, speed, accel) in (&dest, &pos, &mut vel, &speed, &acc).join() {
+            let to_dest: Vector2<f32> = dest.0 - hunter.0;
+            let direction = to_dest.normalize();
+            let accel_ratio = speed.0 / accel.0;
+            let target_velocity = direction * if to_dest.magnitude() > accel.0 * (accel_ratio * (accel_ratio + 1.0) / 2.0) {
+                speed.0
+            } else {
+                0.0
+            };
+            let delta = target_velocity - vel.0;
+            vel.0 += delta.normalize() * accel.0;
+            if delta.magnitude() < accel.0 {
+                vel.0 = target_velocity;
+            }
         }
     }
 }
@@ -465,7 +476,7 @@ impl<'a> System<'a> for DunGenSystem {
                         // .with(Position(pos)) ?
                         .with(model)
                         .build();
-                },
+                }
                 TileType::Floor => {
                     let model = {
                         let context = world.read_resource::<graphics::Context>();

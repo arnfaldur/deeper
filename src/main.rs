@@ -188,7 +188,7 @@ async fn run_async() {
         .build();
 
     let mut rng = thread_rng();
-    for _enemy in 0..64 {
+    for _enemy in 0..1024 {
         let (randx, randy): (f32, f32) = rng.gen();
         world.create_entity()
             .with(Position(Vector2::new(
@@ -196,7 +196,7 @@ async fn run_async() {
                 player_start.1 as f32 + (randy) * 4.0,
             )))
             .with(Speed(0.02))
-            .with(Acceleration(0.005))
+            .with(Acceleration(0.0005))
             .with(Orientation(0.0))
             .with(Velocity::new())
             .with(DynamicBody)
@@ -228,6 +228,7 @@ async fn run_async() {
         match event {
             Event::MainEventsCleared => {
                 dispatcher.dispatch(&mut world);
+                world.maintain();
             },
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 //unimplemented!();
