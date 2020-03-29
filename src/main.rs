@@ -12,7 +12,7 @@ mod input;
 mod components;
 mod systems;
 
-use crate::components::components::*;
+use crate::components::*;
 use crate::systems::systems::*;
 
 use std::f32::consts::PI;
@@ -40,19 +40,6 @@ async fn run_async() {
     let mut ass_man = AssetManager::new();
     let ds = ass_man.load_display_settings();
 
-    let dungeon = DungGen::new()
-        .width(60)
-        .height(60)
-        .n_rooms(10)
-        .room_min(5)
-        .room_range(5)
-        .generate();
-
-    let player_start = dungeon
-        .room_centers
-        .choose(&mut rand::thread_rng())
-        .unwrap()
-        .clone();
 
     let event_loop = EventLoop::new();
 
@@ -67,44 +54,6 @@ async fn run_async() {
 
     ass_man.load_models(&context);
 
-    let mut init_encoder = context.device.create_command_encoder(
-        &wgpu::CommandEncoderDescriptor { todo: 0 }
-    );
-
-    let mut lights: graphics::Lights = Default::default();
-
-    lights.directional_light = graphics::DirectionalLight {
-        direction: [1.0, 0.8, 0.8, 0.0],
-        ambient: [0.01, 0.015, 0.02, 1.0],
-        color: [0.1, 0.1, 0.2, 1.0],
-    };
-
-    for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
-        if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
-        lights.point_lights[i] = Default::default();
-        lights.point_lights[i].radius = 30.0;
-        lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
-        lights.point_lights[i].color = [1.0, 0.4, 0.1, 1.0];
-    }
-
-    let temp_buf = context.device.create_buffer_with_data(
-        lights.as_bytes(),
-        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-    );
-
-    init_encoder.copy_buffer_to_buffer(
-        &temp_buf,
-        0,
-        &context.lights_buf,
-        0,
-        std::mem::size_of::<graphics::Lights>() as u64,
-    );
-
-    let command_buffer = init_encoder.finish();
-
-    context.queue.submit(&[command_buffer]);
-    // End graphics shit
-
     let mut world = World::new();
 
     register_components(&mut world);
@@ -113,7 +62,7 @@ async fn run_async() {
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
-        .with(DunGenSystem { dungeon }, "DunGenSystem", &[])
+        .with(DunGenSystem, "DunGenSystem", &[])
         .with(HotLoaderSystem::new(), "HotLoaderSystem", &[])
         .with(PlayerSystem::new(), "PlayerSystem", &[])
         .with(AIFollowSystem, "AIFollowSystem", &[])
@@ -129,14 +78,14 @@ async fn run_async() {
             "SphericalFollowSystem",
             &["MovementSystem"],
         )
-        .with_thread_local(GraphicsSystem)
-        .build();
+        .with(MapSwitchingSystem, "MapSwitchingSystem", &["MovementSystem"])
+        .with_thread_local(GraphicsSystem).build();
 
     let player = world
         .create_entity()
-        .with(Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)))
+        .with(Position(Vector2::unit_x()))
         .with(Speed(5.))
-        .with(Acceleration(10.))
+        .with(Acceleration(20.))
         .with(Orientation(0.0))
         .with(Velocity::new())
         .with(DynamicBody)
@@ -146,7 +95,7 @@ async fn run_async() {
 
     let player_camera = world
         .create_entity()
-        .with(components::components::Camera {
+        .with(components::Camera {
             up: Vector3::unit_z(),
             fov: 25.0,
         })
@@ -155,30 +104,6 @@ async fn run_async() {
         .with(SphericalOffset::new())
         .build();
 
-    let mut rng = thread_rng();
-    for _enemy in 0..128 {
-        let rad = rng.gen_range(0.1, 0.5);
-        world.create_entity()
-            .with(Position(Vector2::new(
-                player_start.0 as f32 + rng.gen_range(0., 32.),
-                player_start.1 as f32 + rng.gen_range(0., 32.),
-            )))
-            .with(Speed(rng.gen_range(1., 2.)))
-            .with(Acceleration(rng.gen_range(3., 6.)))
-            .with(Orientation(0.0))
-            .with(Velocity::new())
-            .with(DynamicBody)
-            .with(CircleCollider { radius: rad })
-            .with(AIFollow {
-                target: player,
-                minimum_distance: 2.0 + rad,
-            })
-            .with(Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
-                .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
-                .with_scale(rad))
-            .build();
-    }
-
     world.insert(Player::from_entity(player));
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
@@ -186,6 +111,7 @@ async fn run_async() {
     world.insert(ass_man);
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
+    world.insert(MapTransition::Deeper);
 
     let input_state = InputState::new();
     world.insert(input_state);

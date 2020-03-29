@@ -1,16 +1,16 @@
 use specs::prelude::*;
 use std::f32::consts::{PI, FRAC_PI_2};
-use std::ops::Mul;
+use std::ops::{Mul, Deref, DerefMut};
 use zerocopy::AsBytes;
 
 extern crate cgmath;
 
 use cgmath::{prelude::*, Vector2, Vector3};
 
-use crate::graphics;
+use crate::{graphics, components};
 use crate::loader;
 use crate::input::{InputState, Key};
-use crate::components::components::*;
+use crate::components::*;
 
 pub struct MovementSystem;
 
@@ -57,20 +57,16 @@ pub struct HotLoaderSystem {
 }
 
 impl HotLoaderSystem {
-
     pub fn new() -> Self {
         let (tx, rx) = channel();
-
-        // TODO: Make async watcher
 
         let mut watcher: RecommendedWatcher =
             Watcher::new(tx, Duration::from_secs(2)).unwrap();
         watcher.watch("assets/Models/", RecursiveMode::Recursive);
 
-        Self { rx, watcher}
+        Self { rx, watcher }
     }
 }
-
 
 impl<'a> System<'a> for HotLoaderSystem {
     type SystemData = (
@@ -128,9 +124,7 @@ impl<'a> System<'a> for HotLoaderSystem {
         }
     }
 
-    fn setup(&mut self, world: &mut World) {
-
-    }
+    fn setup(&mut self, world: &mut World) {}
 }
 
 pub struct GraphicsSystem;
@@ -342,7 +336,7 @@ impl<'a> System<'a> for PlayerSystem {
             );
 
             if let Some(mouse_world_pos) = project_screen_to_world(
-                Vector3::new(mouse_pos.x,  context.sc_desc.height as f32 - mouse_pos.y, 1.0),
+                Vector3::new(mouse_pos.x, context.sc_desc.height as f32 - mouse_pos.y, 1.0),
                 graphics::correction_matrix() * mx_projection * mx_view,
                 Vector4::new(0, 0, context.sc_desc.width as i32, context.sc_desc.height as i32),
             ) {
@@ -508,140 +502,325 @@ impl<'a> System<'a> for Physics2DSystem {
     }
 }
 
+pub struct MapSwitchingSystem;
+
+impl<'a> System<'a> for MapSwitchingSystem {
+    type SystemData = (
+        ReadExpect<'a, Player>,
+        WriteExpect<'a, MapTransition>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, MapSwitcher>,
+    );
+
+    fn run(&mut self, (player, mut trans, pos, switcher): Self::SystemData) {
+        let player_pos = pos.get(player.entity).expect("The player has no position, can't run MapSwitchingSystem");
+        for (pos, switcher) in (&pos, &switcher).join() {
+            if pos.0.distance(player_pos.0) < 0.5 {
+                *trans = switcher.0;
+            }
+        }
+    }
+}
+
 use self::cgmath::{Matrix4, Vector4};
 use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
-use crate::dung_gen::{DungGen, WallDirection};
+use crate::dung_gen::DungGen;
 use rand::{thread_rng, Rng};
 use std::time::{SystemTime, Duration};
 use std::path::Path;
 use glsl_to_spirv::ShaderType;
+use futures::SinkExt;
+use rand::prelude::*;
 
-pub struct DunGenSystem {
-    pub dungeon: DungGen,
-}
+pub struct DunGenSystem;
 
 impl<'a> System<'a> for DunGenSystem {
-    type SystemData = ();
+    type SystemData = (
+        WriteExpect<'a, MapTransition>,
+        ReadExpect<'a, graphics::Context>,
+        ReadExpect<'a, loader::AssetManager>,
+        ReadExpect<'a, Player>,
+        Entities<'a>,
+        ReadStorage<'a, TileType>,
+        Read<'a, LazyUpdate>,
+    );
 
-    fn run(&mut self, (): Self::SystemData) {}
+    fn run(&mut self, (mut trans, context, ass_man, player, mut ents, tile, updater): Self::SystemData) {
+        match trans.deref() {
+            MapTransition::Deeper => {
+                println!("Making the map!");
+                for (ent, _) in (&ents, &tile).join() {
+                    ents.delete(ent);
+                }
+                let dungeon = DungGen::new()
+                    .width(60)
+                    .height(60)
+                    .n_rooms(10)
+                    .room_min(5)
+                    .room_range(5)
+                    .generate();
 
-    fn setup(&mut self, world: &mut World) {
-        use crate::dung_gen::TileType;
+                let player_start = dungeon
+                    .room_centers
+                    .choose(&mut rand::thread_rng())
+                    .unwrap()
+                    .clone();
 
-        for (&(x, y), &wall_type) in self.dungeon.world.iter() {
-            let pos = Vector2::new(x as f32, y as f32);
-            let pos3d = Vector3::new(x as f32, y as f32, 0.0);
+                updater.insert(player.entity, Position(Vector2::new((player_start.0+1) as f32, player_start.1 as f32)));
 
-            let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_tile_idx) = {
-                let ass_man = world.read_resource::<loader::AssetManager>();
-                (
-                    ass_man.get_model_index("cube.obj").unwrap(),
-                    ass_man.get_model_index("plane.obj").unwrap(),
-                    ass_man.get_model_index("Wall.obj").unwrap(),
-                    ass_man.get_model_index("StairsDown.obj").unwrap(),
-                    ass_man.get_model_index("floortile.obj").unwrap(),
-                )
-            };
+                let mut init_encoder = context.device.create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor { todo: 0 }
+                );
 
-            match wall_type {
-                TileType::Nothing => {
-                    let model = {
-                        let context = world.read_resource::<graphics::Context>();
-                        StaticModel::new(
-                            &context,
-                            plane_idx,
-                            Vector3::new(x as f32, y as f32, 1.0),
-                            1.0,
-                            0.0,
-                            graphics::Material::dark_stone(),
+                let mut lights: graphics::Lights = Default::default();
+
+                lights.directional_light = graphics::DirectionalLight {
+                    direction: [1.0, 0.8, 0.8, 0.0],
+                    ambient: [0.01, 0.015, 0.02, 1.0],
+                    color: [0.1, 0.1, 0.2, 1.0],
+                };
+
+                for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
+                    if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
+                    lights.point_lights[i] = Default::default();
+                    lights.point_lights[i].radius = 30.0;
+                    lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
+                    lights.point_lights[i].color = [1.0, 0.4, 0.1, 1.0];
+                }
+
+                let temp_buf = context.device.create_buffer_with_data(
+                    lights.as_bytes(),
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                );
+
+                init_encoder.copy_buffer_to_buffer(
+                    &temp_buf,
+                    0,
+                    &context.lights_buf,
+                    0,
+                    std::mem::size_of::<graphics::Lights>() as u64,
+                );
+
+                let command_buffer = init_encoder.finish();
+
+                context.queue.submit(&[command_buffer]);
+                // End graphics shit
+
+                // Reset player position and stuff
+                updater.insert(player.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
+                updater.insert(player.entity, Orientation(0.0));
+                updater.insert(player.entity, Velocity::new());
+
+                let mut rng = thread_rng();
+                for _enemy in 0..128 {
+                    let rad = rng.gen_range(0.1, 0.5);
+                    let enemy = ents.create();
+                    updater.insert(enemy, Position(Vector2::new(
+                        player_start.0 as f32 + rng.gen_range(0., 32.),
+                        player_start.1 as f32 + rng.gen_range(0., 32.),
+                    )));
+                    updater.insert(enemy, Speed(rng.gen_range(1., 2.)));
+                    updater.insert(enemy, Acceleration(rng.gen_range(3., 6.)));
+                    updater.insert(enemy, Orientation(0.0));
+                    updater.insert(enemy, Velocity::new());
+                    updater.insert(enemy, DynamicBody);
+                    updater.insert(enemy, CircleCollider { radius: rad });
+                    updater.insert(enemy, AIFollow {
+                        target: player.entity,
+                        minimum_distance: 2.0 + rad,
+                    });
+                    updater.insert(enemy,
+                                   Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
+                                       .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
+                                       .with_scale(rad) );
+                }
+
+                for (&(x, y), &wall_type) in dungeon.world.iter() {
+                    let pos = Vector2::new(x as f32, y as f32);
+                    let pos3d = Vector3::new(x as f32, y as f32, 0.0);
+
+                    let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
+                    let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
+
+                    let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_idx) = {
+                        (
+                            ass_man.get_model_index("cube.obj").unwrap(),
+                            ass_man.get_model_index("plane.obj").unwrap(),
+                            ass_man.get_model_index("Wall.obj").unwrap(),
+                            ass_man.get_model_index("StairsDown.obj").unwrap(),
+                            ass_man.get_model_index("floortile.obj").unwrap(),
                         )
                     };
-                    world
-                        .create_entity()
-                        // .with(Position(pos)) ?
-                        .with(model)
-                        .build();
-                }
-                TileType::Floor => {
-                    let model = {
-                        let context = world.read_resource::<graphics::Context>();
-                        StaticModel::new(
-                            &context,
-                            floor_tile_idx,
-                            pos3d,
-                            1.0,
-                            0.0,
-                            graphics::Material::darkest_stone(),
-                            //graphics::Material::glossy(Vector3::<f32>::new(0.0, 0.0, 0.0)),
-                        )
-                    };
-                    world
-                        .create_entity()
-                        .with(Position(pos))
-                        .with(FloorTile)
-                        .with(model)
-                        .build();
-                }
-                TileType::Wall(maybe_direction) => {
-                    let dir = match maybe_direction {
-                        Some(WallDirection::South) => 180.0,
-                        Some(WallDirection::East) => 270.0,
-                        Some(WallDirection::West) => 90.0,
-                        _ => 0.0,
-                    };
-                    let model = {
-                        let context = world.read_resource::<graphics::Context>();
-                        match maybe_direction {
-                            None => StaticModel::new(
-                                &context,
-                                cube_idx,
-                                pos3d,
-                                1.0,
-                                0.0,
-                                graphics::Material::glossy(Vector3::<f32>::new(0.3, 0.3, 0.3)),
-                            ),
-                            Some(_) => StaticModel::new(
-                                &context,
-                                wall_idx,
-                                pos3d,
-                                1.0,
-                                dir,
-                                graphics::Material::dark_stone(),
-                            ),
+                    let mut entity = ents.create();
+                    let model = StaticModel::new(
+                        &context,
+                        match wall_type {
+                            TileType::Nothing => plane_idx,
+                            TileType::Wall(None) => cube_idx,
+                            TileType::Wall(Some(_)) => wall_idx,
+                            TileType::Floor => floor_idx,
+                            TileType::LadderDown => stairs_down_idx,
+                        },
+                        match wall_type {
+                            TileType::Nothing => Vector3::new(x as f32, y as f32, 1.0),
+                            _ => pos3d,
+                        },
+                        1.0,
+                        match wall_type {
+                            TileType::Wall(Some(WallDirection::South)) => 180.,
+                            TileType::Wall(Some(WallDirection::East)) => 270.,
+                            TileType::Wall(Some(WallDirection::West)) => 90.,
+                            _ => 0.,
+                        },
+                        match wall_type {
+                            TileType::Nothing => graphics::Material::dark_stone(),
+                            _ => graphics::Material::darkest_stone(),
+                        },
+                    );
+                    updater.insert(entity, model);
+                    match wall_type {
+                        TileType::Nothing => {
+                            // .with(Position(pos)) ?
                         }
-                    };
-                    world
-                        .create_entity()
-                        .with(Position(pos))
-                        .with(WallTile)
-                        .with(model)
-                        .with(Orientation(dir))
-                        .with(StaticBody)
-                        //.with(CircleCollider { radius: 0.5 })
-                        .with(SquareCollider { side_length: 1.0 })
-                        .build();
-                }
-                TileType::LadderDown => {
-                    let model = {
-                        let context = world.read_resource::<graphics::Context>();
-                        StaticModel::new(
-                            &context,
-                            stairs_down_idx,
-                            pos3d,
-                            1.0,
-                            0.0,
-                            graphics::Material::dark_stone(),
-                        )
-                    };
-                    world
-                        .create_entity()
-                        .with(Position(pos))
-                        .with(FloorTile)
-                        .with(model)
-                        .build();
-                }
-                TileType::LadderUp => (),
+                        _ => {
+                            updater.insert(entity, wall_type);
+                            updater.insert(entity, Position(pos));
+                        }
+                    }
+                    match wall_type {
+                        TileType::Wall(maybe_direction) => {
+                            updater.insert(entity, StaticBody);
+                            updater.insert(entity, SquareCollider { side_length: 1.0 });
+                        }
+                        TileType::LadderDown => {
+                            updater.insert(entity, MapSwitcher(MapTransition::Deeper));
+                        }
+                        _ => {}
+                    }
+                };
             }
-        };
+            _ => {}
+        }
+        *trans = MapTransition::None;
     }
+
+//fn setup(&mut self, world: &mut World) {
+//    for (&(x, y), &wall_type) in self.dungeon.world.iter() {
+//        let pos = Vector2::new(x as f32, y as f32);
+//        let pos3d = Vector3::new(x as f32, y as f32, 0.0);
+
+//        let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
+//        let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
+
+//        let (cube_idx, plane_idx, wall_idx, stairs_down_idx) = {
+//            let ass_man = world.read_resource::<loader::AssetManager>();
+//            (
+//                ass_man.get_model_index("cube.obj").unwrap(),
+//                ass_man.get_model_index("plane.obj").unwrap(),
+//                ass_man.get_model_index("Wall.obj").unwrap(),
+//                ass_man.get_model_index("StairsDown.obj").unwrap(),
+//            )
+//        };
+
+//        match wall_type {
+//            TileType::Nothing => {
+//                let model = {
+//                    let context = world.read_resource::<graphics::Context>();
+//                    StaticModel::new(
+//                        &context,
+//                        plane_idx,
+//                        Vector3::new(x as f32, y as f32, 1.0),
+//                        1.0,
+//                        0.0,
+//                        DARK_GRAY,
+//                    )
+//                };
+//                world
+//                    .create_entity()
+//                    // .with(Position(pos)) ?
+//                    .with(model)
+//                    .build();
+//            }
+//            TileType::Floor => {
+//                let model = {
+//                    let context = world.read_resource::<graphics::Context>();
+//                    StaticModel::new(
+//                        &context,
+//                        plane_idx,
+//                        pos3d,
+//                        1.0,
+//                        0.0,
+//                        DARK_GRAY,
+//                    )
+//                };
+//                world
+//                    .create_entity()
+//                    .with(Position(pos))
+//                    .with(FloorTile)
+//                    .with(model)
+//                    .build();
+//            }
+//            TileType::Wall(maybe_direction) => {
+//                let dir = match maybe_direction {
+//                    Some(WallDirection::South) => 180.0,
+//                    Some(WallDirection::East) => 270.0,
+//                    Some(WallDirection::West) => 90.0,
+//                    _ => 0.0,
+//                };
+//                let model = {
+//                    let context = world.read_resource::<graphics::Context>();
+//                    match maybe_direction {
+//                        None => StaticModel::new(
+//                            &context,
+//                            cube_idx,
+//                            pos3d,
+//                            1.0,
+//                            0.0,
+//                            LIGHT_GRAY,
+//                        ),
+//                        Some(_) => StaticModel::new(
+//                            &context,
+//                            wall_idx,
+//                            pos3d,
+//                            1.0,
+//                            dir,
+//                            DARK_GRAY,
+//                        ),
+//                    }
+//                };
+//                world
+//                    .create_entity()
+//                    .with(Position(pos))
+//                    .with(WallTile)
+//                    .with(model)
+//                    .with(Orientation(dir))
+//                    .with(StaticBody)
+//                    //.with(CircleCollider { radius: 0.5 })
+//                    .with(SquareCollider { side_length: 1.0 })
+//                    .build();
+//            }
+//            TileType::LadderDown => {
+//                let model = {
+//                    let context = world.read_resource::<graphics::Context>();
+//                    StaticModel::new(
+//                        &context,
+//                        stairs_down_idx,
+//                        pos3d,
+//                        1.0,
+//                        0.0,
+//                        DARK_GRAY,
+//                    )
+//                };
+//                world
+//                    .create_entity()
+//                    .with(Position(pos))
+//                    .with(FloorTile)
+//                    .with(model)
+//                    .with(MapSwitcher(MapTransition::Deeper))
+//                    .build();
+//            }
+//            TileType::LadderUp => (),
+//        }
+//    };
+//}
 }
