@@ -162,7 +162,7 @@ impl<'a> System<'a> for GraphicsSystem {
             matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
             let local_uniforms = graphics::LocalUniforms {
                 model_matrix: matrix.into(),
-                color: model.tint.into(),
+                material: model.material,
             };
             uniforms.push(local_uniforms);
         }
@@ -524,26 +524,25 @@ impl<'a> System<'a> for DunGenSystem {
 
                 updater.insert(player.entity, Position(Vector2::new((player_start.0+1) as f32, player_start.1 as f32)));
 
+                let mut init_encoder = context.device.create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor { todo: 0 }
+                );
+
                 let mut lights: graphics::Lights = Default::default();
 
                 lights.directional_light = graphics::DirectionalLight {
                     direction: [1.0, 0.8, 0.8, 0.0],
-                    ambient: [0.1, 0.1, 0.1, 1.0],
-                    color: [0.2, 0.2, 0.3, 1.0],
+                    ambient: [0.01, 0.015, 0.02, 1.0],
+                    color: [0.1, 0.1, 0.2, 1.0],
                 };
-
 
                 for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
                     if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
-                    lights.point_lights[i] = graphics::PointLight {
-                        position: [x as f32, y as f32, 2.0, 1.0],
-                        color: [1.0, 0.5, 0.25, 1.0],
-                    };
+                    lights.point_lights[i] = Default::default();
+                    lights.point_lights[i].radius = 30.0;
+                    lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
+                    lights.point_lights[i].color = [1.0, 0.4, 0.1, 1.0];
                 }
-
-                let mut init_encoder = context.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { todo: 0 }
-                );
 
                 let temp_buf = context.device.create_buffer_with_data(
                     lights.as_bytes(),
@@ -587,9 +586,9 @@ impl<'a> System<'a> for DunGenSystem {
                         minimum_distance: 2.0 + rad,
                     });
                     updater.insert(enemy,
-                                   Model3D::from_index(&context, ass_man.get_model_index("sphere2.obj").unwrap())
-                                       .with_scale(rad)
-                                       .with_tint(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())));
+                                   Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
+                                       .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
+                                       .with_scale(rad) );
                 }
 
                 for (&(x, y), &wall_type) in dungeon.world.iter() {
@@ -599,12 +598,13 @@ impl<'a> System<'a> for DunGenSystem {
                     let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
                     let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
 
-                    let (cube_idx, plane_idx, wall_idx, stairs_down_idx) = {
+                    let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_idx) = {
                         (
                             ass_man.get_model_index("cube.obj").unwrap(),
                             ass_man.get_model_index("plane.obj").unwrap(),
                             ass_man.get_model_index("Wall.obj").unwrap(),
                             ass_man.get_model_index("StairsDown.obj").unwrap(),
+                            ass_man.get_model_index("floortile.obj").unwrap(),
                         )
                     };
                     let mut entity = ents.create();
@@ -614,7 +614,7 @@ impl<'a> System<'a> for DunGenSystem {
                             TileType::Nothing => plane_idx,
                             TileType::Wall(None) => cube_idx,
                             TileType::Wall(Some(_)) => wall_idx,
-                            TileType::Floor => plane_idx,
+                            TileType::Floor => floor_idx,
                             TileType::LadderDown => stairs_down_idx,
                         },
                         match wall_type {
@@ -629,8 +629,8 @@ impl<'a> System<'a> for DunGenSystem {
                             _ => 0.,
                         },
                         match wall_type {
-                            TileType::Wall(None) => LIGHT_GRAY,
-                            _ => DARK_GRAY,
+                            TileType::Nothing => graphics::Material::dark_stone(),
+                            _ => graphics::Material::darkest_stone(),
                         },
                     );
                     updater.insert(entity, model);
