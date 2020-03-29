@@ -89,6 +89,12 @@ pub struct AIFollow {
 }
 
 #[derive(Component)]
+pub enum Faction {
+    Enemies,
+    Friends,
+}
+
+#[derive(Component)]
 pub struct Destination(pub Vector2<f32>);
 
 #[derive(Copy, Clone)]
@@ -293,4 +299,5 @@ pub fn register_components(world: &mut World) {
     world.register::<AIFollow>();
     world.register::<Destination>();
     world.register::<MapSwitcher>();
+    world.register::<Faction>();
 }

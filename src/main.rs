@@ -62,24 +62,24 @@ async fn run_async() {
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
-        .with(DunGenSystem, "DunGenSystem", &[])
-        .with(HotLoaderSystem::new(), "HotLoaderSystem", &[])
-        .with(PlayerSystem::new(), "PlayerSystem", &[])
-        .with(AIFollowSystem, "AIFollowSystem", &[])
-        .with(GoToDestinationSystem, "GoToDestinationSystem", &["AIFollowSystem"])
-        .with(Physics2DSystem, "Physics2DSystem", &["GoToDestinationSystem", "PlayerSystem", "AIFollowSystem"])
+        .with(HotLoaderSystem::new(), "HotLoader", &[])
+        .with(PlayerSystem::new(), "Player", &[])
+        .with(AIFollowSystem, "AIFollow", &[])
+        .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
+        .with(Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
         .with(
             MovementSystem,
-            "MovementSystem",
-            &["Physics2DSystem", "PlayerSystem"],
+            "Movement",
+            &["Physics2D", "Player"],
         )
         .with(
             SphericalFollowSystem,
-            "SphericalFollowSystem",
-            &["MovementSystem"],
+            "SphericalFollow",
+            &["Movement"],
         )
-        .with(MapSwitchingSystem, "MapSwitchingSystem", &["MovementSystem"])
-        .with_thread_local(GraphicsSystem).build();
+        .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
+        .with(DunGenSystem, "DunGen", &["MapSwitching"])
+        .with(GraphicsSystem, "Graphics", &[]).build();
 
     let player = world
         .create_entity()

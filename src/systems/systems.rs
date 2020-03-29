@@ -498,15 +498,21 @@ impl<'a> System<'a> for DunGenSystem {
         ReadExpect<'a, Player>,
         Entities<'a>,
         ReadStorage<'a, TileType>,
+        ReadStorage<'a, Faction>,
         Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut trans, context, ass_man, player, mut ents, tile, updater): Self::SystemData) {
-        match trans.deref() {
+    fn run(&mut self, (mut trans, context, ass_man, player, mut ents, tile, factions, updater): Self::SystemData) {
+        match *trans {
             MapTransition::Deeper => {
-                println!("Making the map!");
+                println!("Making the map! {}", random::<u64>());
                 for (ent, _) in (&ents, &tile).join() {
                     ents.delete(ent);
+                }
+                for (ent, faction) in (&ents, &factions).join() {
+                    if let Faction::Enemies = faction {
+                        ents.delete(ent);
+                    }
                 }
                 let dungeon = DungGen::new()
                     .width(60)
@@ -517,12 +523,12 @@ impl<'a> System<'a> for DunGenSystem {
                     .generate();
 
                 let player_start = dungeon
-                    .room_centers
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
+                    .room_centers[0]
+                    //.choose(&mut rand::thread_rng())
+                    //.unwrap()
                     .clone();
 
-                updater.insert(player.entity, Position(Vector2::new((player_start.0+1) as f32, player_start.1 as f32)));
+                updater.insert(player.entity, Position(Vector2::new((player_start.0 + 2) as f32, player_start.1 as f32)));
 
                 let mut init_encoder = context.device.create_command_encoder(
                     &wgpu::CommandEncoderDescriptor { todo: 0 }
@@ -563,7 +569,6 @@ impl<'a> System<'a> for DunGenSystem {
                 // End graphics shit
 
                 // Reset player position and stuff
-                updater.insert(player.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
                 updater.insert(player.entity, Orientation(0.0));
                 updater.insert(player.entity, Velocity::new());
 
@@ -585,10 +590,11 @@ impl<'a> System<'a> for DunGenSystem {
                         target: player.entity,
                         minimum_distance: 2.0 + rad,
                     });
+                    updater.insert(enemy, Faction::Enemies);
                     updater.insert(enemy,
                                    Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
                                        .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
-                                       .with_scale(rad) );
+                                       .with_scale(rad));
                 }
 
                 for (&(x, y), &wall_type) in dungeon.world.iter() {
@@ -634,12 +640,12 @@ impl<'a> System<'a> for DunGenSystem {
                         },
                     );
                     updater.insert(entity, model);
+                    updater.insert(entity, wall_type);
                     match wall_type {
                         TileType::Nothing => {
                             // .with(Position(pos)) ?
                         }
                         _ => {
-                            updater.insert(entity, wall_type);
                             updater.insert(entity, Position(pos));
                         }
                     }
