@@ -159,7 +159,7 @@ async fn run_async() {
                 player_start.1 as f32 + (randy) * 4.0,
             )))
             .with(Speed(0.02))
-            .with(Acceleration(0.005))
+            .with(Acceleration(0.0005))
             .with(Orientation(0.0))
             .with(Velocity::new())
             .with(DynamicBody)
@@ -191,6 +191,7 @@ async fn run_async() {
             Event::MainEventsCleared => {
                 dispatcher.dispatch(&mut world);
                 world.get_mut::<InputState>().unwrap().new_frame();
+                world.maintain();
             },
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 world.get_mut::<graphics::Context>().unwrap().resize(size);
