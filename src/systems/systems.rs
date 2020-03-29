@@ -50,26 +50,21 @@ impl<'a> System<'a> for SphericalFollowSystem {
 
 pub struct GraphicsSystem {
     pub model_array: Vec<graphics::Model>,
-    pub sc_desc: wgpu::SwapChainDescriptor,
-    pub swap_chain: wgpu::SwapChain,
-    pub queue: wgpu::Queue,
 }
 
 impl GraphicsSystem {
     pub fn new(
         model_array: Vec<graphics::Model>,
-        sc_desc: wgpu::SwapChainDescriptor,
-        swap_chain: wgpu::SwapChain,
-        queue: wgpu::Queue,
     ) -> Self {
-        Self { model_array, sc_desc, swap_chain, queue }
+        Self { model_array }
     }
 }
 
 impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
-        ReadExpect<'a, graphics::Context>,
+        WriteExpect<'a, graphics::Context>,
         ReadExpect<'a, ActiveCamera>,
+
         ReadStorage<'a, Camera>,
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
@@ -79,8 +74,8 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, StaticModel>,
     );
 
-    fn run(&mut self, (context, active_cam, camera, target, pos3d, pos, orient, models, static_model): Self::SystemData) {
-        let frame = self.swap_chain.get_next_texture().unwrap();
+    fn run(&mut self, (mut context, active_cam, camera, target, pos3d, pos, orient, models, static_model): Self::SystemData) {
+        let frame = context.swap_chain.get_next_texture().unwrap();
 
         let cam = camera.get(active_cam.0)
             .expect("No valid active camera entity");
@@ -98,9 +93,10 @@ impl<'a> System<'a> for GraphicsSystem {
             graphics::to_pos3(cam_target),
             cgmath::Vector3::unit_z(),
         );
+
         let mx_projection = cgmath::perspective(
             cgmath::Deg(cam.fov),
-            self.sc_desc.width as f32 / self.sc_desc.height as f32,
+            context.sc_desc.width as f32 / context.sc_desc.height as f32,
             1.0,
             1000.0,
         );
@@ -202,7 +198,7 @@ impl<'a> System<'a> for GraphicsSystem {
 
         let command_buf = encoder.finish();
 
-        self.queue.submit(&[command_buf]);
+        context.queue.submit(&[command_buf]);
     }
 
     fn setup(&mut self, world: &mut World) {}
