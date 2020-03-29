@@ -6,35 +6,8 @@ use rand::Rng;
 use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
 use std::collections::HashMap;
 use self::rand::thread_rng;
-use crate::dung_gen::WallDirection::North;
-use specs::rayon::iter::Either;
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-pub enum TileType {
-    Wall(Option<WallDirection>),
-    Floor,
-    Nothing,
-    LadderDown,
-    LadderUp,
-}
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-pub enum WallDirection {
-    North,
-    West,
-    South,
-    East,
-    NorthWest(CornerType),
-    SouthWest(CornerType),
-    SouthEast(CornerType),
-    NorthEast(CornerType),
-}
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-pub enum CornerType{
-    Open,
-    Closed,
-}
+use specs::prelude::*;
+use crate::components::{TileType, WallDirection};
 
 pub struct DungGen {
     pub width: i32,
