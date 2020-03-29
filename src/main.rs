@@ -1,7 +1,9 @@
 mod loader;
+
 use loader::AssetManager;
 
 mod dung_gen;
+
 use dung_gen::DungGen;
 
 mod graphics;
@@ -18,7 +20,7 @@ use rand::seq::SliceRandom;
 use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
-use winit::dpi::{PhysicalSize};
+use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 
 use std::{mem, slice};
@@ -29,6 +31,9 @@ use cgmath::{Vector2, Vector3};
 use zerocopy::AsBytes;
 use crate::input::{EventBucket, InputState};
 use rand::{thread_rng, Rng};
+use std::time::Instant;
+use glsl_to_spirv::ShaderType::Fragment;
+use std::ops::DerefMut;
 
 
 async fn run_async() {
@@ -136,8 +141,8 @@ async fn run_async() {
     let player = world
         .create_entity()
         .with(Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)))
-        .with(Speed(0.05))
-        .with(Acceleration(0.01))
+        .with(Speed(5.))
+        .with(Acceleration(10.))
         .with(Orientation(0.0))
         .with(Velocity::new())
         .with(DynamicBody)
@@ -158,24 +163,24 @@ async fn run_async() {
 
     let mut rng = thread_rng();
     for _enemy in 0..128 {
-        let (randx, randy): (f32, f32) = rng.gen();
+        let rad = rng.gen_range(0.1, 0.5);
         world.create_entity()
             .with(Position(Vector2::new(
-                player_start.0 as f32 + (randx) * 4.0,
-                player_start.1 as f32 + (randy) * 4.0,
+                player_start.0 as f32 + rng.gen_range(0., 32.),
+                player_start.1 as f32 + rng.gen_range(0., 32.),
             )))
-            .with(Speed(0.02))
-            .with(Acceleration(0.0005))
+            .with(Speed(rng.gen_range(1., 2.)))
+            .with(Acceleration(rng.gen_range(3., 6.)))
             .with(Orientation(0.0))
             .with(Velocity::new())
             .with(DynamicBody)
-            .with(CircleCollider { radius: 0.1 })
+            .with(CircleCollider { radius: rad })
             .with(AIFollow {
                 target: player,
-                minimum_distance: 1.0,
+                minimum_distance: 2.0 + rad,
             })
             .with(Model3D::from_index(&context, 4)
-                .with_scale(0.1)
+                .with_scale(rad)
                 .with_tint(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
             .build();
     }
@@ -184,6 +189,8 @@ async fn run_async() {
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
     world.insert(context);
+    world.insert(Instant::now());
+    world.insert(FrameTime(std::f32::EPSILON));
 
 
     let event_bucket = input::EventBucket { 0: vec![] };
@@ -198,22 +205,26 @@ async fn run_async() {
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::MainEventsCleared => {
+                // update frametime information
+                let frame_time = world.read_resource::<Instant>().elapsed();
+                world.write_resource::<FrameTime>().0 = frame_time.as_secs_f32();
+                *world.write_resource::<Instant>().deref_mut() = Instant::now();
                 dispatcher.dispatch(&mut world);
                 world.maintain();
-            },
+            }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 world.get_mut::<graphics::Context>().unwrap().resize(size);
                 //unimplemented!();
-            },
+            }
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
-            | Event::WindowEvent  {
+            | Event::WindowEvent {
                 event: WindowEvent::KeyboardInput {
                     input: KeyboardInput {
                         virtual_keycode: Some(VirtualKeyCode::Escape), ..
                     }, ..
                 }, ..
             }
-                => *control_flow = ControlFlow::Exit,
+            => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { event, .. } => {
                 world.get_mut::<InputState>().unwrap().update_from_event(&event);
             }

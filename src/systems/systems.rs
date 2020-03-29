@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use std::f32::consts::PI;
+use std::f32::consts::{PI, FRAC_PI_2};
 use std::ops::Mul;
 use zerocopy::AsBytes;
 
@@ -13,17 +13,15 @@ use crate::components::components::*;
 pub struct MovementSystem;
 
 impl<'a> System<'a> for MovementSystem {
-    type SystemData = (WriteStorage<'a, Position>, ReadStorage<'a, Velocity>);
+    type SystemData = (
+        ReadExpect<'a, FrameTime>,
+        WriteStorage<'a, Position>,
+        ReadStorage<'a, Velocity>,
+    );
 
-    fn run(&mut self, (mut pos, vel): Self::SystemData) {
-        let mut rng = thread_rng();
+    fn run(&mut self, (frame_time, mut pos, vel): Self::SystemData) {
         for (pos, vel) in (&mut pos, &vel).join() {
-            let velo: Vector2<f32> = vel.0;
-            let (randx, randy): (f32, f32) = (
-                rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0),
-                rng.gen_range(-std::f32::EPSILON * 10.0, std::f32::EPSILON * 10.0)
-            );
-            pos.0 += Vector2::new(velo.x + randx, velo.y + randy);
+            pos.0 += vel.0 * frame_time.0;
         }
     }
 }
@@ -64,7 +62,6 @@ impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
         WriteExpect<'a, graphics::Context>,
         ReadExpect<'a, ActiveCamera>,
-
         ReadStorage<'a, Camera>,
         ReadStorage<'a, Target>,
         ReadStorage<'a, Position3D>,
@@ -288,10 +285,6 @@ impl<'a> System<'a> for PlayerSystem {
             }
         }
     }
-
-    fn setup(&mut self, world: &mut World) {
-        println!("PlayerSystem setup!");
-    }
 }
 
 pub(crate) struct AIFollowSystem;
@@ -311,8 +304,6 @@ impl<'a> System<'a> for AIFollowSystem {
                 let distance = difference.magnitude();
                 if distance > follow.minimum_distance {
                     dest.insert(ent, Destination(hunted.0));
-                } else {
-                    //dest.remove(ent);
                 }
             }
         }
@@ -323,6 +314,7 @@ pub(crate) struct GoToDestinationSystem;
 
 impl<'a> System<'a> for GoToDestinationSystem {
     type SystemData = (
+        ReadExpect<'a, FrameTime>,
         ReadStorage<'a, Destination>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -330,20 +322,18 @@ impl<'a> System<'a> for GoToDestinationSystem {
         ReadStorage<'a, Acceleration>,
     );
 
-    fn run(&mut self, (dest, pos, mut vel, speed, acc): Self::SystemData) {
+    fn run(&mut self, (frame_time, dest, pos, mut vel, speed, acc): Self::SystemData) {
         for (dest, hunter, vel, speed, accel) in (&dest, &pos, &mut vel, &speed, &acc).join() {
             let to_dest: Vector2<f32> = dest.0 - hunter.0;
             let direction = to_dest.normalize();
-            let accel_ratio = speed.0 / accel.0;
-            let target_velocity = direction * if to_dest.magnitude() > accel.0 * (accel_ratio * (accel_ratio + 1.0) / 2.0) {
-                speed.0
-            } else {
-                0.0
-            };
-            let delta = target_velocity - vel.0;
-            vel.0 += delta.normalize() * accel.0;
-            if delta.magnitude() < accel.0 {
-                vel.0 = target_velocity;
+            let time_to_stop = speed.0 / accel.0;
+            let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
+            let target_velocity = direction * speed.0 * slowdown;
+            let delta: Vector2<f32> = (target_velocity - vel.0);
+            let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
+
+            if delta != Vector2::unit_x() * 0.0 {
+                vel.0 += delta.normalize() * velocity_change;
             }
         }
     }
@@ -354,6 +344,7 @@ pub struct Physics2DSystem;
 impl<'a> System<'a> for Physics2DSystem {
     type SystemData = (
         Entities<'a>,
+        ReadExpect<'a, FrameTime>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, StaticBody>,
@@ -362,7 +353,7 @@ impl<'a> System<'a> for Physics2DSystem {
         ReadStorage<'a, SquareCollider>,
     );
 
-    fn run(&mut self, (ents, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
+    fn run(&mut self, (ents, frame_time, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
         // TODO: Move these to a EntityValidationSystem or something like that
         for _ in (&dynamics, &statics).join() {
             panic!("There's a naughty static body that really feels dynamic inside.");
@@ -374,53 +365,63 @@ impl<'a> System<'a> for Physics2DSystem {
             for (ent_b, _, pos_b, circle_b) in (&ents, &dynamics, &pos, &circles).join() {
                 if ent_a != ent_b {
                     let collision_distance = circle_a.radius + circle_b.radius;
+
                     // get post move locations
-                    let delta_a = pos_a.0 + vel.get(ent_a).unwrap().0;
-                    let delta_b = pos_b.0 + vel.get(ent_b).unwrap().0;
+                    let delta_a = pos_a.0 + vel.get(ent_a).unwrap().0 * frame_time.0;
+                    let delta_b = pos_b.0 + vel.get(ent_b).unwrap().0 * frame_time.0;
                     // vector from ent_a to ent_b
                     let position_delta = delta_a - delta_b;
                     // how much are we colliding?
                     let collision_depth = collision_distance - position_delta.magnitude();
-                    if 0.0 < collision_depth {
-                        // normalize the vector to scale and reflect
-                        let collision_direction = position_delta.normalize();
+                    // same as position_delta but without velocity applied
+                    let collision_direction = position_delta.normalize();
+                    if collision_depth > 0.0 {
                         // get_mut is necessary to appease the borrow checker
-                        vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0;
-                        vel.get_mut(ent_b).unwrap().0 += collision_direction * -collision_depth / 2.0;
+                        //vel.get_mut(ent_a).unwrap().0 += (position_delta.normalize_to(collision_depth));
+                        //vel.get_mut(ent_b).unwrap().0 -= (position_delta.normalize_to(collision_depth));
+
+                        vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0 / frame_time.0;
+                        vel.get_mut(ent_b).unwrap().0 -= collision_direction * collision_depth / 2.0 / frame_time.0;
                     }
                 }
             }
         }
         for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
-                if (pos_a.0 + vel_a.0 - pos_b.0).magnitude() < (circle_a.radius + circle_b.radius) {
-                    let diff = pos_b.0 - pos_a.0;
-                    let collinear_part = diff * (vel_a.0.dot(diff));
-                    vel_a.0 -= collinear_part;
+                let collision_distance = circle_a.radius + circle_b.radius;
+                // get post move locations
+                let delta_a = pos_a.0 + vel_a.0 * frame_time.0;
+                let delta_b = pos_b.0;
+                // vector from ent_a to ent_b
+                let position_delta = delta_a - delta_b;
+                // how much are we colliding?
+                let collision_depth = collision_distance - position_delta.magnitude();
+                if collision_depth > 0.0 {
+                    vel_a.0 += (position_delta.normalize_to(collision_depth));
                 }
             }
         }
         for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
                 let half_side = square_b.side_length / 2.0;
-                let diff: Vector2<f32> = pos_a.0 + vel_a.0 - pos_b.0;
-                let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
-                let corner_dist = abs_diff - Vector2::new(half_side, half_side);
-                if corner_dist.magnitude() < circle_a.radius {
-                    let sigference: Vector2<f32> = Vector2::new(diff.x.signum(), diff.y.signum());
-                    let vel_change = sigference.mul_element_wise(corner_dist.normalize()) * (corner_dist.magnitude() - circle_a.radius);
-                    vel_a.0 -= vel_change;
+                let position_difference: Vector2<f32> = pos_a.0 + vel_a.0 * frame_time.0 - pos_b.0;
+                let abs_pos_diff: Vector2<f32> = Vector2::new(position_difference.x.abs(), position_difference.y.abs());
+                let difference_from_corner = abs_pos_diff - Vector2::new(half_side, half_side);
+                if difference_from_corner.magnitude() < circle_a.radius {
+                    let sigference: Vector2<f32> = Vector2::new(position_difference.x.signum(), position_difference.y.signum());
+                    let vel_change = sigference.mul_element_wise(difference_from_corner.normalize()) * (difference_from_corner.magnitude() - circle_a.radius);
+                    vel_a.0 -= vel_change / frame_time.0;
                 }
-                let diff: Vector2<f32> = pos_a.0 + vel_a.0 - pos_b.0;
+                let diff: Vector2<f32> = pos_a.0 + vel_a.0 * frame_time.0 - pos_b.0;
                 let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
                 if abs_diff.x <= half_side {
                     if abs_diff.y < half_side + circle_a.radius {
-                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum();
+                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum() / frame_time.0;
                     }
                 }
                 if abs_diff.y <= half_side {
                     if abs_diff.x < half_side + circle_a.radius {
-                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum();
+                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum() / frame_time.0;
                     }
                 }
             }
@@ -527,6 +528,7 @@ impl<'a> System<'a> for DunGenSystem {
                         .with(model)
                         .with(Orientation(dir))
                         .with(StaticBody)
+                        //.with(CircleCollider { radius: 0.5 })
                         .with(SquareCollider { side_length: 1.0 })
                         .build();
                 }
