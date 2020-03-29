@@ -72,11 +72,15 @@ use std::path::Path;
 use wavefront_obj::obj;
 use std::fs::File;
 use std::io::Read;
-use wgpu::BufferDescriptor;
+use wgpu::{BufferDescriptor, TextureView};
 use cgmath::Vector3;
+use winit::window::Window;
+use winit::dpi::PhysicalSize;
 
 pub struct Context {
     pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
+
     pub uniform_buf: wgpu::Buffer,
     pub lights_buf: wgpu::Buffer,
 
@@ -89,29 +93,48 @@ pub struct Context {
     pub pipeline: wgpu::RenderPipeline,
 
     pub depth_view: wgpu::TextureView,
+
+    pub surface: wgpu::Surface,
+    pub sc_desc: wgpu::SwapChainDescriptor,
+    pub swap_chain: wgpu::SwapChain,
 }
 
 const FRAG_SRC: &str = include_str!("../../shaders/debug.frag");
 const VERT_SRC: &str = include_str!("../../shaders/debug.vert");
 
 impl Context {
-    pub fn new(device: wgpu::Device) -> Self {
+    pub async fn new(window: &Window) -> Self {
+        let surface = wgpu::Surface::create(window);
 
-        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: 1920,
-                height: 1080,
-                depth: 1,
+        let size = window.inner_size();
+
+        let adapter = wgpu::Adapter::request(
+            &wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::Default,
             },
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        });
+            wgpu::BackendBit::PRIMARY,
+        ).await.unwrap();
 
-        let depth_view = depth_texture.create_default_view();
+        let (device, mut queue) = adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                extensions: wgpu::Extensions {
+                    anisotropic_filtering: false
+                },
+                limits: Default::default(),
+            }
+        ).await;
+
+        let mut sc_desc = wgpu::SwapChainDescriptor {
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            format: COLOR_FORMAT,
+            width: size.width as u32,
+            height: size.height as u32,
+            present_mode: wgpu::PresentMode::Mailbox,
+        };
+
+        let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+
+        let depth_view = Context::create_depth_view(&device, size);
 
         let bind_group_layout = device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
@@ -239,6 +262,10 @@ impl Context {
 
         Context {
             device,
+            queue,
+            surface,
+            sc_desc,
+            swap_chain,
             uniform_buf,
             lights_buf,
             local_bind_group_layout,
@@ -248,6 +275,33 @@ impl Context {
             pipeline,
             depth_view
         }
+    }
+
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+        self.sc_desc.width  = size.width;
+        self.sc_desc.height = size.height;
+
+        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+
+        self.depth_view = Context::create_depth_view(&self.device, size);
+    }
+
+    fn create_depth_view(device: &wgpu::Device, size: PhysicalSize<u32>) -> wgpu::TextureView {
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: size.width as u32,
+                height: size.height as u32,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: DEPTH_FORMAT,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        });
+
+        return depth_texture.create_default_view();
     }
 
     pub fn load_model_from_obj(&self, path: &str) -> Model {

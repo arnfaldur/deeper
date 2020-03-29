@@ -58,35 +58,7 @@ async fn run_async() {
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
 
-    let surface = wgpu::Surface::create(&window);
-
-    let adapter = wgpu::Adapter::request(
-        &wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::Default,
-        },
-        wgpu::BackendBit::PRIMARY,
-    ).await.unwrap();
-
-    let (device, mut queue) = adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            extensions: wgpu::Extensions {
-                anisotropic_filtering: false
-            },
-            limits: Default::default(),
-        }
-    ).await;
-
-    let mut sc_desc = wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        format: graphics::COLOR_FORMAT,
-        width: size.width as u32,
-        height: size.height as u32,
-        present_mode: wgpu::PresentMode::Mailbox,
-    };
-
-    let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
-
-    let context = graphics::Context::new(device);
+    let context = graphics::Context::new(&window).await;
 
     let mut init_encoder = context.device.create_command_encoder(
         &wgpu::CommandEncoderDescriptor { todo: 0 }
@@ -123,9 +95,8 @@ async fn run_async() {
 
     let command_buffer = init_encoder.finish();
 
-    queue.submit(&[command_buffer]);
+    context.queue.submit(&[command_buffer]);
     // End graphics shit
-
 
     let mut world = World::new();
 
@@ -159,9 +130,7 @@ async fn run_async() {
             "SphericalFollowSystem",
             &["MovementSystem"],
         )
-        .with_thread_local(GraphicsSystem::new(
-            model_array, sc_desc, swap_chain, queue,
-        ))
+        .with_thread_local(GraphicsSystem::new(model_array))
         .build();
 
     let player = world
@@ -188,7 +157,7 @@ async fn run_async() {
         .build();
 
     let mut rng = thread_rng();
-    for _enemy in 0..64 {
+    for _enemy in 0..128 {
         let (randx, randy): (f32, f32) = rng.gen();
         world.create_entity()
             .with(Position(Vector2::new(
@@ -205,7 +174,9 @@ async fn run_async() {
                 target: player,
                 minimum_distance: 1.0,
             })
-            .with(Model3D::from_index(&context, 4).with_scale(0.1))
+            .with(Model3D::from_index(&context, 4)
+                .with_scale(0.1)
+                .with_tint(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
             .build();
     }
 
@@ -230,6 +201,7 @@ async fn run_async() {
                 dispatcher.dispatch(&mut world);
             },
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+                world.get_mut::<graphics::Context>().unwrap().resize(size);
                 //unimplemented!();
             },
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. }

@@ -26,10 +26,7 @@ impl PathSettings {
 pub struct DisplaySettings {
     pub screen_width: i32,
     pub screen_height: i32,
-
     pub fps: u32,
-    pub tile_size: i32,
-    pub max_tiles: f64, // TODO: what is this?
 }
 
 impl DisplaySettings {
@@ -38,8 +35,6 @@ impl DisplaySettings {
             screen_width: 1024,
             screen_height: 768,
             fps: 60,
-            tile_size: 10,
-            max_tiles: 64.0,
         }
     }
 }
@@ -64,7 +59,7 @@ impl AssetManager {
             let data = fs::read_to_string(ps_path).unwrap();
             self.loaded_at_time
                 .insert(ps_path.parse().unwrap(), SystemTime::now());
-            self.paths = serde_json::from_str(data.as_str()).unwrap();
+            self.paths = ron::de::from_str(data.as_str()).unwrap();
         } else {
             eprintln!("No path settings found at path: \"{}\"", ps_path);
         }
@@ -76,10 +71,12 @@ impl AssetManager {
         if fs::metadata(ds_path.as_str()).is_ok() {
             let data = fs::read_to_string(ds_path.as_str()).unwrap();
             self.loaded_at_time.insert(ds_path, SystemTime::now());
-            return serde_json::from_str(data.as_str()).unwrap();
+            return ron::de::from_str(data.as_str()).unwrap()
         } else {
             eprintln!("No display settings found at path: \"{}\"", ds_path);
         }
         return DisplaySettings::new();
     }
+
+
 }
