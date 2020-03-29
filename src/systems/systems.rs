@@ -524,7 +524,8 @@ impl<'a> System<'a> for DunGenSystem {
                             pos3d,
                             1.0,
                             0.0,
-                            graphics::Material::dark_stone(),
+                            graphics::Material::darkest_stone(),
+                            //graphics::Material::glossy(Vector3::<f32>::new(0.0, 0.0, 0.0)),
                         )
                     };
                     world
@@ -550,7 +551,7 @@ impl<'a> System<'a> for DunGenSystem {
                                 pos3d,
                                 1.0,
                                 0.0,
-                                graphics::Material::bright_stone(),
+                                graphics::Material::glossy(Vector3::<f32>::new(0.3, 0.3, 0.3)),
                             ),
                             Some(_) => StaticModel::new(
                                 &context,

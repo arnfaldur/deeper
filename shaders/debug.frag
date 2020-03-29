@@ -197,7 +197,7 @@ void main() {
 
     Material mat = material;
 
-    vec3 F_0 = vec3(0.20);
+    vec3 F_0 = vec3(0.02);
     F_0 = mix(F_0, vec3(mat.albedo), mat.metallic);
 
     vec3 Lo = vec3(0.0);
@@ -208,7 +208,7 @@ void main() {
         vec3 lightDir = normalize(to_light);
         vec3 halfway = normalize(lightDir + viewDir);
 
-        float attenuation = fLightFalloff(length(to_light), 20.0, 2.0);
+        float attenuation = fLightFalloff(length(to_light), light.radius, 3.0);
         vec3 radiance = light.color.xyz * attenuation;
 
         float NDF = fDistributionGGX(normal, halfway, mat.roughness);
@@ -223,15 +223,34 @@ void main() {
         float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
         vec3 specular = numerator / max(denominator, 0.001);
 
-        float specular_falloff = fLightFalloff(length(to_light), 20.0, 4.0);
+        float specular_falloff = fLightFalloff(length(to_light), light.radius, 2.0);
         float NdotL = max(dot(normal, lightDir), 0.0);
         Lo += (kD * vec3(mat.albedo) / PI + specular_falloff * specular) * radiance * NdotL;
 
         //finalColor += fPointLightFactor(uPointLights[i], vec4(normal, 0.0), mat);
     }
 
-    vec3 ambient = vec3(0.01) * vec3(mat.albedo);
+    vec3 ambient = uDirectionalLight.ambient.rgb * vec3(mat.albedo);
     vec3 color = ambient + Lo;
+
+    vec3 lightDir = normalize(uDirectionalLight.direction.xyz);
+    vec3 halfway = normalize(lightDir + viewDir);
+    vec3 radiance = uDirectionalLight.color.xyz;
+
+    float NDF = fDistributionGGX(normal, halfway, mat.roughness);
+    float G = fGeometrySmith(normal, viewDir, lightDir, mat.roughness);
+    vec3 F = fFresnelSchlick(max(dot(halfway, viewDir), 0.0), F_0);
+
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - mat.metallic;
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
+    vec3 specular = numerator / max(denominator, 0.001);
+
+    float NdotL = max(dot(normal, lightDir), 0.0);
+    color += (kD * vec3(mat.albedo) / PI + specular) * radiance * NdotL;
 
 
     color = color / (color + vec3(1.0));

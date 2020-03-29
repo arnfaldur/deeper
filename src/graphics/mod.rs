@@ -37,22 +37,31 @@ impl Material {
         let mut mat : Self = Default::default();
         mat.albedo = [1.0, 1.0, 1.0, 1.0];
         mat.metallic = 0.1;
-        mat.roughness = 0.3;
+        mat.roughness = 0.15;
         return mat;
     }
 
     pub fn glossy(color : Vector3<f32>) -> Self {
         let mut mat : Self = Self::default();
         mat.albedo = [color.x, color.y, color.z, 1.0];
-        mat.metallic = 0.01;
+        mat.roughness = 0.2;
+        mat.metallic = 0.2;
+        return mat;
+    }
+
+    pub fn darkest_stone() -> Self {
+        let mut mat : Self = Self::default();
+        mat.albedo = [0.05, 0.05, 0.05, 1.0];
+        mat.metallic = 0.0;
+        mat.roughness = 0.5;
         return mat;
     }
 
     pub fn dark_stone() -> Self {
         let mut mat : Self = Self::default();
         mat.albedo = [0.07, 0.07 , 0.07, 1.0];
-        mat.metallic = 0.1;
-        mat.roughness = 0.8;
+        mat.metallic = 0.0;
+        mat.roughness = 0.7;
         return mat;
     }
 
@@ -60,7 +69,7 @@ impl Material {
         let mut mat : Self = Default::default();
         mat.albedo = [0.2, 0.2 , 0.2, 1.0];
         mat.metallic = 0.01;
-        mat.roughness = 0.8;
+        mat.roughness = 0.6;
         return mat;
     }
 }

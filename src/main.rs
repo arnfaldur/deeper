@@ -75,16 +75,16 @@ async fn run_async() {
 
     lights.directional_light = graphics::DirectionalLight {
         direction: [1.0, 0.8, 0.8, 0.0],
-        ambient: [0.1, 0.1, 0.1, 1.0],
-        color: [0.2, 0.2, 0.3, 1.0],
+        ambient: [0.01, 0.015, 0.02, 1.0],
+        color: [0.1, 0.1, 0.2, 1.0],
     };
 
     for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
         if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
         lights.point_lights[i] = Default::default();
-        lights.point_lights[i].radius = 20.0;
+        lights.point_lights[i].radius = 30.0;
         lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
-        lights.point_lights[i].color = [0.6, 0.4, 0.1, 1.0];
+        lights.point_lights[i].color = [1.0, 0.4, 0.1, 1.0];
     }
 
     let temp_buf = context.device.create_buffer_with_data(
@@ -174,8 +174,8 @@ async fn run_async() {
                 minimum_distance: 2.0 + rad,
             })
             .with(Model3D::from_index(&context, ass_man.get_model_index("sphere2.obj").unwrap())
-                .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen()))))
-                .with_scale(rad)
+                .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
+                .with_scale(rad))
             .build();
     }
 
