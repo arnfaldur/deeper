@@ -486,13 +486,14 @@ impl<'a> System<'a> for DunGenSystem {
             let pos = Vector2::new(x as f32, y as f32);
             let pos3d = Vector3::new(x as f32, y as f32, 0.0);
 
-            let (cube_idx, plane_idx, wall_idx, stairs_down_idx) = {
+            let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_tile_idx) = {
                 let ass_man = world.read_resource::<loader::AssetManager>();
                 (
                     ass_man.get_model_index("cube.obj").unwrap(),
                     ass_man.get_model_index("plane.obj").unwrap(),
                     ass_man.get_model_index("Wall.obj").unwrap(),
                     ass_man.get_model_index("StairsDown.obj").unwrap(),
+                    ass_man.get_model_index("floortile.obj").unwrap(),
                 )
             };
 
@@ -520,7 +521,7 @@ impl<'a> System<'a> for DunGenSystem {
                         let context = world.read_resource::<graphics::Context>();
                         StaticModel::new(
                             &context,
-                            plane_idx,
+                            floor_tile_idx,
                             pos3d,
                             1.0,
                             0.0,

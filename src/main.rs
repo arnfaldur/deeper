@@ -173,7 +173,7 @@ async fn run_async() {
                 target: player,
                 minimum_distance: 2.0 + rad,
             })
-            .with(Model3D::from_index(&context, ass_man.get_model_index("sphere2.obj").unwrap())
+            .with(Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
                 .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
                 .with_scale(rad))
             .build();

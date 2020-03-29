@@ -112,6 +112,8 @@ float fLightFalloff(float distance, float lightRadius, float scale) {
     return pow(clamp(1 - pow(distance/lightRadius, 4), 0.0, 1.0),2) / (pow(distance, 2) + 1);
 }
 
+// https://learnopengl.com/PBR/Lighting
+
 vec3 fFresnelSchlick(float cos_theta, vec3 F_0) {
     return F_0 + (1.0 - F_0) * pow(1.0 - cos_theta, 5.0);
 }
@@ -162,31 +164,32 @@ float fBlinnPhong(vec4 normal, vec4 lightDir, vec4 viewDir, float shininess) {
     return pow(max(dot(normal, halfway), 0.0), 3*shininess); // blinn-phong
 }
 
-//vec4 fPointLightFactor(PointLight light, vec4 normal, Material material) {
-//    vec4 toLight  = light.position - v_FragPos;
-//    vec4 lightDir = normalize(toLight);
-//
-//    float intensity = fLightFalloff(length(toLight), 20.0, 3.0);
-//
-//    vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
-//    vec4 specular = material.specular * fPhong(normal, lightDir, material.shininess);
-//    //vec4 specular = material.specular * fBlinnPhong(normal, lightDir, viewDir, material.shininess);
-//
-//    //return intensity * light.color * (diffuse + specular);
-//    return intensity * light.color * (diffuse + specular);
-//}
-
-//vec4 fDirectionalLightFactor(DirectionalLight light, vec4 normal, Material material) {
-//    vec4 lightDir = normalize(light.direction);
-//    vec4 diffuse  = material.diffuse  * fLambert(normal, lightDir);
-//    vec4 specular = material.specular * fPhong(normal, lightDir, 64);
-//    // TODO: fix
-//    //vec4 specular = material.specular * fBlinnPhong(normal, light.direction, viewDir, material.shininess);
-//    return light.ambient * material.diffuse + light.color * (diffuse + specular);
-//}
-
 float contrast(float a, float x) {
     return clamp(a * (cos(x * PI + PI) + 1) / 2.0 + ((1-a)*x), 0.0, 1.0);
+}
+
+vec3 fLightFactor(vec3 normal, float distance, float radius, vec3 color, vec3 lightDir, vec3 viewDir, vec3 F_0, Material mat) {
+    vec3 halfway = normalize(lightDir + viewDir);
+
+    float attenuation = fLightFalloff(distance, radius, 3.0);
+    vec3 radiance = color * attenuation;
+
+    float NDF = fDistributionGGX(normal, halfway, mat.roughness);
+    float G = fGeometrySmith(normal, viewDir, lightDir, mat.roughness);
+    vec3 F = fFresnelSchlick(max(dot(halfway, viewDir), 0.0), F_0);
+
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - mat.metallic;
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
+    vec3 specular = numerator / max(denominator, 0.001);
+
+    float specular_falloff = fLightFalloff(distance, radius, 2.0);
+    float NdotL = max(dot(normal, lightDir), 0.0);
+
+    return (kD * vec3(mat.albedo) / PI + specular_falloff * specular) * radiance * NdotL;
 }
 
 void main() {
@@ -206,26 +209,17 @@ void main() {
         PointLight light = uPointLights[i];
         vec3 to_light = light.position.xyz - v_FragPos.xyz;
         vec3 lightDir = normalize(to_light);
-        vec3 halfway = normalize(lightDir + viewDir);
 
-        float attenuation = fLightFalloff(length(to_light), light.radius, 3.0);
-        vec3 radiance = light.color.xyz * attenuation;
-
-        float NDF = fDistributionGGX(normal, halfway, mat.roughness);
-        float G = fGeometrySmith(normal, viewDir, lightDir, mat.roughness);
-        vec3 F = fFresnelSchlick(max(dot(halfway, viewDir), 0.0), F_0);
-
-        vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - mat.metallic;
-
-        vec3 numerator = NDF * G * F;
-        float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
-        vec3 specular = numerator / max(denominator, 0.001);
-
-        float specular_falloff = fLightFalloff(length(to_light), light.radius, 2.0);
-        float NdotL = max(dot(normal, lightDir), 0.0);
-        Lo += (kD * vec3(mat.albedo) / PI + specular_falloff * specular) * radiance * NdotL;
+        Lo += fLightFactor(
+            normal,
+            length(to_light),
+            light.radius,
+            light.color.xyz,
+            lightDir,
+            viewDir,
+            F_0,
+            mat
+        );
 
         //finalColor += fPointLightFactor(uPointLights[i], vec4(normal, 0.0), mat);
     }
