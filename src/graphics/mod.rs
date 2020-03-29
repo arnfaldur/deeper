@@ -129,7 +129,7 @@ use std::path::Path;
 use wavefront_obj::obj;
 use std::fs::File;
 use std::io::Read;
-use wgpu::{BufferDescriptor, TextureView};
+use wgpu::{BufferDescriptor, TextureView, ShaderModule, RenderPipeline, PipelineLayout, Device};
 use cgmath::Vector3;
 use winit::window::Window;
 use winit::dpi::PhysicalSize;
@@ -269,8 +269,34 @@ impl Context {
         let fs = glsl_to_spirv::compile(FRAG_SRC, ShaderType::Fragment).unwrap();
         let fs_module = device.create_shader_module(&wgpu::read_spirv(fs).unwrap());
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout,
+        let pipeline = Context::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
+
+        let mut context = Context {
+            device,
+            queue,
+            surface,
+            sc_desc,
+            swap_chain,
+            uniform_buf,
+            lights_buf,
+            local_bind_group_layout,
+            bind_group_layout,
+            bind_group,
+            pipeline_layout,
+            pipeline,
+            depth_view
+        };
+
+        return context;
+    }
+
+    pub fn recompile_pipeline(&mut self, vs_module: ShaderModule, fs_module: ShaderModule) {
+        self.pipeline = Context::compile_pipeline(&self.device, &self.pipeline_layout, vs_module, fs_module);
+    }
+
+    fn compile_pipeline(device: &Device, pipeline_layout: &PipelineLayout, vs_module : ShaderModule, fs_module : ShaderModule) -> RenderPipeline{
+        return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            layout: pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
@@ -316,22 +342,6 @@ impl Context {
             sample_mask: !0,
             alpha_to_coverage_enabled: false
         });
-
-        Context {
-            device,
-            queue,
-            surface,
-            sc_desc,
-            swap_chain,
-            uniform_buf,
-            lights_buf,
-            local_bind_group_layout,
-            bind_group_layout,
-            bind_group,
-            pipeline_layout,
-            pipeline,
-            depth_view
-        }
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {

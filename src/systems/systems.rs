@@ -61,6 +61,8 @@ impl HotLoaderSystem {
     pub fn new() -> Self {
         let (tx, rx) = channel();
 
+        // TODO: Make async watcher
+
         let mut watcher: RecommendedWatcher =
             Watcher::new(tx, Duration::from_secs(2)).unwrap();
         watcher.watch("assets/Models/", RecursiveMode::Recursive);
@@ -69,18 +71,60 @@ impl HotLoaderSystem {
     }
 }
 
+
 impl<'a> System<'a> for HotLoaderSystem {
     type SystemData = (
         WriteExpect<'a, loader::AssetManager>,
+        WriteExpect<'a, graphics::Context>,
         ReadExpect<'a, InputState>,
-        ReadExpect<'a, graphics::Context>,
     );
 
-    fn run(&mut self, (mut ass_man, input, context): Self::SystemData) {
+    fn run(&mut self, (mut ass_man, mut context, input): Self::SystemData) {
 
         if input.is_key_pressed(Key::L) {
             println!("Hotloading...");
             ass_man.load_models(&context);
+
+            let frag_path = Path::new("shaders/debug.frag");
+            let vert_path = Path::new("shaders/debug.frag");
+
+            let vs_module = if let Ok(data) = std::fs::read_to_string(vert_path) {
+                if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
+                    if let Ok(sprv) = &wgpu::read_spirv(vs) {
+                        Some(context.device.create_shader_module(sprv))
+                    } else {
+                        println!("Failed to create shader module");
+                        None
+                    }
+                } else {
+                    println!("Failed to recompile vertex shader");
+                    None
+                }
+            } else {
+                println!("Failed to read vertex shader");
+                None
+            };
+
+            let fs_module = if let Ok(data) = std::fs::read_to_string(frag_path) {
+                if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
+                    if let Ok(sprv) = &wgpu::read_spirv(fs) {
+                        Some(context.device.create_shader_module(sprv))
+                    } else {
+                        println!("Failed to create shader module");
+                        None
+                    }
+                } else {
+                    println!("Failed to recompile vertex shader");
+                    None
+                }
+            } else {
+                println!("Failed to read vertex shader");
+                None
+            };
+
+            if let (Some(vsm), Some(fsm)) = (vs_module, fs_module) {
+                context.recompile_pipeline(vsm, fsm);
+            }
         }
     }
 
@@ -469,6 +513,8 @@ use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
 use crate::dung_gen::{DungGen, WallDirection};
 use rand::{thread_rng, Rng};
 use std::time::{SystemTime, Duration};
+use std::path::Path;
+use glsl_to_spirv::ShaderType;
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
