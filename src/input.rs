@@ -40,16 +40,22 @@ impl MouseState {
             ElementState::Pressed => {
                 match mouse_button {
                     MouseButton::Left => {
+                        if !self.left.down {
+                            self.left.pressed = true;
+                        }
                         self.left.down    = true;
-                        self.left.pressed = true;
                     },
                     MouseButton::Right => {
+                        if !self.right.down {
+                            self.right.pressed = true;
+                        }
                         self.right.down    = true;
-                        self.right.pressed = true;
                     },
                     MouseButton::Middle => {
+                        if !self.middle.down {
+                            self.middle.pressed = true;
+                        }
                         self.middle.down    = true;
-                        self.middle.pressed = true;
                     },
                     _ => {}
                 }
@@ -81,6 +87,7 @@ pub enum Key {
     S,
     D,
     F,
+    L,
 }
 
 pub struct InputState {
@@ -96,6 +103,7 @@ impl InputState {
         keyboard.insert(Key::S, ButtonState::new());
         keyboard.insert(Key::D, ButtonState::new());
         keyboard.insert(Key::F, ButtonState::new());
+        keyboard.insert(Key::L, ButtonState::new());
 
         Self {
             mouse: MouseState::new(),
@@ -111,6 +119,16 @@ impl InputState {
         return self.keyboard.get(&key).unwrap().pressed;
     }
 
+    pub fn new_frame(&mut self) {
+        self.mouse.middle.pressed = false;
+        self.mouse.left.pressed = false;
+        self.mouse.right.pressed = false;
+
+        for (x, y) in &mut self.keyboard {
+            y.pressed = false;
+        }
+    }
+
     pub fn update_from_event(&mut self, event: &winit::event::WindowEvent) {
         use winit::event::WindowEvent::*;
         use winit::event::VirtualKeyCode;
@@ -123,13 +141,16 @@ impl InputState {
                         VirtualKeyCode::S => Some(Key::S),
                         VirtualKeyCode::D => Some(Key::D),
                         VirtualKeyCode::F => Some(Key::F),
+                        VirtualKeyCode::L => Some(Key::L),
                         _ => None,
                     } {
                         let state = self.keyboard.get_mut(key).unwrap();
                         match input.state {
                             ElementState::Pressed => {
+                                if !state.down {
+                                    state.pressed = true;
+                                }
                                 state.down = true;
-                                state.pressed = true;
                             },
                             ElementState::Released => {
                                 state.down = false;

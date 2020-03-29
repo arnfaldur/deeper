@@ -8,6 +8,8 @@ extern crate cgmath;
 use cgmath::{prelude::*, Vector2, Vector3};
 
 use crate::graphics;
+use crate::loader;
+use crate::input::{InputState, Key};
 use crate::components::components::*;
 
 pub struct MovementSystem;
@@ -48,21 +50,60 @@ impl<'a> System<'a> for SphericalFollowSystem {
     }
 }
 
-pub struct GraphicsSystem {
-    pub model_array: Vec<graphics::Model>,
+use notify::{RecommendedWatcher, DebouncedEvent, Watcher, RecursiveMode};
+use std::sync::mpsc::{Sender, Receiver, channel};
+
+pub struct HotLoaderSystem {
+    pub watcher: RecommendedWatcher,
+    pub rx: Receiver<DebouncedEvent>,
 }
 
-impl GraphicsSystem {
-    pub fn new(
-        model_array: Vec<graphics::Model>,
-    ) -> Self {
-        Self { model_array }
+impl HotLoaderSystem {
+
+    pub fn new() -> Self {
+        let (tx, rx) = channel();
+
+        let mut watcher: RecommendedWatcher =
+            Watcher::new(tx, Duration::from_secs(2)).unwrap();
+        watcher.watch("assets/Models/", RecursiveMode::Recursive);
+
+        Self { rx, watcher}
     }
 }
+
+impl<'a> System<'a> for HotLoaderSystem {
+    type SystemData = (
+        WriteExpect<'a, loader::AssetManager>,
+        ReadExpect<'a, InputState>,
+        ReadExpect<'a, graphics::Context>,
+    );
+
+    fn run(&mut self, (mut ass_man, input, context): Self::SystemData) {
+
+        if input.is_key_pressed(Key::L) {
+            loop {
+                if let Ok(x) =
+                    self.rx.recv_timeout(Duration::from_secs(1)) {
+                } else {
+                    break;
+                }
+            }
+            println!("Hotloading...");
+            ass_man.load_models(&context);
+        }
+    }
+
+    fn setup(&mut self, world: &mut World) {
+
+    }
+}
+
+pub struct GraphicsSystem;
 
 impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
         WriteExpect<'a, graphics::Context>,
+        ReadExpect<'a, loader::AssetManager>,
         ReadExpect<'a, ActiveCamera>,
 
         ReadStorage<'a, Camera>,
@@ -74,7 +115,7 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, StaticModel>,
     );
 
-    fn run(&mut self, (mut context, active_cam, camera, target, pos3d, pos, orient, models, static_model): Self::SystemData) {
+    fn run(&mut self, (mut context, ass_man, active_cam, camera, target, pos3d, pos, orient, models, static_model): Self::SystemData) {
         let frame = context.swap_chain.get_next_texture().unwrap();
 
         let cam = camera.get(active_cam.0)
@@ -181,7 +222,7 @@ impl<'a> System<'a> for GraphicsSystem {
 
             for (model) in (&static_model).join() {
                 rpass.set_bind_group(1, &model.bind_group, &[]);
-                for mesh in &self.model_array[model.idx].meshes {
+                for mesh in &ass_man.models[model.idx].meshes {
                     rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
                     rpass.draw(0..mesh.num_vertices as u32, 0..1)
                 }
@@ -189,7 +230,7 @@ impl<'a> System<'a> for GraphicsSystem {
 
             for (_, model) in (&pos, &models).join() {
                 rpass.set_bind_group(1, &model.bind_group, &[]);
-                for mesh in &self.model_array[model.idx].meshes {
+                for mesh in &ass_man.models[model.idx].meshes {
                     rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
                     rpass.draw(0..mesh.num_vertices as u32, 0..1)
                 }
@@ -218,6 +259,7 @@ impl PlayerSystem {
 impl<'a> System<'a> for PlayerSystem {
     type SystemData = (
         ReadExpect<'a, InputState>,
+        ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, Player>,
         ReadExpect<'a, PlayerCamera>,
         ReadStorage<'a, Position>,
@@ -229,7 +271,7 @@ impl<'a> System<'a> for PlayerSystem {
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(&mut self, (input, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut dest, mut offset): Self::SystemData) {
+    fn run(&mut self, (input, context, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut dest, mut offset): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
@@ -266,9 +308,9 @@ impl<'a> System<'a> for PlayerSystem {
             );
 
             if let Some(mouse_world_pos) = project_screen_to_world(
-                Vector3::new(mouse_pos.x, 1080.0 - mouse_pos.y, 1.0),
+                Vector3::new(mouse_pos.x,  context.sc_desc.height as f32 - mouse_pos.y, 1.0),
                 graphics::correction_matrix() * mx_projection * mx_view,
-                Vector4::new(0, 0, 1920, 1080),
+                Vector4::new(0, 0, context.sc_desc.width as i32, context.sc_desc.height as i32),
             ) {
                 let ray_delta: Vector3<f32> = mouse_world_pos - camera_pos.0;
                 let t: f32 = mouse_world_pos.z / ray_delta.z;
@@ -418,11 +460,10 @@ impl<'a> System<'a> for Physics2DSystem {
 }
 
 use self::cgmath::{Matrix4, Vector4};
-use crate::input::InputState;
 use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
 use crate::dung_gen::{DungGen, WallDirection};
 use rand::{thread_rng, Rng};
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 
 pub struct DunGenSystem {
     pub dungeon: DungGen,
@@ -443,13 +484,23 @@ impl<'a> System<'a> for DunGenSystem {
             let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
             let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
 
+            let (cube_idx, plane_idx, wall_idx, stairs_down_idx) = {
+                let ass_man = world.read_resource::<loader::AssetManager>();
+                (
+                    ass_man.get_model_index("cube.obj").unwrap(),
+                    ass_man.get_model_index("plane.obj").unwrap(),
+                    ass_man.get_model_index("Wall.obj").unwrap(),
+                    ass_man.get_model_index("StairsDown.obj").unwrap(),
+                )
+            };
+
             match wall_type {
                 TileType::Nothing => {
                     let model = {
                         let context = world.read_resource::<graphics::Context>();
                         StaticModel::new(
                             &context,
-                            1,
+                            plane_idx,
                             Vector3::new(x as f32, y as f32, 1.0),
                             1.0,
                             0.0,
@@ -467,7 +518,7 @@ impl<'a> System<'a> for DunGenSystem {
                         let context = world.read_resource::<graphics::Context>();
                         StaticModel::new(
                             &context,
-                            1,
+                            plane_idx,
                             pos3d,
                             1.0,
                             0.0,
@@ -493,7 +544,7 @@ impl<'a> System<'a> for DunGenSystem {
                         match maybe_direction {
                             None => StaticModel::new(
                                 &context,
-                                0,
+                                cube_idx,
                                 pos3d,
                                 1.0,
                                 0.0,
@@ -501,7 +552,7 @@ impl<'a> System<'a> for DunGenSystem {
                             ),
                             Some(_) => StaticModel::new(
                                 &context,
-                                3,
+                                wall_idx,
                                 pos3d,
                                 1.0,
                                 dir,
@@ -524,7 +575,7 @@ impl<'a> System<'a> for DunGenSystem {
                         let context = world.read_resource::<graphics::Context>();
                         StaticModel::new(
                             &context,
-                            5,
+                            stairs_down_idx,
                             pos3d,
                             1.0,
                             0.0,
