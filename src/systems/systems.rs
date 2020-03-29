@@ -81,13 +81,6 @@ impl<'a> System<'a> for HotLoaderSystem {
     fn run(&mut self, (mut ass_man, input, context): Self::SystemData) {
 
         if input.is_key_pressed(Key::L) {
-            loop {
-                if let Ok(x) =
-                    self.rx.recv_timeout(Duration::from_secs(1)) {
-                } else {
-                    break;
-                }
-            }
             println!("Hotloading...");
             ass_man.load_models(&context);
         }
