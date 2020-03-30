@@ -52,19 +52,15 @@ use notify::{RecommendedWatcher, DebouncedEvent, Watcher, RecursiveMode};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 pub struct HotLoaderSystem {
-    pub watcher: RecommendedWatcher,
-    pub rx: Receiver<DebouncedEvent>,
+    // pub watcher: RecommendedWatcher,
+    // pub rx: Receiver<DebouncedEvent>,
+    pub shaders_loaded_at: SystemTime,
+    pub hotload_shaders_turned_on: bool,
 }
 
 impl HotLoaderSystem {
     pub fn new() -> Self {
-        let (tx, rx) = channel();
-
-        let mut watcher: RecommendedWatcher =
-            Watcher::new(tx, Duration::from_secs(2)).unwrap();
-        watcher.watch("assets/Models/", RecursiveMode::Recursive);
-
-        Self { rx, watcher }
+        Self { shaders_loaded_at: SystemTime::now(), hotload_shaders_turned_on: false }
     }
 }
 
@@ -80,50 +76,63 @@ impl<'a> System<'a> for HotLoaderSystem {
 
     fn run(&mut self, (mut ass_man, mut context, input): Self::SystemData) {
 
-        if input.is_key_pressed(Key::L) {
-            println!("Hotloading...");
-            ass_man.load_models(&context);
+        if input.is_key_pressed(Key::H) {
+            println!("Hotloading shaders turned ON");
+            self.hotload_shaders_turned_on = !self.hotload_shaders_turned_on;
+        }
 
+        if input.is_key_pressed(Key::L) {
+            println!("Hotloading models...");
+            ass_man.load_models(&context);
+        }
+
+        if self.hotload_shaders_turned_on {
             let frag_path = Path::new("shaders/debug.frag");
             let vert_path = Path::new("shaders/debug.vert");
 
-            let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
-                if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
-                    if let Ok(sprv) = &wgpu::read_spirv(vs) {
-                        Some(context.device.create_shader_module(sprv))
+            let frag_modified = std::fs::metadata(frag_path).unwrap().modified().unwrap();
+            let vert_modified = std::fs::metadata(vert_path).unwrap().modified().unwrap();
+
+            if frag_modified.gt(&self.shaders_loaded_at) || vert_modified.gt(&self.shaders_loaded_at) {
+                let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
+                    if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
+                        if let Ok(sprv) = &wgpu::read_spirv(vs) {
+                            Some(context.device.create_shader_module(sprv))
+                        } else {
+                            println!("Failed to create shader module");
+                            None
+                        }
                     } else {
-                        println!("Failed to create shader module");
+                        println!("Failed to recompile vertex shader");
                         None
                     }
                 } else {
-                    println!("Failed to recompile vertex shader");
+                    println!("Failed to read vertex shader");
                     None
-                }
-            } else {
-                println!("Failed to read vertex shader");
-                None
-            };
+                };
 
-            let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
-                println!("{}", data);
-                if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
-                    if let Ok(sprv) = &wgpu::read_spirv(fs) {
-                        Some(context.device.create_shader_module(sprv))
+                let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
+                    if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
+                        if let Ok(sprv) = &wgpu::read_spirv(fs) {
+                            Some(context.device.create_shader_module(sprv))
+                        } else {
+                            println!("Failed to create shader module");
+                            None
+                        }
                     } else {
-                        println!("Failed to create shader module");
+                        println!("Failed to recompile vertex shader");
                         None
                     }
                 } else {
-                    println!("Failed to recompile vertex shader");
+                    println!("Failed to read vertex shader");
                     None
-                }
-            } else {
-                println!("Failed to read vertex shader");
-                None
-            };
+                };
 
-            if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
-                context.recompile_pipeline(vsm, fsm);
+                if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
+                    println!("Recompiling shaders...");
+                    context.recompile_pipeline(vsm, fsm);
+                    self.shaders_loaded_at = SystemTime::now();
+                }
             }
         }
     }
@@ -412,21 +421,17 @@ impl<'a> System<'a> for AIFollowSystem {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, Destination>,
-        WriteStorage<'a, Orientation>,
         ReadStorage<'a, AIFollow>,
         ReadStorage<'a, Position>,
     );
 
-    fn run(&mut self, (ents, mut dest, mut orient, follow, pos): Self::SystemData) {
-        for (ent, mut orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
+    fn run(&mut self, (ents, mut dest, follow, pos): Self::SystemData) {
+        for (ent, follow, hunter) in (&ents, &follow, &pos).join() {
             if let Some(hunted) = pos.get(follow.target) {
                 let difference: Vector2<f32> = hunted.0 - hunter.0;
                 let distance = difference.magnitude();
                 if distance > follow.minimum_distance {
                     dest.insert(ent, Destination(hunted.0));
-                    if let Some(orientation) = orient {
-                        orientation.0 = cgmath::Deg::from(-difference.angle(Vector2::unit_y()));
-                    }
                 }
             }
         }
@@ -441,12 +446,13 @@ impl<'a> System<'a> for GoToDestinationSystem {
         ReadStorage<'a, Destination>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Orientation>,
         ReadStorage<'a, Speed>,
         ReadStorage<'a, Acceleration>,
     );
 
-    fn run(&mut self, (frame_time, dest, pos, mut vel, speed, acc): Self::SystemData) {
-        for (dest, hunter, vel, speed, accel) in (&dest, &pos, &mut vel, &speed, &acc).join() {
+    fn run(&mut self, (frame_time, dest, pos, mut vel, mut orient, speed, acc): Self::SystemData) {
+        for (dest, hunter, vel, orient, speed, accel) in (&dest, &pos, &mut vel, (&mut orient).maybe(), &speed, &acc).join() {
             let to_dest: Vector2<f32> = dest.0 - hunter.0;
             let direction = to_dest.normalize();
             let time_to_stop = speed.0 / accel.0;
@@ -454,6 +460,10 @@ impl<'a> System<'a> for GoToDestinationSystem {
             let target_velocity = direction * speed.0 * slowdown;
             let delta: Vector2<f32> = (target_velocity - vel.0);
             let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
+
+            if let Some(orientation) = orient {
+                orientation.0 = cgmath::Deg::from(-to_dest.angle(Vector2::unit_y()));
+            }
 
             if delta != Vector2::unit_x() * 0.0 {
                 vel.0 += delta.normalize() * velocity_change;
@@ -692,6 +702,7 @@ impl<'a> System<'a> for DunGenSystem {
                             TileType::Wall(None) => cube_idx,
                             TileType::Wall(Some(_)) => wall_idx,
                             TileType::Floor => floor_idx,
+                            TileType::Path => floor_idx,
                             TileType::LadderDown => stairs_down_idx,
                         },
                         match wall_type {
@@ -707,6 +718,7 @@ impl<'a> System<'a> for DunGenSystem {
                         },
                         match wall_type {
                             TileType::Nothing => graphics::Material::dark_stone(),
+                            TileType::Path => graphics::Material::glossy(Vector3::new(0.1, 0.1, 0.1)),
                             _ => graphics::Material::darkest_stone(),
                         },
                     );

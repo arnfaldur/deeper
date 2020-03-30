@@ -83,11 +83,12 @@ impl MouseState {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Key {
-    E,
-    S,
     D,
+    E,
     F,
+    H,
     L,
+    S,
     Space,
 }
 
@@ -100,11 +101,12 @@ impl InputState {
     pub fn new() -> Self {
 
         let mut keyboard =std::collections::HashMap::new();
-        keyboard.insert(Key::E, ButtonState::new());
-        keyboard.insert(Key::S, ButtonState::new());
         keyboard.insert(Key::D, ButtonState::new());
+        keyboard.insert(Key::E, ButtonState::new());
         keyboard.insert(Key::F, ButtonState::new());
+        keyboard.insert(Key::H, ButtonState::new());
         keyboard.insert(Key::L, ButtonState::new());
+        keyboard.insert(Key::S, ButtonState::new());
         keyboard.insert(Key::Space, ButtonState::new());
 
         Self {
@@ -139,11 +141,12 @@ impl InputState {
             KeyboardInput {input, ..} => {
                 if let Some(kc)  = input.virtual_keycode {
                     if let Some(key) = &match kc {
-                        VirtualKeyCode::E => Some(Key::E),
-                        VirtualKeyCode::S => Some(Key::S),
                         VirtualKeyCode::D => Some(Key::D),
+                        VirtualKeyCode::E => Some(Key::E),
                         VirtualKeyCode::F => Some(Key::F),
+                        VirtualKeyCode::H => Some(Key::H),
                         VirtualKeyCode::L => Some(Key::L),
+                        VirtualKeyCode::S => Some(Key::S),
                         VirtualKeyCode::Space => Some(Key::Space),
                         _ => None,
                     } {

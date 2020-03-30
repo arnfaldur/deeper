@@ -273,6 +273,7 @@ impl Model3D {
 pub enum TileType {
     Wall(Option<WallDirection>),
     Floor,
+    Path,
     Nothing,
     LadderDown,
 }

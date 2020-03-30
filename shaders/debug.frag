@@ -133,7 +133,7 @@ float fDistributionGGX(vec3 N, vec3 H, float roughness) {
 
 float fGeometrySchlickGGX(float NdotV, float roughness) {
     float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
+    float k = (r*r) / 16.0;
 
     float num   = NdotV;
     float denom = NdotV * (1.0 - k) + k;
@@ -186,7 +186,7 @@ vec3 fLightFactor(vec3 normal, float distance, float radius, vec3 color, vec3 li
     float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
     vec3 specular = numerator / max(denominator, 0.001);
 
-    float specular_falloff = fLightFalloff(distance, radius, 2.0);
+    float specular_falloff = fLightFalloff(distance, radius, 5.0);
     float NdotL = max(dot(normal, lightDir), 0.0);
 
     return (kD * vec3(mat.albedo) / PI + specular_falloff * specular) * radiance * NdotL;
@@ -200,7 +200,7 @@ void main() {
 
     Material mat = material;
 
-    vec3 F_0 = vec3(0.02);
+    vec3 F_0 = vec3(0.1);
     F_0 = mix(F_0, vec3(mat.albedo), mat.metallic);
 
     vec3 Lo = vec3(0.0);
@@ -242,7 +242,7 @@ void main() {
     vec3 specular = numerator / max(denominator, 0.001);
 
     float NdotL = max(dot(normal, lightDir), 0.0);
-    color += (kD * vec3(mat.albedo) / PI + specular) * radiance * NdotL;
+    color += (kD * vec3(mat.albedo) / PI + specular) * NdotL * radiance;
 
 
     color = color / (color + vec3(1.0));
@@ -250,7 +250,7 @@ void main() {
 
     color = RGBtoHCY(color);
     color.z += 0.1;
-    color.z = contrast(1.5, color.z);
+    color.z = contrast(1.6, color.z);
     color = HCYtoRGB(color);
 
     o_Target = vec4(color, 0.2);
