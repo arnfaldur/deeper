@@ -99,9 +99,10 @@ impl<'a> System<'a> for GraphicsSystem {
         ReadStorage<'a, Orientation>,
         ReadStorage<'a, Model3D>,
         ReadStorage<'a, StaticModel>,
+        ReadStorage<'a, HitPoints>,
     );
 
-    fn run(&mut self, (mut context, ass_man, active_cam, camera, target, pos3d, pos, orient, models, static_model): Self::SystemData) {
+    fn run(&mut self, (mut context, ass_man, active_cam, camera, target, pos3d, pos, orient, models, static_model, hp): Self::SystemData) {
         let frame = context.swap_chain.get_next_texture().unwrap();
 
         let cam = camera.get(active_cam.0)
@@ -154,15 +155,25 @@ impl<'a> System<'a> for GraphicsSystem {
 
         let mut uniforms = vec!();
 
-        for (pos, model, rotation) in (&pos, &models, (&orient).maybe()).join() {
+        for (pos, model, rotation, hp) in (&pos, &models, (&orient).maybe(), (&hp).maybe()).join() {
             let mut matrix = Matrix4::from_scale(model.scale);
             if let Some(rot) = rotation {
-                matrix = Matrix4::from_angle_z(cgmath::Deg(rot.0)) * matrix;
+                matrix = Matrix4::from_angle_z(rot.0) * matrix;
             }
             matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
+
+            let bloody_red = Vector4::unit_x() + Vector4::unit_w();
+
+            let alb = Vector4::from(model.material.albedo);
+
+            let mut redder_mat: graphics::Material = model.material.clone();
+            if let Some(hp) = hp {
+                redder_mat.albedo = bloody_red.lerp(alb, hp.health / hp.max).into();
+            }
+
             let local_uniforms = graphics::LocalUniforms {
                 model_matrix: matrix.into(),
-                material: model.material,
+                material: redder_mat,
             };
             uniforms.push(local_uniforms);
         }
@@ -244,6 +255,8 @@ impl PlayerSystem {
 // Note(Jökull): Is this really just the input handler?
 impl<'a> System<'a> for PlayerSystem {
     type SystemData = (
+        Entities<'a>,
+        Read<'a, LazyUpdate>,
         ReadExpect<'a, InputState>,
         ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, Player>,
@@ -251,13 +264,14 @@ impl<'a> System<'a> for PlayerSystem {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Position3D>,
         ReadStorage<'a, Camera>,
+        ReadStorage<'a, Faction>,
+        ReadStorage<'a, HitPoints>,
         WriteStorage<'a, Orientation>,
-        WriteStorage<'a, Model3D>,
         WriteStorage<'a, Destination>,
         WriteStorage<'a, SphericalOffset>,
     );
 
-    fn run(&mut self, (input, context, player, player_cam, pos, pos3d, cam, mut orient, mut model, mut dest, mut offset): Self::SystemData) {
+    fn run(&mut self, (ents, updater, input, context, player, player_cam, pos, pos3d, cam, faction, hp, mut orient, mut dest, mut offset): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
@@ -306,35 +320,67 @@ impl<'a> System<'a> for PlayerSystem {
 
                 let difference: Vector2<f32> = (ray_hit - player_pos.0).normalize();
 
-                let model = model.get_mut(player.entity).unwrap();
                 let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
                 if difference.x > 0.0 {
                     new_rotation += 180.0;
                 }
-                player_orient.0 = new_rotation;
-                model.z_rotation = new_rotation;
+                (player_orient.0).0 = new_rotation;
+            }
+        }
+        if input.is_key_pressed(Key::Space) {
+            for (ent, pos, &HitPoints { max, health }, &faction) in (&ents, &pos, &hp, &faction).join() {
+                if faction == Faction::Enemies && pos.0.distance(player_pos.0) < 2.0
+                    && cgmath::Basis2::<f32>::from_angle(player_orient.0).rotate_vector(-Vector2::unit_x()).dot(pos.0 - player_pos.0) > 0.0 {
+                    updater.insert(ent, HitPoints { max, health: (health - 1.0).max(0.0) });
+                }
             }
         }
     }
 }
 
-pub(crate) struct AIFollowSystem;
+pub struct HitPointRegenSystem;
+impl<'a> System<'a> for HitPointRegenSystem {
+    type SystemData = (
+        Entities<'a>,
+        ReadExpect<'a, FrameTime>,
+        WriteStorage<'a, HitPoints>,
+        Read<'a, LazyUpdate>,
+    );
+
+    fn run(&mut self, (ents, frame_time, mut hp, updater): Self::SystemData) {
+        for (ent, hp) in (&ents, &mut hp).join() {
+            if hp.health <= 0.0 {
+                updater.remove::<AIFollow>(ent);
+                updater.remove::<Destination>(ent);
+            } else {
+                hp.health += 1.337 * frame_time.0;
+                hp.health = hp.max.min(hp.health);
+            }
+        }
+    }
+}
+
+pub struct AIFollowSystem;
 
 impl<'a> System<'a> for AIFollowSystem {
     type SystemData = (
         Entities<'a>,
+        WriteStorage<'a, Destination>,
+        WriteStorage<'a, Orientation>,
         ReadStorage<'a, AIFollow>,
         ReadStorage<'a, Position>,
-        WriteStorage<'a, Destination>,
     );
 
-    fn run(&mut self, (ents, follow, pos, mut dest): Self::SystemData) {
-        for (ent, follow, hunter) in (&ents, &follow, &pos).join() {
+    fn run(&mut self, (ents, mut dest, mut orient, follow, pos): Self::SystemData) {
+        for (ent, mut orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
             if let Some(hunted) = pos.get(follow.target) {
-                let difference = hunted.0 - hunter.0;
+                let difference: Vector2<f32> = hunted.0 - hunter.0;
                 let distance = difference.magnitude();
                 if distance > follow.minimum_distance {
                     dest.insert(ent, Destination(hunted.0));
+                    if let Some(orientation) = orient {
+                        orientation.0 = cgmath::Deg::from(-difference.angle(Vector2::unit_y()));
+                    }
                 }
             }
         }
@@ -480,7 +526,7 @@ impl<'a> System<'a> for MapSwitchingSystem {
     }
 }
 
-use self::cgmath::{Matrix4, Vector4};
+use self::cgmath::{Matrix4, Vector4, Deg};
 use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
 use crate::dung_gen::DungGen;
 use rand::{thread_rng, Rng};
@@ -496,16 +542,16 @@ impl<'a> System<'a> for DunGenSystem {
         ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, loader::AssetManager>,
         ReadExpect<'a, Player>,
+        WriteExpect<'a, i64>,
         Entities<'a>,
         ReadStorage<'a, TileType>,
         ReadStorage<'a, Faction>,
         Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut trans, context, ass_man, player, mut ents, tile, factions, updater): Self::SystemData) {
+    fn run(&mut self, (mut trans, context, ass_man, player, mut floor, mut ents, tile, factions, updater): Self::SystemData) {
         match *trans {
             MapTransition::Deeper => {
-                println!("Making the map! {}", random::<u64>());
                 for (ent, _) in (&ents, &tile).join() {
                     ents.delete(ent);
                 }
@@ -514,6 +560,8 @@ impl<'a> System<'a> for DunGenSystem {
                         ents.delete(ent);
                     }
                 }
+                *floor += 1;
+                println!("You have reached floor {}", *floor);
                 let dungeon = DungGen::new()
                     .width(60)
                     .height(60)
@@ -522,13 +570,20 @@ impl<'a> System<'a> for DunGenSystem {
                     .room_range(5)
                     .generate();
 
-                let player_start = dungeon
-                    .room_centers[0]
-                    //.choose(&mut rand::thread_rng())
-                    //.unwrap()
-                    .clone();
+                let mut rng = thread_rng();
+                let player_start = {
+                    let (x, y) = dungeon
+                        .room_centers
+                        .choose(&mut rand::thread_rng()).unwrap()
+                        .clone();
+                    (x + rng.gen_range(-2, 2), y + rng.gen_range(-2, 2))
+                };
 
-                updater.insert(player.entity, Position(Vector2::new((player_start.0 + 2) as f32, player_start.1 as f32)));
+
+                // Reset player position and stuff
+                updater.insert(player.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
+                updater.insert(player.entity, Orientation(Deg(0.0)));
+                updater.insert(player.entity, Velocity::new());
 
                 let mut init_encoder = context.device.create_command_encoder(
                     &wgpu::CommandEncoderDescriptor { todo: 0 }
@@ -568,41 +623,9 @@ impl<'a> System<'a> for DunGenSystem {
                 context.queue.submit(&[command_buffer]);
                 // End graphics shit
 
-                // Reset player position and stuff
-                updater.insert(player.entity, Orientation(0.0));
-                updater.insert(player.entity, Velocity::new());
-
-                let mut rng = thread_rng();
-                for _enemy in 0..128 {
-                    let rad = rng.gen_range(0.1, 0.5);
-                    let enemy = ents.create();
-                    updater.insert(enemy, Position(Vector2::new(
-                        player_start.0 as f32 + rng.gen_range(0., 32.),
-                        player_start.1 as f32 + rng.gen_range(0., 32.),
-                    )));
-                    updater.insert(enemy, Speed(rng.gen_range(1., 2.)));
-                    updater.insert(enemy, Acceleration(rng.gen_range(3., 6.)));
-                    updater.insert(enemy, Orientation(0.0));
-                    updater.insert(enemy, Velocity::new());
-                    updater.insert(enemy, DynamicBody);
-                    updater.insert(enemy, CircleCollider { radius: rad });
-                    updater.insert(enemy, AIFollow {
-                        target: player.entity,
-                        minimum_distance: 2.0 + rad,
-                    });
-                    updater.insert(enemy, Faction::Enemies);
-                    updater.insert(enemy,
-                                   Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
-                                       .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
-                                       .with_scale(rad));
-                }
-
                 for (&(x, y), &wall_type) in dungeon.world.iter() {
                     let pos = Vector2::new(x as f32, y as f32);
                     let pos3d = Vector3::new(x as f32, y as f32, 0.0);
-
-                    let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
-                    let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
 
                     let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_idx) = {
                         (
@@ -642,9 +665,7 @@ impl<'a> System<'a> for DunGenSystem {
                     updater.insert(entity, model);
                     updater.insert(entity, wall_type);
                     match wall_type {
-                        TileType::Nothing => {
-                            // .with(Position(pos)) ?
-                        }
+                        TileType::Nothing => {}
                         _ => {
                             updater.insert(entity, Position(pos));
                         }
@@ -659,130 +680,33 @@ impl<'a> System<'a> for DunGenSystem {
                         }
                         _ => {}
                     }
+                    if TileType::Floor == wall_type && rng.gen_bool(((*floor - 1) as f64 * 0.05 + 1.).log2() as f64) {
+                        let rad = rng.gen_range(0.1, 0.5);
+                        let enemy = ents.create();
+                        updater.insert(enemy, Position(pos));
+                        updater.insert(enemy, Speed(rng.gen_range(1., 3.)));
+                        updater.insert(enemy, Acceleration(rng.gen_range(3., 9.)));
+                        updater.insert(enemy, Orientation(Deg(0.0)));
+                        updater.insert(enemy, Velocity::new());
+                        updater.insert(enemy, DynamicBody);
+                        updater.insert(enemy, CircleCollider { radius: rad });
+                        updater.insert(enemy, AIFollow {
+                            target: player.entity,
+                            minimum_distance: 2.0 + rad,
+                        });
+                        updater.insert(enemy, Faction::Enemies);
+                        updater.insert(enemy, HitPoints { max: rng.gen_range(2.,5.), health: rng.gen_range(2.,5.) });
+                        updater.insert(enemy,
+                                       Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
+                                           .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
+                                           .with_scale(rad * 1.7));
+                    }
                 };
+
+                for _enemy in 0..128 {}
             }
             _ => {}
         }
         *trans = MapTransition::None;
     }
-
-//fn setup(&mut self, world: &mut World) {
-//    for (&(x, y), &wall_type) in self.dungeon.world.iter() {
-//        let pos = Vector2::new(x as f32, y as f32);
-//        let pos3d = Vector3::new(x as f32, y as f32, 0.0);
-
-//        let DARK_GRAY = Vector3::new(0.1, 0.1, 0.1);
-//        let LIGHT_GRAY = Vector3::new(0.2, 0.2, 0.2);
-
-//        let (cube_idx, plane_idx, wall_idx, stairs_down_idx) = {
-//            let ass_man = world.read_resource::<loader::AssetManager>();
-//            (
-//                ass_man.get_model_index("cube.obj").unwrap(),
-//                ass_man.get_model_index("plane.obj").unwrap(),
-//                ass_man.get_model_index("Wall.obj").unwrap(),
-//                ass_man.get_model_index("StairsDown.obj").unwrap(),
-//            )
-//        };
-
-//        match wall_type {
-//            TileType::Nothing => {
-//                let model = {
-//                    let context = world.read_resource::<graphics::Context>();
-//                    StaticModel::new(
-//                        &context,
-//                        plane_idx,
-//                        Vector3::new(x as f32, y as f32, 1.0),
-//                        1.0,
-//                        0.0,
-//                        DARK_GRAY,
-//                    )
-//                };
-//                world
-//                    .create_entity()
-//                    // .with(Position(pos)) ?
-//                    .with(model)
-//                    .build();
-//            }
-//            TileType::Floor => {
-//                let model = {
-//                    let context = world.read_resource::<graphics::Context>();
-//                    StaticModel::new(
-//                        &context,
-//                        plane_idx,
-//                        pos3d,
-//                        1.0,
-//                        0.0,
-//                        DARK_GRAY,
-//                    )
-//                };
-//                world
-//                    .create_entity()
-//                    .with(Position(pos))
-//                    .with(FloorTile)
-//                    .with(model)
-//                    .build();
-//            }
-//            TileType::Wall(maybe_direction) => {
-//                let dir = match maybe_direction {
-//                    Some(WallDirection::South) => 180.0,
-//                    Some(WallDirection::East) => 270.0,
-//                    Some(WallDirection::West) => 90.0,
-//                    _ => 0.0,
-//                };
-//                let model = {
-//                    let context = world.read_resource::<graphics::Context>();
-//                    match maybe_direction {
-//                        None => StaticModel::new(
-//                            &context,
-//                            cube_idx,
-//                            pos3d,
-//                            1.0,
-//                            0.0,
-//                            LIGHT_GRAY,
-//                        ),
-//                        Some(_) => StaticModel::new(
-//                            &context,
-//                            wall_idx,
-//                            pos3d,
-//                            1.0,
-//                            dir,
-//                            DARK_GRAY,
-//                        ),
-//                    }
-//                };
-//                world
-//                    .create_entity()
-//                    .with(Position(pos))
-//                    .with(WallTile)
-//                    .with(model)
-//                    .with(Orientation(dir))
-//                    .with(StaticBody)
-//                    //.with(CircleCollider { radius: 0.5 })
-//                    .with(SquareCollider { side_length: 1.0 })
-//                    .build();
-//            }
-//            TileType::LadderDown => {
-//                let model = {
-//                    let context = world.read_resource::<graphics::Context>();
-//                    StaticModel::new(
-//                        &context,
-//                        stairs_down_idx,
-//                        pos3d,
-//                        1.0,
-//                        0.0,
-//                        DARK_GRAY,
-//                    )
-//                };
-//                world
-//                    .create_entity()
-//                    .with(Position(pos))
-//                    .with(FloorTile)
-//                    .with(model)
-//                    .with(MapSwitcher(MapTransition::Deeper))
-//                    .build();
-//            }
-//            TileType::LadderUp => (),
-//        }
-//    };
-//}
 }

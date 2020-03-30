@@ -26,7 +26,7 @@ use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 use std::{mem, slice};
 use crate::graphics::{Vertex, Model, Mesh};
 use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor, CommandEncoder};
-use cgmath::{Vector2, Vector3};
+use cgmath::{Vector2, Vector3, Deg};
 
 use zerocopy::AsBytes;
 use crate::input::{EventBucket, InputState};
@@ -64,6 +64,7 @@ async fn run_async() {
     let mut dispatcher = DispatcherBuilder::new()
         .with(HotLoaderSystem::new(), "HotLoader", &[])
         .with(PlayerSystem::new(), "Player", &[])
+        .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
         .with(AIFollowSystem, "AIFollow", &[])
         .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
         .with(Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
@@ -85,8 +86,8 @@ async fn run_async() {
         .create_entity()
         .with(Position(Vector2::unit_x()))
         .with(Speed(5.))
-        .with(Acceleration(20.))
-        .with(Orientation(0.0))
+        .with(Acceleration(30.))
+        .with(Orientation(Deg(0.0)))
         .with(Velocity::new())
         .with(DynamicBody)
         .with(CircleCollider { radius: 0.3 })
@@ -112,6 +113,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
+    world.insert(0 as i64);
 
     let input_state = InputState::new();
     world.insert(input_state);

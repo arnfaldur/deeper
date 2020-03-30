@@ -298,7 +298,6 @@ impl DungGen {
 
         let mut rng = thread_rng();
         let ladder_loc = rng.gen_range(0, self.room_centers.len());
-        let ladder_loc = 0;
         self.world.insert(self.room_centers[ladder_loc], TileType::LadderDown);
 
         return self;

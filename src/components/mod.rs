@@ -12,7 +12,7 @@ use specs::{Component, VecStorage};
 use std::f32::consts::PI;
 use crate::graphics;
 use crate::graphics::LocalUniforms;
-use self::cgmath::Matrix4;
+use self::cgmath::{Matrix4, Deg};
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -55,7 +55,7 @@ impl Velocity {
 }
 
 #[derive(Component)]
-pub struct Orientation(pub f32);
+pub struct Orientation(pub Deg<f32>);
 
 #[derive(Component)]
 pub struct Speed(pub f32);
@@ -89,13 +89,19 @@ pub struct AIFollow {
 }
 
 #[derive(Component)]
+pub struct Destination(pub Vector2<f32>);
+
+#[derive(Component, Eq, PartialEq, Copy, Clone)]
 pub enum Faction {
     Enemies,
     Friends,
 }
 
 #[derive(Component)]
-pub struct Destination(pub Vector2<f32>);
+pub struct HitPoints {
+    pub max: f32,
+    pub health: f32,
+}
 
 #[derive(Copy, Clone)]
 pub enum MapTransition {
@@ -300,4 +306,5 @@ pub fn register_components(world: &mut World) {
     world.register::<Destination>();
     world.register::<MapSwitcher>();
     world.register::<Faction>();
+    world.register::<HitPoints>();
 }
