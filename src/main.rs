@@ -60,6 +60,10 @@ async fn run_async() {
 
     use std::path::Path;
 
+    use rg3d_sound::context::Context as AudioContext;
+
+    let ac = AudioContext::new().unwrap();
+
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(DunGenSystem, "DunGenSystem", &[])

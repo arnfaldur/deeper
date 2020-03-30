@@ -220,8 +220,6 @@ void main() {
             F_0,
             mat
         );
-
-        //finalColor += fPointLightFactor(uPointLights[i], vec4(normal, 0.0), mat);
     }
 
     vec3 ambient = uDirectionalLight.ambient.rgb * vec3(mat.albedo);
@@ -250,17 +248,10 @@ void main() {
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
 
-    //finalColor += fDirectionalLightFactor(uDirectionalLight, vec4(normal, 0.0), mat);
-
-    //float brightness = length(color) / length(vec3(1.0));
-    //color = contrast(0.0, brightness) * normalize(color) * length(vec3(1.0));
-    //finalColor += fPointLightFactor(uPointLights[0], normal, mat);
-
     color = RGBtoHCY(color);
     color.z += 0.1;
     color.z = contrast(1.5, color.z);
     color = HCYtoRGB(color);
 
-    o_Target = vec4(color, 1.0);
-    // o_Target = vec4(vec3(mat.roughness), 1.0);
+    o_Target = vec4(color, 0.2);
 }

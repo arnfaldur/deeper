@@ -68,6 +68,9 @@ impl HotLoaderSystem {
     }
 }
 
+const FRAG_SRC: &str = include_str!("../../shaders/debug.frag");
+const VERT_SRC: &str = include_str!("../../shaders/debug.vert");
+
 impl<'a> System<'a> for HotLoaderSystem {
     type SystemData = (
         WriteExpect<'a, loader::AssetManager>,
@@ -82,9 +85,9 @@ impl<'a> System<'a> for HotLoaderSystem {
             ass_man.load_models(&context);
 
             let frag_path = Path::new("shaders/debug.frag");
-            let vert_path = Path::new("shaders/debug.frag");
+            let vert_path = Path::new("shaders/debug.vert");
 
-            let vs_module = if let Ok(data) = std::fs::read_to_string(vert_path) {
+            let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
                 if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
                     if let Ok(sprv) = &wgpu::read_spirv(vs) {
                         Some(context.device.create_shader_module(sprv))
@@ -101,7 +104,8 @@ impl<'a> System<'a> for HotLoaderSystem {
                 None
             };
 
-            let fs_module = if let Ok(data) = std::fs::read_to_string(frag_path) {
+            let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
+                println!("{}", data);
                 if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
                     if let Ok(sprv) = &wgpu::read_spirv(fs) {
                         Some(context.device.create_shader_module(sprv))
@@ -118,7 +122,7 @@ impl<'a> System<'a> for HotLoaderSystem {
                 None
             };
 
-            if let (Some(vsm), Some(fsm)) = (vs_module, fs_module) {
+            if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
                 context.recompile_pipeline(vsm, fsm);
             }
         }
@@ -577,15 +581,15 @@ impl<'a> System<'a> for DunGenSystem {
                 lights.directional_light = graphics::DirectionalLight {
                     direction: [1.0, 0.8, 0.8, 0.0],
                     ambient: [0.01, 0.015, 0.02, 1.0],
-                    color: [0.1, 0.1, 0.2, 1.0],
+                    color: [0.02, 0.025, 0.05, 1.0],
                 };
 
                 for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
                     if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
                     lights.point_lights[i] = Default::default();
-                    lights.point_lights[i].radius = 30.0;
+                    lights.point_lights[i].radius = 10.0;
                     lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
-                    lights.point_lights[i].color = [1.0, 0.4, 0.1, 1.0];
+                    lights.point_lights[i].color = [2.0, 1.0, 0.1, 1.0];
                 }
 
                 let temp_buf = context.device.create_buffer_with_data(

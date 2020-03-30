@@ -315,7 +315,11 @@ impl Context {
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: COLOR_FORMAT,
-                alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                alpha_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcColor,
+                    dst_factor: wgpu::BlendFactor::DstColor,
+                    operation: wgpu::BlendOperation::Add,
+                },
                 color_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
