@@ -249,7 +249,7 @@ void main() {
     color = pow(color, vec3(1.0/2.2));
 
     color = RGBtoHCY(color);
-    color.z += 0.1;
+    color.z += 0.112;
     color.z = contrast(1.6, color.z);
     color = HCYtoRGB(color);
 

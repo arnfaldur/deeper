@@ -421,17 +421,21 @@ impl<'a> System<'a> for AIFollowSystem {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, Destination>,
+        WriteStorage<'a, Orientation>,
         ReadStorage<'a, AIFollow>,
         ReadStorage<'a, Position>,
     );
 
-    fn run(&mut self, (ents, mut dest, follow, pos): Self::SystemData) {
-        for (ent, follow, hunter) in (&ents, &follow, &pos).join() {
+    fn run(&mut self, (ents, mut dest, mut orient, follow, pos): Self::SystemData) {
+        for (ent, mut orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
             if let Some(hunted) = pos.get(follow.target) {
                 let difference: Vector2<f32> = hunted.0 - hunter.0;
                 let distance = difference.magnitude();
                 if distance > follow.minimum_distance {
                     dest.insert(ent, Destination(hunted.0));
+                    if let Some(orientation) = orient {
+                        orientation.0 = cgmath::Deg::from(-difference.angle(Vector2::unit_y()));
+                    }
                 }
             }
         }
@@ -446,13 +450,12 @@ impl<'a> System<'a> for GoToDestinationSystem {
         ReadStorage<'a, Destination>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
-        WriteStorage<'a, Orientation>,
         ReadStorage<'a, Speed>,
         ReadStorage<'a, Acceleration>,
     );
 
-    fn run(&mut self, (frame_time, dest, pos, mut vel, mut orient, speed, acc): Self::SystemData) {
-        for (dest, hunter, vel, orient, speed, accel) in (&dest, &pos, &mut vel, (&mut orient).maybe(), &speed, &acc).join() {
+    fn run(&mut self, (frame_time, dest, pos, mut vel, speed, acc): Self::SystemData) {
+        for (dest, hunter, vel, speed, accel) in (&dest, &pos, &mut vel, &speed, &acc).join() {
             let to_dest: Vector2<f32> = dest.0 - hunter.0;
             let direction = to_dest.normalize();
             let time_to_stop = speed.0 / accel.0;
@@ -460,10 +463,6 @@ impl<'a> System<'a> for GoToDestinationSystem {
             let target_velocity = direction * speed.0 * slowdown;
             let delta: Vector2<f32> = (target_velocity - vel.0);
             let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
-
-            if let Some(orientation) = orient {
-                orientation.0 = cgmath::Deg::from(-to_dest.angle(Vector2::unit_y()));
-            }
 
             if delta != Vector2::unit_x() * 0.0 {
                 vel.0 += delta.normalize() * velocity_change;
