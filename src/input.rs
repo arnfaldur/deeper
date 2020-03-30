@@ -88,6 +88,7 @@ pub enum Key {
     D,
     F,
     L,
+    Space,
 }
 
 pub struct InputState {
@@ -104,6 +105,7 @@ impl InputState {
         keyboard.insert(Key::D, ButtonState::new());
         keyboard.insert(Key::F, ButtonState::new());
         keyboard.insert(Key::L, ButtonState::new());
+        keyboard.insert(Key::Space, ButtonState::new());
 
         Self {
             mouse: MouseState::new(),
@@ -142,6 +144,7 @@ impl InputState {
                         VirtualKeyCode::D => Some(Key::D),
                         VirtualKeyCode::F => Some(Key::F),
                         VirtualKeyCode::L => Some(Key::L),
+                        VirtualKeyCode::Space => Some(Key::Space),
                         _ => None,
                     } {
                         let state = self.keyboard.get_mut(key).unwrap();

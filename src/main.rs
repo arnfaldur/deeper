@@ -26,7 +26,7 @@ use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 use std::{mem, slice};
 use crate::graphics::{Vertex, Model, Mesh};
 use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor, CommandEncoder};
-use cgmath::{Vector2, Vector3};
+use cgmath::{Vector2, Vector3, Deg};
 
 use zerocopy::AsBytes;
 use crate::input::{EventBucket, InputState};
@@ -66,31 +66,32 @@ async fn run_async() {
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
-        .with(DunGenSystem, "DunGenSystem", &[])
-        .with(HotLoaderSystem::new(), "HotLoaderSystem", &[])
-        .with(PlayerSystem::new(), "PlayerSystem", &[])
-        .with(AIFollowSystem, "AIFollowSystem", &[])
-        .with(GoToDestinationSystem, "GoToDestinationSystem", &["AIFollowSystem"])
-        .with(Physics2DSystem, "Physics2DSystem", &["GoToDestinationSystem", "PlayerSystem", "AIFollowSystem"])
+        .with(HotLoaderSystem::new(), "HotLoader", &[])
+        .with(PlayerSystem::new(), "Player", &[])
+        .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
+        .with(AIFollowSystem, "AIFollow", &[])
+        .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
+        .with(Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
         .with(
             MovementSystem,
-            "MovementSystem",
-            &["Physics2DSystem", "PlayerSystem"],
+            "Movement",
+            &["Physics2D", "Player"],
         )
         .with(
             SphericalFollowSystem,
-            "SphericalFollowSystem",
-            &["MovementSystem"],
+            "SphericalFollow",
+            &["Movement"],
         )
-        .with(MapSwitchingSystem, "MapSwitchingSystem", &["MovementSystem"])
-        .with_thread_local(GraphicsSystem).build();
+        .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
+        .with(DunGenSystem, "DunGen", &["MapSwitching"])
+        .with(GraphicsSystem, "Graphics", &[]).build();
 
     let player = world
         .create_entity()
         .with(Position(Vector2::unit_x()))
         .with(Speed(5.))
-        .with(Acceleration(20.))
-        .with(Orientation(0.0))
+        .with(Acceleration(30.))
+        .with(Orientation(Deg(0.0)))
         .with(Velocity::new())
         .with(DynamicBody)
         .with(CircleCollider { radius: 0.3 })
@@ -116,6 +117,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
+    world.insert(0 as i64);
 
     let input_state = InputState::new();
     world.insert(input_state);
