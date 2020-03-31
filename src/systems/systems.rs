@@ -370,7 +370,7 @@ impl<'a> System<'a> for PlayerSystem {
             ) {
                 let ray_delta: Vector3<f32> = mouse_world_pos - camera_pos.0;
                 let t: f32 = mouse_world_pos.z / ray_delta.z;
-                let ray_hit = to_vec2(mouse_world_pos - ray_delta * t);
+                let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
 
                 dest.insert(player.entity, Destination(ray_hit));
 
@@ -389,7 +389,7 @@ impl<'a> System<'a> for PlayerSystem {
                 let in_frontness = (pos.0 - player_pos.0).normalize().dot(forward_vector.normalize());
                 if faction == Faction::Enemies && pos.0.distance(player_pos.0) < 2.0 && in_frontness > 0.5 {
                     updater.insert(ent, HitPoints { max, health: (health - 1.0).max(0.0) });
-                    updater.insert(ent, Velocity((pos.0 - player_pos.0).normalize() * 1. / dynamic.0));
+                    updater.insert(ent, Velocity((pos.0 - player_pos.0).normalize() * 1.5 / dynamic.0));
                 }
             }
         }
@@ -412,7 +412,7 @@ impl<'a> System<'a> for HitPointRegenSystem {
                 updater.remove::<AIFollow>(ent);
                 updater.remove::<Destination>(ent);
             } else {
-                hp.health += 0.337 * frame_time.0;
+                hp.health += 0.7654321 * frame_time.0;
                 hp.health = hp.max.min(hp.health);
             }
         }

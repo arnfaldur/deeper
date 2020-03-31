@@ -40,7 +40,6 @@ pub struct FrameTime(pub f32);
 pub struct Position(pub Vector2<f32>);
 
 impl Position {
-    pub fn new() -> Position { Position(Vector2::new(0.0, 0.0)) }
     pub fn to_vec3(self) -> Vector3<f32> {
         Vector3::new(self.0.x, self.0.y, 0.0)
     }
