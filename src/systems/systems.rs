@@ -23,7 +23,9 @@ impl<'a> System<'a> for MovementSystem {
 
     fn run(&mut self, (frame_time, mut pos, vel): Self::SystemData) {
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.0 += vel.0 * frame_time.0;
+            if vel.0.x.is_finite() && vel.0.y.is_finite() && (vel.0 * frame_time.0).magnitude() < 0.5 {
+                pos.0 += vel.0 * frame_time.0;
+            }
         }
     }
 }
@@ -257,6 +259,10 @@ impl<'a> System<'a> for PlayerSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, LazyUpdate>,
+        WriteStorage<'a, Orientation>,
+        WriteStorage<'a, Destination>,
+        WriteStorage<'a, SphericalOffset>,
+        WriteStorage<'a, Velocity>,
         ReadExpect<'a, InputState>,
         ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, Player>,
@@ -266,26 +272,24 @@ impl<'a> System<'a> for PlayerSystem {
         ReadStorage<'a, Camera>,
         ReadStorage<'a, Faction>,
         ReadStorage<'a, HitPoints>,
-        WriteStorage<'a, Orientation>,
-        WriteStorage<'a, Destination>,
-        WriteStorage<'a, SphericalOffset>,
+        ReadStorage<'a, DynamicBody>,
     );
 
-    fn run(&mut self, (ents, updater, input, context, player, player_cam, pos, pos3d, cam, faction, hp, mut orient, mut dest, mut offset): Self::SystemData) {
+    fn run(&mut self, (ents, updater, mut orient, mut dest, mut offset, mut vel, input, context, player, player_cam, pos, pos3d, cam, faction, hp, dynamic): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
 
-        //let mouse_delta = rl.get_mouse_position() - self.last_mouse_pos;
         let mouse_pos = input.mouse.pos;
-        let mouse_delta = input.mouse.pos - self.last_mouse_pos;
-        self.last_mouse_pos = input.mouse.pos;
+        //let mouse_delta = input.mouse.pos - self.last_mouse_pos;
+        //self.last_mouse_pos = input.mouse.pos;
 
-        if input.mouse.middle.down {
-            camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
-            camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
-            camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
-        }
+        // camera orbiting system disabled for now
+        //if input.mouse.middle.down {
+        //    camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
+        //    camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
+        //    camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
+        //}
 
         let player_pos = pos.get(player.entity)
             .expect("I have no place in this world.");
@@ -328,10 +332,12 @@ impl<'a> System<'a> for PlayerSystem {
             }
         }
         if input.is_key_pressed(Key::Space) {
-            for (ent, pos, &HitPoints { max, health }, &faction) in (&ents, &pos, &hp, &faction).join() {
-                if faction == Faction::Enemies && pos.0.distance(player_pos.0) < 2.0
-                    && cgmath::Basis2::<f32>::from_angle(player_orient.0).rotate_vector(-Vector2::unit_x()).dot(pos.0 - player_pos.0) > 0.0 {
+            for (ent, pos, &HitPoints { max, health }, &faction, dynamic) in (&ents, &pos, &hp, &faction, &dynamic).join() {
+                let forward_vector = cgmath::Basis2::<f32>::from_angle(player_orient.0).rotate_vector(-Vector2::unit_x());
+                let in_frontness = (pos.0 - player_pos.0).normalize().dot(forward_vector.normalize());
+                if faction == Faction::Enemies && pos.0.distance(player_pos.0) < 2.0 && in_frontness > 0.5 {
                     updater.insert(ent, HitPoints { max, health: (health - 1.0).max(0.0) });
+                    updater.insert(ent, Velocity((pos.0 - player_pos.0).normalize() * 1. / dynamic.0));
                 }
             }
         }
@@ -339,6 +345,7 @@ impl<'a> System<'a> for PlayerSystem {
 }
 
 pub struct HitPointRegenSystem;
+
 impl<'a> System<'a> for HitPointRegenSystem {
     type SystemData = (
         Entities<'a>,
@@ -353,7 +360,7 @@ impl<'a> System<'a> for HitPointRegenSystem {
                 updater.remove::<AIFollow>(ent);
                 updater.remove::<Destination>(ent);
             } else {
-                hp.health += 1.337 * frame_time.0;
+                hp.health += 0.337 * frame_time.0;
                 hp.health = hp.max.min(hp.health);
             }
         }
@@ -438,8 +445,12 @@ impl<'a> System<'a> for Physics2DSystem {
         for _ in (&dynamics, !&vel).join() {
             panic!("A dynamic entity has no velocity!");
         }
-        for (ent_a, _, pos_a, circle_a) in (&ents, &dynamics, &pos, &circles).join() {
-            for (ent_b, _, pos_b, circle_b) in (&ents, &dynamics, &pos, &circles).join() {
+        let damping = 4.0;
+        for (_, vel) in (&dynamics, &mut vel).join() {
+            vel.0 *= 1. - (damping * frame_time.0).min(1.);
+        }
+        for (ent_a, dyn_a, pos_a, circle_a) in (&ents, &dynamics, &pos, &circles).join() {
+            for (ent_b, dyn_b, pos_b, circle_b) in (&ents, &dynamics, &pos, &circles).join() {
                 if ent_a != ent_b {
                     let collision_distance = circle_a.radius + circle_b.radius;
 
@@ -681,29 +692,30 @@ impl<'a> System<'a> for DunGenSystem {
                         _ => {}
                     }
                     if TileType::Floor == wall_type && rng.gen_bool(((*floor - 1) as f64 * 0.05 + 1.).log2() as f64) {
-                        let rad = rng.gen_range(0.1, 0.5);
+                        let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
                         let enemy = ents.create();
-                        updater.insert(enemy, Position(pos));
-                        updater.insert(enemy, Speed(rng.gen_range(1., 3.)));
-                        updater.insert(enemy, Acceleration(rng.gen_range(3., 9.)));
+                        updater.insert(enemy, Position(pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3))));
+                        updater.insert(enemy, Speed(rng.gen_range(1., 4.) - 1.6 * rad));
+                        updater.insert(enemy, Acceleration(rng.gen_range(3., 9.) + 2.0 * rad));
                         updater.insert(enemy, Orientation(Deg(0.0)));
                         updater.insert(enemy, Velocity::new());
-                        updater.insert(enemy, DynamicBody);
+                        updater.insert(enemy, DynamicBody(rad));
                         updater.insert(enemy, CircleCollider { radius: rad });
                         updater.insert(enemy, AIFollow {
                             target: player.entity,
                             minimum_distance: 2.0 + rad,
                         });
                         updater.insert(enemy, Faction::Enemies);
-                        updater.insert(enemy, HitPoints { max: rng.gen_range(2.,5.), health: rng.gen_range(2.,5.) });
+                        updater.insert(enemy, HitPoints {
+                            max: rng.gen_range(0., 2.) + 8. * rad,
+                            health: rng.gen_range(0., 2.) + 8. * rad,
+                        });
                         updater.insert(enemy,
                                        Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
                                            .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
                                            .with_scale(rad * 1.7));
                     }
                 };
-
-                for _enemy in 0..128 {}
             }
             _ => {}
         }
