@@ -13,7 +13,7 @@ mod components;
 mod systems;
 
 use crate::components::*;
-use crate::systems::systems::*;
+use crate::systems::*;
 
 use std::f32::consts::PI;
 use rand::seq::SliceRandom;
