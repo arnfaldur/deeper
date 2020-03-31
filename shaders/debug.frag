@@ -48,6 +48,7 @@ layout(set = 1, binding = 0) uniform Locals {
 
 // The following color space functions are from
 // http://www.chilliant.com/rgb2hsv.html
+
 const float Epsilon = 1e-10;
 const vec3 HCYwts = vec3(0.299, 0.587, 0.114);
 
@@ -186,7 +187,7 @@ vec3 fLightFactor(vec3 normal, float distance, float radius, vec3 color, vec3 li
     float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
     vec3 specular = numerator / max(denominator, 0.001);
 
-    float specular_falloff = fLightFalloff(distance, radius, 5.0);
+    float specular_falloff = fLightFalloff(distance, radius, 4.0);
     float NdotL = max(dot(normal, lightDir), 0.0);
 
     return (kD * vec3(mat.albedo) / PI + specular_falloff * specular) * radiance * NdotL;
@@ -200,7 +201,7 @@ void main() {
 
     Material mat = material;
 
-    vec3 F_0 = vec3(0.1);
+    vec3 F_0 = vec3(0.2);
     F_0 = mix(F_0, vec3(mat.albedo), mat.metallic);
 
     vec3 Lo = vec3(0.0);
@@ -225,7 +226,7 @@ void main() {
     vec3 ambient = uDirectionalLight.ambient.rgb * vec3(mat.albedo);
     vec3 color = ambient + Lo;
 
-    vec3 lightDir = normalize(uDirectionalLight.direction.xyz);
+    vec3 lightDir = normalize(uDirectionalLight.direction.xyz - vec3(0.0, 0.0, 0.0));
     vec3 halfway = normalize(lightDir + viewDir);
     vec3 radiance = uDirectionalLight.color.xyz;
 
