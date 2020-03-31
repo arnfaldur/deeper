@@ -562,10 +562,6 @@ pub fn project_world_to_screen(
     }
 }
 
-pub fn length(vector: Vector3<f32>) -> f32  {
-    return (vector.x * vector.x + vector.y * vector.y + vector.z * vector.z).sqrt();
-}
-
 pub fn correction_matrix() -> cgmath::Matrix4<f32> {
     cgmath::Matrix4::new(
         1.0, 0.0, 0.0, 0.0,
