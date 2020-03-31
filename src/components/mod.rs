@@ -67,7 +67,7 @@ pub struct Acceleration(pub f32);
 pub struct StaticBody;
 
 #[derive(Component)]
-pub struct DynamicBody;
+pub struct DynamicBody(pub f32);
 
 #[derive(Component)]
 pub struct CircleCollider {
