@@ -33,7 +33,7 @@ use crate::input::{EventBucket, InputState};
 use rand::{thread_rng, Rng};
 use std::time::Instant;
 use glsl_to_spirv::ShaderType::Fragment;
-use std::ops::DerefMut;
+use std::ops::{DerefMut, Deref};
 
 
 async fn run_async() {
@@ -61,8 +61,27 @@ async fn run_async() {
     use std::path::Path;
 
     use rg3d_sound::context::Context as AudioContext;
+    use rg3d_sound::buffer::SoundBuffer;
+    use rg3d_sound::buffer::DataSource;
+    use rg3d_sound::source::generic::GenericSourceBuilder;
+    use rg3d_sound::source::Status;
+    use rg3d_sound::source::SoundSource;
+    use rg3d_sound::pool::Handle;
 
-    let ac = AudioContext::new().unwrap();
+    let mut ac = AudioContext::new().unwrap();
+
+    let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/GodlingMusicTest.wav").unwrap()).unwrap();
+
+    let source = GenericSourceBuilder::new(buf)
+        .with_status(Status::Playing)
+        .with_looping(true)
+        .build_source()
+        .unwrap();
+
+    let _source_handle: Handle<SoundSource> = ac.lock()
+        .unwrap()
+        .add_source(source);
+
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
@@ -109,7 +128,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
-    world.insert(20 as i64);
+    world.insert(0 as i64);
 
     let input_state = InputState::new();
     world.insert(input_state);

@@ -173,7 +173,7 @@ vec3 fLightFactor(vec3 normal, float distance, float radius, vec3 color, vec3 li
     vec3 halfway = normalize(lightDir + viewDir);
 
     float attenuation = fLightFalloff(distance, radius, 3.0);
-    vec3 radiance = color * attenuation;
+    vec3 radiance = 1.0 * color * attenuation;
 
     float NDF = fDistributionGGX(normal, halfway, mat.roughness);
     float G = fGeometrySmith(normal, viewDir, lightDir, mat.roughness);
