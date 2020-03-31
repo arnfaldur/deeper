@@ -216,7 +216,7 @@ impl DungGen {
 
             for x in x_start..=x_end + 1 {
                 if x <= x_end {
-                    self.world.insert((x, y_start), TileType::Floor);
+                    self.world.insert((x, y_start), TileType::Path);
                 }
                 if let None = self.world.get(&(x, y_start + 1)) {
                     self.world.insert((x, y_start + 1), TileType::Wall(None));
@@ -235,7 +235,7 @@ impl DungGen {
 
             for y in y_start..=y_end + 1 {
                 if y <= y_end {
-                    self.world.insert((x_end, y), TileType::Floor);
+                    self.world.insert((x_end, y), TileType::Path);
                 }
                 if let None = self.world.get(&(x_end + 1, y)) {
                     self.world.insert((x_end + 1, y), TileType::Wall(None));
@@ -260,20 +260,24 @@ impl DungGen {
                 let W = *self.world.get(&(x - 1, y)).unwrap_or(&TileType::Wall(None));
                 let S = *self.world.get(&(x, y - 1)).unwrap_or(&TileType::Wall(None));
                 let E = *self.world.get(&(x + 1, y)).unwrap_or(&TileType::Wall(None));
-                //let NE = self.world.get(&(x+1,y+1));
-                //let NW = self.world.get(&(x-1,y+1));
-                //let SE = self.world.get(&(x+1,y-1));
-                //let SW = self.world.get(&(x-1,y-1));
-                for &(a, b, c, d, typ) in [
-                    (S, E, N, W, TileType::Wall(Some(WallDirection::North))),
-                    (E, N, W, S, TileType::Wall(Some(WallDirection::West))),
-                    (N, W, S, E, TileType::Wall(Some(WallDirection::South))),
-                    (W, S, E, N, TileType::Wall(Some(WallDirection::East))),
+
+                let NE = *self.world.get(&(x + 1, y + 1)).unwrap_or(&TileType::Wall(None));
+                let NW = *self.world.get(&(x - 1, y + 1)).unwrap_or(&TileType::Wall(None));
+                let SE = *self.world.get(&(x + 1, y - 1)).unwrap_or(&TileType::Wall(None));
+                let SW = *self.world.get(&(x - 1, y - 1)).unwrap_or(&TileType::Wall(None));
+
+                for &(a, b, c, d, e, f, typ) in [
+                    (S, E, N, W, NE, NW, TileType::Wall(Some(WallDirection::North))),
+                    (E, N, W, S, SW, NW, TileType::Wall(Some(WallDirection::West))),
+                    (N, W, S, E, SE, SW, TileType::Wall(Some(WallDirection::South))),
+                    (W, S, E, N, SE, NE, TileType::Wall(Some(WallDirection::East))),
                 ].iter() {
-                    if a == TileType::Floor
+                    if (a == TileType::Floor || a == TileType::Path)
                         && b == TileType::Wall(None)
                         && c == TileType::Wall(None)
                         && d == TileType::Wall(None)
+                        && e == TileType::Wall(None)
+                        && f == TileType::Wall(None)
                     {
                         directed_walls.push((loc, typ));
                     }

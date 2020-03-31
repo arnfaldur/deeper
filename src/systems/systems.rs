@@ -54,33 +54,88 @@ use notify::{RecommendedWatcher, DebouncedEvent, Watcher, RecursiveMode};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 pub struct HotLoaderSystem {
-    pub watcher: RecommendedWatcher,
-    pub rx: Receiver<DebouncedEvent>,
+    // pub watcher: RecommendedWatcher,
+    // pub rx: Receiver<DebouncedEvent>,
+    pub shaders_loaded_at: SystemTime,
+    pub hotload_shaders_turned_on: bool,
 }
 
 impl HotLoaderSystem {
     pub fn new() -> Self {
-        let (tx, rx) = channel();
-
-        let mut watcher: RecommendedWatcher =
-            Watcher::new(tx, Duration::from_secs(2)).unwrap();
-        watcher.watch("assets/Models/", RecursiveMode::Recursive);
-
-        Self { rx, watcher }
+        Self { shaders_loaded_at: SystemTime::now(), hotload_shaders_turned_on: false }
     }
 }
+
+const FRAG_SRC: &str = include_str!("../../shaders/debug.frag");
+const VERT_SRC: &str = include_str!("../../shaders/debug.vert");
 
 impl<'a> System<'a> for HotLoaderSystem {
     type SystemData = (
         WriteExpect<'a, loader::AssetManager>,
+        WriteExpect<'a, graphics::Context>,
         ReadExpect<'a, InputState>,
-        ReadExpect<'a, graphics::Context>,
     );
 
-    fn run(&mut self, (mut ass_man, input, context): Self::SystemData) {
+    fn run(&mut self, (mut ass_man, mut context, input): Self::SystemData) {
+
+        if input.is_key_pressed(Key::H) {
+            println!("Hotloading shaders turned ON");
+            self.hotload_shaders_turned_on = !self.hotload_shaders_turned_on;
+        }
+
         if input.is_key_pressed(Key::L) {
-            println!("Hotloading...");
+            println!("Hotloading models...");
             ass_man.load_models(&context);
+        }
+
+        if self.hotload_shaders_turned_on {
+            let frag_path = Path::new("shaders/debug.frag");
+            let vert_path = Path::new("shaders/debug.vert");
+
+            let frag_modified = std::fs::metadata(frag_path).unwrap().modified().unwrap();
+            let vert_modified = std::fs::metadata(vert_path).unwrap().modified().unwrap();
+
+            if frag_modified.gt(&self.shaders_loaded_at) || vert_modified.gt(&self.shaders_loaded_at) {
+                let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
+                    if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
+                        if let Ok(sprv) = &wgpu::read_spirv(vs) {
+                            Some(context.device.create_shader_module(sprv))
+                        } else {
+                            println!("Failed to create shader module");
+                            None
+                        }
+                    } else {
+                        println!("Failed to recompile vertex shader");
+                        None
+                    }
+                } else {
+                    println!("Failed to read vertex shader");
+                    None
+                };
+
+                let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
+                    if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
+                        if let Ok(sprv) = &wgpu::read_spirv(fs) {
+                            Some(context.device.create_shader_module(sprv))
+                        } else {
+                            println!("Failed to create shader module");
+                            None
+                        }
+                    } else {
+                        println!("Failed to recompile vertex shader");
+                        None
+                    }
+                } else {
+                    println!("Failed to read vertex shader");
+                    None
+                };
+
+                if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
+                    println!("Recompiling shaders...");
+                    context.recompile_pipeline(vsm, fsm);
+                    self.shaders_loaded_at = SystemTime::now();
+                }
+            }
         }
     }
 
@@ -542,6 +597,8 @@ use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
 use crate::dung_gen::DungGen;
 use rand::{thread_rng, Rng};
 use std::time::{SystemTime, Duration};
+use std::path::Path;
+use glsl_to_spirv::ShaderType;
 use futures::SinkExt;
 use rand::prelude::*;
 
@@ -605,15 +662,15 @@ impl<'a> System<'a> for DunGenSystem {
                 lights.directional_light = graphics::DirectionalLight {
                     direction: [1.0, 0.8, 0.8, 0.0],
                     ambient: [0.01, 0.015, 0.02, 1.0],
-                    color: [0.1, 0.1, 0.2, 1.0],
+                    color: [0.02, 0.025, 0.05, 1.0],
                 };
 
                 for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
                     if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
                     lights.point_lights[i] = Default::default();
-                    lights.point_lights[i].radius = 30.0;
+                    lights.point_lights[i].radius = 10.0;
                     lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
-                    lights.point_lights[i].color = [1.0, 0.4, 0.1, 1.0];
+                    lights.point_lights[i].color = [2.0, 1.0, 0.1, 1.0];
                 }
 
                 let temp_buf = context.device.create_buffer_with_data(
@@ -655,6 +712,7 @@ impl<'a> System<'a> for DunGenSystem {
                             TileType::Wall(None) => cube_idx,
                             TileType::Wall(Some(_)) => wall_idx,
                             TileType::Floor => floor_idx,
+                            TileType::Path => floor_idx,
                             TileType::LadderDown => stairs_down_idx,
                         },
                         match wall_type {
@@ -670,6 +728,7 @@ impl<'a> System<'a> for DunGenSystem {
                         },
                         match wall_type {
                             TileType::Nothing => graphics::Material::dark_stone(),
+                            TileType::Path => graphics::Material::glossy(Vector3::new(0.1, 0.1, 0.1)),
                             _ => graphics::Material::darkest_stone(),
                         },
                     );
