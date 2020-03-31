@@ -66,8 +66,8 @@ impl HotLoaderSystem {
     }
 }
 
-const FRAG_SRC: &str = include_str!("../../shaders/debug.frag");
-const VERT_SRC: &str = include_str!("../../shaders/debug.vert");
+const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
+const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
 
 impl<'a> System<'a> for HotLoaderSystem {
     type SystemData = (
@@ -95,8 +95,8 @@ impl<'a> System<'a> for HotLoaderSystem {
         }
 
         if self.hotload_shaders_turned_on {
-            let frag_path = Path::new("shaders/debug.frag");
-            let vert_path = Path::new("shaders/debug.vert");
+            let frag_path = Path::new("shaders/forward.frag");
+            let vert_path = Path::new("shaders/forward.vert");
 
             let frag_modified = std::fs::metadata(frag_path).unwrap().modified().unwrap();
             let vert_modified = std::fs::metadata(vert_path).unwrap().modified().unwrap();
@@ -305,15 +305,7 @@ impl<'a> System<'a> for GraphicsSystem {
     fn setup(&mut self, world: &mut World) {}
 }
 
-pub struct PlayerSystem {
-    // Note(Jökull): Yeah, I know. This is just while we're feeling out what is the
-    //               responsibility of the input handling system exactly
-    last_mouse_pos: Vector2<f32>,
-}
-
-impl PlayerSystem {
-    pub fn new() -> Self { Self { last_mouse_pos: Vector2::new(0.0, 0.0) } }
-}
+pub struct PlayerSystem;
 
 // Note(Jökull): Is this really just the input handler?
 impl<'a> System<'a> for PlayerSystem {
@@ -342,15 +334,14 @@ impl<'a> System<'a> for PlayerSystem {
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
 
         let mouse_pos = input.mouse.pos;
-        //let mouse_delta = input.mouse.pos - self.last_mouse_pos;
-        //self.last_mouse_pos = input.mouse.pos;
+        let mouse_delta = input.mouse.pos - input.mouse.last_pos;
 
-        // camera orbiting system disabled for now
-        //if input.mouse.middle.down {
-        //    camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
-        //    camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
-        //    camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
-        //}
+        // camera orbiting system enabled for now
+        if input.mouse.middle.down {
+            camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
+            camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
+            camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
+        }
 
         let player_pos = pos.get(player.entity)
             .expect("I have no place in this world.");

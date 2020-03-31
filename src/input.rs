@@ -128,6 +128,8 @@ impl InputState {
         self.mouse.left.pressed = false;
         self.mouse.right.pressed = false;
 
+        self.mouse.last_pos = self.mouse.pos;
+
         for (x, y) in &mut self.keyboard {
             y.pressed = false;
         }
@@ -170,7 +172,6 @@ impl InputState {
                 self.mouse.update_from_mouse_button(button, state);
             },
             CursorMoved{ position, .. } => {
-                self.mouse.last_pos = self.mouse.pos;
                 self.mouse.pos = Vector2::new(position.x as f32, position.y as f32);
             }
             _ => ()

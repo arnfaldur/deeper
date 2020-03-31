@@ -67,13 +67,13 @@ async fn run_async() {
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(HotLoaderSystem::new(), "HotLoader", &[])
-        .with(PlayerSystem::new(), "Player", &[])
+        .with(PlayerSystem, "Player", &[])
         .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
         .with(AIFollowSystem, "AIFollow", &[])
         .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
         .with(Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
-        .with( MovementSystem, "Movement", &["Physics2D", "Player"], )
-        .with( SphericalFollowSystem, "SphericalFollow", &["Movement"], )
+        .with(MovementSystem, "Movement", &["Physics2D", "Player"], )
+        .with(SphericalFollowSystem, "SphericalFollow", &["Movement"], )
         .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(DunGenSystem, "DunGen", &["MapSwitching"])
         .with(GraphicsSystem, "Graphics", &[]).build();
@@ -109,7 +109,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
-    world.insert(5 as i64);
+    world.insert(20 as i64);
 
     let input_state = InputState::new();
     world.insert(input_state);

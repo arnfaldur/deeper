@@ -156,8 +156,8 @@ pub struct Context {
     pub swap_chain: wgpu::SwapChain,
 }
 
-const FRAG_SRC: &str = include_str!("../../shaders/debug.frag");
-const VERT_SRC: &str = include_str!("../../shaders/debug.vert");
+const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
+const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
 
 impl Context {
     pub async fn new(window: &Window) -> Self {
@@ -511,6 +511,9 @@ pub fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
     return mx_correction * mx_projection * mx_view;
 }
 
+// Function by Vallentin
+// https://vallentin.dev/2019/08/12/screen-to-world-cgmath
+
 pub fn project_screen_to_world(
     screen: cgmath::Vector3<f32>,
     view_projection: cgmath::Matrix4<f32>,
@@ -536,6 +539,9 @@ pub fn project_screen_to_world(
         None
     }
 }
+
+// Function by Vallentin
+// https://vallentin.dev/2019/08/12/screen-to-world-cgmath
 
 pub fn project_world_to_screen(
     world: cgmath::Vector3<f32>,
