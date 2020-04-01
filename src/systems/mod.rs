@@ -205,7 +205,7 @@ impl<'a> System<'a> for GraphicsSystem {
         );
 
         let mut encoder = context.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { todo: 0 }
+            &wgpu::CommandEncoderDescriptor { label: None }
         );
 
         encoder.copy_buffer_to_buffer(
@@ -652,7 +652,7 @@ impl<'a> System<'a> for DunGenSystem {
                 updater.insert(player.entity, Velocity::new());
 
                 let mut init_encoder = context.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { todo: 0 }
+                    &wgpu::CommandEncoderDescriptor { label: None }
                 );
 
                 let mut lights: graphics::Lights = Default::default();

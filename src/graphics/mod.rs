@@ -195,6 +195,7 @@ impl Context {
 
         let bind_group_layout = device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
+                label: None,
                 bindings: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -212,6 +213,7 @@ impl Context {
 
         let local_bind_group_layout = device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
+                label: None,
                 bindings: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -237,6 +239,7 @@ impl Context {
         );
 
         let mut bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
             layout: &bind_group_layout,
             bindings: &[
                 wgpu::Binding {
@@ -332,16 +335,18 @@ impl Context {
                 stencil_read_mask: !0,
                 stencil_write_mask: !0,
             }),
-            index_format: wgpu::IndexFormat::Uint16,
-            vertex_buffers: &[wgpu::VertexBufferDescriptor{
-                stride: std::mem::size_of::<Vertex>() as u64,
-                step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![
-                    0 => Float3,
-                    1 => Float3,
-                    2 => Float2
-                ]
-            }],
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: wgpu::IndexFormat::Uint16,
+                vertex_buffers: &[wgpu::VertexBufferDescriptor{
+                    stride: std::mem::size_of::<Vertex>() as u64,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &wgpu::vertex_attr_array![
+                        0 => Float3,
+                        1 => Float3,
+                        2 => Float2
+                    ]
+                }]
+            },
             sample_count: 1,
             sample_mask: !0,
             alpha_to_coverage_enabled: false
@@ -359,6 +364,7 @@ impl Context {
 
     fn create_depth_view(device: &wgpu::Device, size: PhysicalSize<u32>) -> wgpu::TextureView {
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
             size: wgpu::Extent3d {
                 width: size.width as u32,
                 height: size.height as u32,
@@ -502,12 +508,7 @@ pub fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
         pos3(0f32, 0.0, 0.0),
         cgmath::Vector3::unit_z(),
     );
-    let mx_correction = cgmath::Matrix4::new(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, -1.0, 0.0, 0.0,
-        0.0, 0.0, 0.5, 0.0,
-        0.0, 0.0, 0.5, 1.0,
-    );
+    let mx_correction = correction_matrix();
     return mx_correction * mx_projection * mx_view;
 }
 
@@ -571,7 +572,7 @@ pub fn project_world_to_screen(
 pub fn correction_matrix() -> cgmath::Matrix4<f32> {
     cgmath::Matrix4::new(
         1.0, 0.0, 0.0, 0.0,
-        0.0, -1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 0.5, 0.0,
         0.0, 0.0, 0.5, 1.0,
     )

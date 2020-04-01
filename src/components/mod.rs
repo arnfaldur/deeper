@@ -175,6 +175,7 @@ impl StaticModel {
 
         let bind_group = context.device.create_bind_group(
             &wgpu::BindGroupDescriptor {
+                label: None,
                 layout: &context.local_bind_group_layout,
                 bindings: &[
                     wgpu::Binding {
@@ -211,12 +212,14 @@ impl Model3D {
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
         let uniform_buf = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: uniforms_size,
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
         });
 
         let bind_group = context.device.create_bind_group(
             &wgpu::BindGroupDescriptor {
+                label: None,
                 layout: &context.local_bind_group_layout,
                 bindings: &[
                     wgpu::Binding {
