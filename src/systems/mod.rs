@@ -374,7 +374,7 @@ impl<'a> System<'a> for PlayerSystem {
             );
 
             if let Some(mouse_world_pos) = project_screen_to_world(
-                Vector3::new(mouse_pos.x, context.sc_desc.height as f32 - mouse_pos.y, 1.0),
+                Vector3::new(mouse_pos.x, mouse_pos.y, 1.0),
                 graphics::correction_matrix() * mx_projection * mx_view,
                 Vector4::new(0, 0, context.sc_desc.width as i32, context.sc_desc.height as i32),
             ) {
@@ -448,7 +448,7 @@ impl<'a> System<'a> for AIFollowSystem {
                 if distance > follow.minimum_distance {
                     dest.insert(ent, Destination(hunted.0));
                     if let Some(orientation) = orient {
-                        orientation.0 = cgmath::Deg::from(-difference.angle(Vector2::unit_y()));
+                        orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
                     }
                 }
             }
