@@ -33,6 +33,7 @@ layout(location = 0) out vec4 o_Target;
 layout(set = 0, binding = 0) uniform Globals {
     mat4 u_ViewProj;
     vec4 u_Eye_Position;
+    float time;
 };
 
 layout(set = 0, binding = 1) uniform Lights {
@@ -166,7 +167,7 @@ float fBlinnPhong(vec4 normal, vec4 lightDir, vec4 viewDir, float shininess) {
 }
 
 float contrast(float a, float x) {
-    return clamp(a * (cos(x * PI + PI) + 1) / 2.0 + ((1-a)*x), 0.0, 1.0);
+    return clamp(a * (cos(PI * (x + 1)) + 1) / 2.0 + (1-a)*x, 0.0, 1.0);
 }
 
 vec3 fLightFactor(vec3 normal, float distance, float radius, vec3 color, vec3 lightDir, vec3 viewDir, vec3 F_0, Material mat) {
@@ -226,7 +227,8 @@ void main() {
     vec3 ambient = uDirectionalLight.ambient.rgb * vec3(mat.albedo);
     vec3 color = ambient + Lo;
 
-    vec3 lightDir = normalize(uDirectionalLight.direction.xyz - vec3(0.0, 0.0, 0.0));
+    //vec3 lightDir = normalize(uDirectionalLight.direction.xyz + vec3(sin(time), cos(time), 0.8));
+    vec3 lightDir = normalize(uDirectionalLight.direction.xyz);
     vec3 halfway = normalize(lightDir + viewDir);
     vec3 radiance = uDirectionalLight.color.xyz;
 
@@ -250,8 +252,11 @@ void main() {
     color = pow(color, vec3(1.0/2.2));
 
     color = RGBtoHCY(color);
-    color.z += 0.112;
-    color.z = contrast(1.6, color.z);
+    //color.x = cos(v_TexCoord.x * 2 * PI + 3 ) + sin(v_TexCoord.y * 2 * PI + time) * sin(v_TexCoord.y * 2 * PI + 9 * time);
+    //color.y += 0.2 * cos(15 * time);
+    //color.z += 0.01 * (cos(v_TexCoord.x * 2 * PI + 4 * time) + sin(v_TexCoord.y * 0.2 * PI + time) * sin(v_TexCoord.y * 2 * PI + 6 * time));
+    color.z += 0.152;
+    color.z = contrast(2.0, color.z);
     color = HCYtoRGB(color);
 
     o_Target = vec4(color, 0.2);

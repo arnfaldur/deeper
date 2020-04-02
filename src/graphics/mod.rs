@@ -20,6 +20,7 @@ pub struct Vertex {
 pub struct GlobalUniforms {
     pub projection_view_matrix: [[f32; 4]; 4],
     pub eye_position: [f32; 4],
+    pub time: f32,
 }
 
 #[repr(C)]

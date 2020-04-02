@@ -128,11 +128,11 @@ impl<'a> System<'a> for HotLoaderSystem {
                             None
                         }
                     } else {
-                        println!("Failed to recompile vertex shader");
+                        println!("Failed to recompile fragment shader");
                         None
                     }
                 } else {
-                    println!("Failed to read vertex shader");
+                    println!("Failed to read fragment shader");
                     None
                 };
 
@@ -148,7 +148,17 @@ impl<'a> System<'a> for HotLoaderSystem {
     fn setup(&mut self, world: &mut World) {}
 }
 
-pub struct GraphicsSystem;
+pub struct GraphicsSystem {
+    time_started: SystemTime,
+}
+
+impl GraphicsSystem {
+    pub fn new() -> Self {
+        Self {
+            time_started: SystemTime::now(),
+        }
+    }
+}
 
 impl<'a> System<'a> for GraphicsSystem {
     type SystemData = (
@@ -197,6 +207,7 @@ impl<'a> System<'a> for GraphicsSystem {
         let global_uniforms = graphics::GlobalUniforms {
             projection_view_matrix: mx.into(),
             eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
+            time: SystemTime::now().duration_since(self.time_started).unwrap().as_secs_f32()
         };
 
         let new_uniform_buf = context.device.create_buffer_with_data(
