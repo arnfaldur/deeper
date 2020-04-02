@@ -35,4 +35,3 @@ notify = "4.0.15"
 
 # ECS
 specs = { version = "0.16.1", features = ["specs-derive"] }
-

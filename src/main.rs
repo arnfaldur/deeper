@@ -91,8 +91,8 @@ async fn run_async() {
         .with(AIFollowSystem, "AIFollow", &[])
         .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
         .with(Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
-        .with(MovementSystem, "Movement", &["Physics2D", "Player"], )
-        .with(SphericalFollowSystem, "SphericalFollow", &["Movement"], )
+        .with(MovementSystem, "Movement", &["Physics2D", "Player"])
+        .with(SphericalFollowSystem, "SphericalFollow", &["Movement"])
         .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(DunGenSystem, "DunGen", &["MapSwitching"])
         .with(GraphicsSystem, "Graphics", &[]).build();
@@ -120,7 +120,7 @@ async fn run_async() {
         .with(SphericalOffset::new())
         .build();
 
-    world.insert(Player::from_entity(player));
+    world.insert(Player { entity: player });
     world.insert(ActiveCamera(player_camera));
     world.insert(PlayerCamera(player_camera));
     world.insert(context);
