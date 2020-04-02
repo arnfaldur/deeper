@@ -60,27 +60,27 @@ async fn run_async() {
 
     use std::path::Path;
 
-    use rg3d_sound::context::Context as AudioContext;
-    use rg3d_sound::buffer::SoundBuffer;
-    use rg3d_sound::buffer::DataSource;
-    use rg3d_sound::source::generic::GenericSourceBuilder;
-    use rg3d_sound::source::Status;
-    use rg3d_sound::source::SoundSource;
-    use rg3d_sound::pool::Handle;
+    // use rg3d_sound::context::Context as AudioContext;
+    // use rg3d_sound::buffer::SoundBuffer;
+    // use rg3d_sound::buffer::DataSource;
+    // use rg3d_sound::source::generic::GenericSourceBuilder;
+    // use rg3d_sound::source::Status;
+    // use rg3d_sound::source::SoundSource;
+    // use rg3d_sound::pool::Handle;
 
-    let mut ac = AudioContext::new().unwrap();
+    // let mut ac = AudioContext::new().unwrap();
 
-    let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/GodlingMusicTest.wav").unwrap()).unwrap();
+    // let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/GodlingMusicTest.wav").unwrap()).unwrap();
 
-    let source = GenericSourceBuilder::new(buf)
-        .with_status(Status::Playing)
-        .with_looping(true)
-        .build_source()
-        .unwrap();
+    // let source = GenericSourceBuilder::new(buf)
+    //     .with_status(Status::Playing)
+    //     .with_looping(true)
+    //     .build_source()
+    //     .unwrap();
 
-    let _source_handle: Handle<SoundSource> = ac.lock()
-        .unwrap()
-        .add_source(source);
+    // let _source_handle: Handle<SoundSource> = ac.lock()
+    //     .unwrap()
+    //     .add_source(source);
 
 
     // initialize dispacher with all game systems
@@ -95,7 +95,7 @@ async fn run_async() {
         .with(SphericalFollowSystem, "SphericalFollow", &["Movement"])
         .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(DunGenSystem, "DunGen", &["MapSwitching"])
-        .with(GraphicsSystem, "Graphics", &[]).build();
+        .with(GraphicsSystem::new(), "Graphics", &[]).build();
 
     let player = world
         .create_entity()
@@ -106,7 +106,9 @@ async fn run_async() {
         .with(Velocity::new())
         .with(DynamicBody(1.0))
         .with(CircleCollider { radius: 0.3 })
-        .with(Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
+        .with(Model3D::from_index(
+            &context, ass_man.get_model_index("arissa.obj").unwrap()
+        ).with_scale(0.5))
         .build();
 
     let player_camera = world

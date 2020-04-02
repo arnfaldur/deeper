@@ -12,6 +12,7 @@ layout(location = 3) out vec4 v_Normal;
 layout(set = 0, binding = 0) uniform Globals {
     mat4 u_ViewProj;
     vec4 u_Eye_Position;
+    float time;
 };
 
 layout(set = 1, binding = 0) uniform Locals {
