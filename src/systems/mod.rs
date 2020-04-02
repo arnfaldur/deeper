@@ -77,14 +77,13 @@ impl<'a> System<'a> for HotLoaderSystem {
     );
 
     fn run(&mut self, (mut ass_man, mut context, input): Self::SystemData) {
-
         if input.is_key_pressed(Key::H) {
             println!("Hotloading shaders turned {}",
-                if self.hotload_shaders_turned_on {
-                    "OFF"
-                } else {
-                    "ON"
-                }
+                     if self.hotload_shaders_turned_on {
+                         "OFF"
+                     } else {
+                         "ON"
+                     }
             );
             self.hotload_shaders_turned_on = !self.hotload_shaders_turned_on;
         }
@@ -501,10 +500,10 @@ impl<'a> System<'a> for Physics2DSystem {
     );
 
     fn run(&mut self, (ents, frame_time, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
-        // TODO: Move these to a EntityValidationSystem or something like that
-        for _ in (&dynamics, &statics).join() {
+        // TODO: Move these to an EntityValidationSystem or something like that
+        (&dynamics, &statics).par_join().for_each(|_| {
             panic!("There's a naughty static body that really feels dynamic inside.");
-        }
+        });
         for _ in (&dynamics, !&vel).join() {
             panic!("A dynamic entity has no velocity!");
         }
@@ -512,14 +511,14 @@ impl<'a> System<'a> for Physics2DSystem {
         for (_, vel) in (&dynamics, &mut vel).join() {
             vel.0 *= 1. - (damping * frame_time.0).min(1.);
         }
-        for (ent_a, dyn_a, pos_a, circle_a) in (&ents, &dynamics, &pos, &circles).join() {
-            for (ent_b, dyn_b, pos_b, circle_b) in (&ents, &dynamics, &pos, &circles).join() {
+        (&ents, &dynamics, &pos, &circles).join().for_each(|(ent_a, _, pos_a, circle_a)| {
+            (&ents, &dynamics, &pos, &circles).join().for_each(|(ent_b, _, pos_b, circle_b)| {
                 if ent_a != ent_b {
                     let collision_distance = circle_a.radius + circle_b.radius;
 
                     // get post move locations
-                    let delta_a = pos_a.0 + vel.get(ent_a).unwrap().0 * frame_time.0;
-                    let delta_b = pos_b.0 + vel.get(ent_b).unwrap().0 * frame_time.0;
+                    let delta_a = pos_a.0 + frame_time.0 * vel.get(ent_a).unwrap().0;
+                    let delta_b = pos_b.0 + frame_time.0 * vel.get(ent_b).unwrap().0;
                     // vector from ent_a to ent_b
                     let position_delta = delta_a - delta_b;
                     // how much are we colliding?
@@ -527,16 +526,16 @@ impl<'a> System<'a> for Physics2DSystem {
                     // same as position_delta but without velocity applied
                     let collision_direction = position_delta.normalize();
                     if collision_depth > 0.0 {
-                        // get_mut is necessary to appease the borrow checker
                         //vel.get_mut(ent_a).unwrap().0 += (position_delta.normalize_to(collision_depth));
                         //vel.get_mut(ent_b).unwrap().0 -= (position_delta.normalize_to(collision_depth));
 
+                        // get_mut is necessary to appease the borrow checker
                         vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0 / frame_time.0;
                         vel.get_mut(ent_b).unwrap().0 -= collision_direction * collision_depth / 2.0 / frame_time.0;
                     }
                 }
-            }
-        }
+            });
+        });
         for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
             for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
                 let collision_distance = circle_a.radius + circle_b.radius;
@@ -552,7 +551,7 @@ impl<'a> System<'a> for Physics2DSystem {
                 }
             }
         }
-        for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
+        (&dynamics, &pos, &mut vel, &circles).join().for_each(|(_, pos_a, vel_a, circle_a)| {
             for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
                 let half_side = square_b.side_length / 2.0;
                 let position_difference: Vector2<f32> = pos_a.0 + vel_a.0 * frame_time.0 - pos_b.0;
@@ -576,7 +575,7 @@ impl<'a> System<'a> for Physics2DSystem {
                     }
                 }
             }
-        }
+        });
     }
 }
 

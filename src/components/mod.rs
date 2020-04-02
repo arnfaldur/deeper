@@ -19,14 +19,6 @@ pub struct Player {
     pub entity: Entity,
 }
 
-impl Player {
-    pub fn from_entity(entity: Entity) -> Self {
-        return Self {
-            entity,
-        };
-    }
-}
-
 pub struct ActiveCamera(pub Entity);
 
 pub struct PlayerCamera(pub Entity);
