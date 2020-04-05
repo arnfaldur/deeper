@@ -1,6 +1,5 @@
 /.idea
 
-/target
 **/*.rs.bk
 
 /misc_assets

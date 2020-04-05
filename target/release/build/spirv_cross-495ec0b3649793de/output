@@ -1,0 +1,154 @@
+OPT_LEVEL = Some("3")
+TARGET = Some("x86_64-pc-windows-msvc")
+HOST = Some("x86_64-pc-windows-msvc")
+CXX_x86_64-pc-windows-msvc = None
+CXX_x86_64_pc_windows_msvc = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-pc-windows-msvc = None
+CXXFLAGS_x86_64_pc_windows_msvc = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+DEBUG = Some("false")
+CXX_x86_64-pc-windows-msvc = None
+CXX_x86_64_pc_windows_msvc = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-pc-windows-msvc = None
+CXXFLAGS_x86_64_pc_windows_msvc = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/wrapper.o" "-c" "src/wrapper.cpp"
+wrapper.cpp
+src/wrapper.cpp(1): warning C4068: unknown pragma
+src/wrapper.cpp(435): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+src/wrapper.cpp(443): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\vector(749): warning C4530: C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\vector(709): note: see reference to function template instantiation 'spirv_cross::RootConstants *std::vector<spirv_cross::RootConstants,std::allocator<spirv_cross::RootConstants>>::_Emplace_reallocate<_Ty>(spirv_cross::RootConstants *const ,_Ty &&)' being compiled
+        with
+        [
+            _Ty=spirv_cross::RootConstants
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\vector(709): note: see reference to function template instantiation 'spirv_cross::RootConstants *std::vector<spirv_cross::RootConstants,std::allocator<spirv_cross::RootConstants>>::_Emplace_reallocate<_Ty>(spirv_cross::RootConstants *const ,_Ty &&)' being compiled
+        with
+        [
+            _Ty=spirv_cross::RootConstants
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\vector(722): note: see reference to function template instantiation 'void std::vector<spirv_cross::RootConstants,std::allocator<spirv_cross::RootConstants>>::emplace_back<spirv_cross::RootConstants>(spirv_cross::RootConstants &&)' being compiled
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\vector(721): note: while compiling class template member function 'void std::vector<spirv_cross::RootConstants,std::allocator<spirv_cross::RootConstants>>::push_back(_Ty &&)'
+        with
+        [
+            _Ty=spirv_cross::RootConstants
+        ]
+src/wrapper.cpp(84): note: see reference to function template instantiation 'void std::vector<spirv_cross::RootConstants,std::allocator<spirv_cross::RootConstants>>::push_back(_Ty &&)' being compiled
+        with
+        [
+            _Ty=spirv_cross::RootConstants
+        ]
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\spirv_cross-0.18.0\src\vendor/SPIRV-Cross/spirv_hlsl.hpp(257): note: see reference to class template instantiation 'std::vector<spirv_cross::RootConstants,std::allocator<spirv_cross::RootConstants>>' being compiled
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cfg.o" "-c" "src/vendor/SPIRV-Cross/spirv_cfg.cpp"
+spirv_cfg.cpp
+src/vendor/SPIRV-Cross/spirv_cfg.cpp(227): warning C4245: 'return': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_cfg.cpp(229): warning C4245: 'return': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_cfg.cpp(231): warning C4245: 'initializing': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cross.o" "-c" "src/vendor/SPIRV-Cross/spirv_cross.cpp"
+spirv_cross.cpp
+src/vendor/SPIRV-Cross/spirv_cross.cpp(1473): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_cross.cpp(3199): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_cross.cpp(3267): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cross_parsed_ir.o" "-c" "src/vendor/SPIRV-Cross/spirv_cross_parsed_ir.cpp"
+spirv_cross_parsed_ir.cpp
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_parser.o" "-c" "src/vendor/SPIRV-Cross/spirv_parser.cpp"
+spirv_parser.cpp
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cross_util.o" "-c" "src/vendor/SPIRV-Cross/spirv_cross_util.cpp"
+spirv_cross_util.cpp
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_glsl.o" "-c" "src/vendor/SPIRV-Cross/spirv_glsl.cpp"
+spirv_glsl.cpp
+src/vendor/SPIRV-Cross/spirv_glsl.cpp(11597): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_glsl.cpp(11644): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_glsl.cpp(12547): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+src/vendor/SPIRV-Cross/spirv_glsl.cpp(12560): warning C4245: 'argument': conversion from 'spirv_cross::SPIRBlock::<unnamed-enum-NoDominator>' to 'uint32_t', signed/unsigned mismatch
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_hlsl.o" "-c" "src/vendor/SPIRV-Cross/spirv_hlsl.cpp"
+spirv_hlsl.cpp
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-O2" "-Brepro" "-W4" "-DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS" "-DSPIRV_CROSS_WRAPPER_NO_EXCEPTIONS" "-DSPIRV_CROSS_WRAPPER_GLSL" "-DSPIRV_CROSS_WRAPPER_HLSL" "-DSPIRV_CROSS_WRAPPER_MSL" "-FoC:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_msl.o" "-c" "src/vendor/SPIRV-Cross/spirv_msl.cpp"
+spirv_msl.cpp
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1772): warning C4530: C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1731): note: see reference to function template instantiation 'std::_Tree_node<unsigned int,std::_Default_allocator_traits<_Alloc>::void_pointer> *std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy_nodes<_Moveit>(std::_Tree_node<unsigned int,std::_Default_allocator_traits<_Alloc>::void_pointer> *,std::_Tree_node<unsigned int,std::_Default_allocator_traits<_Alloc>::void_pointer> *,_Moveit)' being compiled
+        with
+        [
+            _Alloc=std::allocator<uint32_t>,
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Moveit=std::_Tree<std::_Tset_traits<uint32_t,std::less<uint32_t>,std::allocator<uint32_t>,false>>::_Copy_tag
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1731): note: see reference to function template instantiation 'std::_Tree_node<unsigned int,std::_Default_allocator_traits<_Alloc>::void_pointer> *std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy_nodes<_Moveit>(std::_Tree_node<unsigned int,std::_Default_allocator_traits<_Alloc>::void_pointer> *,std::_Tree_node<unsigned int,std::_Default_allocator_traits<_Alloc>::void_pointer> *,_Moveit)' being compiled
+        with
+        [
+            _Alloc=std::allocator<uint32_t>,
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Moveit=std::_Tree<std::_Tset_traits<uint32_t,std::less<uint32_t>,std::allocator<uint32_t>,false>>::_Copy_tag
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1201): note: see reference to function template instantiation 'void std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy<std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy_tag>(const std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>> &,_Moveit)' being compiled
+        with
+        [
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Alloc=std::allocator<uint32_t>,
+            _Moveit=std::_Tree<std::_Tset_traits<uint32_t,std::less<uint32_t>,std::allocator<uint32_t>,false>>::_Copy_tag
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1201): note: see reference to function template instantiation 'void std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy<std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy_tag>(const std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>> &,_Moveit)' being compiled
+        with
+        [
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Alloc=std::allocator<uint32_t>,
+            _Moveit=std::_Tree<std::_Tset_traits<uint32_t,std::less<uint32_t>,std::allocator<uint32_t>,false>>::_Copy_tag
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1197): note: while compiling class template member function 'void std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy_assign(const std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>> &,std::false_type)'
+        with
+        [
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Alloc=std::allocator<uint32_t>
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\xtree(1230): note: see reference to function template instantiation 'void std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>::_Copy_assign(const std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>> &,std::false_type)' being compiled
+        with
+        [
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Alloc=std::allocator<uint32_t>
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.24.28314\include\set(54): note: see reference to class template instantiation 'std::_Tree<std::_Tset_traits<_Kty,_Pr,_Alloc,false>>' being compiled
+        with
+        [
+            _Kty=uint32_t,
+            _Pr=std::less<uint32_t>,
+            _Alloc=std::allocator<uint32_t>
+        ]
+src/vendor/SPIRV-Cross/spirv_msl.cpp(1161): note: see reference to class template instantiation 'std::set<uint32_t,std::less<uint32_t>,std::allocator<uint32_t>>' being compiled
+exit code: 0
+AR_x86_64-pc-windows-msvc = None
+AR_x86_64_pc_windows_msvc = None
+HOST_AR = None
+AR = None
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64\\lib.exe" "-out:C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\libspirv-cross-rust-wrapper.a" "-nologo" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/wrapper.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cfg.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cross.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cross_parsed_ir.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_parser.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_cross_util.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_glsl.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_hlsl.o" "C:\\Users\\Jokull\\deeper\\target\\release\\build\\spirv_cross-495ec0b3649793de\\out\\src/vendor/SPIRV-Cross/spirv_msl.o"
+exit code: 0
+cargo:rustc-link-lib=static=spirv-cross-rust-wrapper
+cargo:rustc-link-search=native=C:\Users\Jokull\deeper\target\release\build\spirv_cross-495ec0b3649793de\out
+CXXSTDLIB_x86_64-pc-windows-msvc = None
+CXXSTDLIB_x86_64_pc_windows_msvc = None
+HOST_CXXSTDLIB = None
+CXXSTDLIB = None

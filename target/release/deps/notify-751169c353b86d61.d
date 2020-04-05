@@ -1,0 +1,12 @@
+C:\Users\Jokull\deeper\target\release\deps\notify-751169c353b86d61.rmeta: C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\lib.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\windows.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\null.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\poll.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\mod.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\timer.rs
+
+C:\Users\Jokull\deeper\target\release\deps\libnotify-751169c353b86d61.rlib: C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\lib.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\windows.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\null.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\poll.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\mod.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\timer.rs
+
+C:\Users\Jokull\deeper\target\release\deps\notify-751169c353b86d61.d: C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\lib.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\windows.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\null.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\poll.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\mod.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\timer.rs
+
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\lib.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\windows.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\null.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\poll.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\mod.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\notify-4.0.15\src\debounce\timer.rs:

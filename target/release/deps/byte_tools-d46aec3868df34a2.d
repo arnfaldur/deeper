@@ -1,0 +1,11 @@
+C:\Users\Jokull\deeper\target\release\deps\byte_tools-d46aec3868df34a2.rmeta: C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\lib.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_single.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_single.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_slice.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_slice.rs
+
+C:\Users\Jokull\deeper\target\release\deps\libbyte_tools-d46aec3868df34a2.rlib: C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\lib.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_single.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_single.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_slice.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_slice.rs
+
+C:\Users\Jokull\deeper\target\release\deps\byte_tools-d46aec3868df34a2.d: C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\lib.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_single.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_single.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_slice.rs C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_slice.rs
+
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\lib.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_single.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_single.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\read_slice.rs:
+C:\Users\Jokull\.cargo\registry\src\github.com-1ecc6299db9ec823\byte-tools-0.2.0\src\write_slice.rs:

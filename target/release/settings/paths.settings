@@ -1,0 +1,11 @@
+(
+    // Settings
+    display_settings_path    : "settings/display.settings",
+    extensions_settings_path : "settings/extensions.settings",
+
+    // Resources
+    assets_path           : "assets/",
+    models_path           : "assets/Models/",
+    entities_path         : "entities/",
+    shaders_path          : "shaders/",
+)
