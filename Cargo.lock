@@ -409,6 +409,7 @@ dependencies = [
  "env_logger",
  "futures",
  "glsl-to-spirv",
+ "imgui",
  "lazy_static",
  "notify",
  "rand 0.7.3",
@@ -861,6 +862,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
 dependencies = [
  "quick-error",
+]
+
+[[package]]
+name = "imgui"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a2d28cee2982d4dab4dd954c23be339ab1f98be4ff5a13ecd8fbfb47cdfa23a"
+dependencies = [
+ "bitflags",
+ "imgui-sys",
+ "lazy_static",
+ "parking_lot",
+]
+
+[[package]]
+name = "imgui-sys"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21a8693e0f66ecd2ec10e2f0ed4dc4519071495f350e6d8ddaf3e70351229257"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
-use notify::{RecommendedWatcher, Watcher, RecursiveMode, DebouncedEvent};
 use std::collections::HashMap;
 use std::fs;
-use std::time::{SystemTime, Duration};
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::time::{SystemTime};
 use crate::graphics;
 
 #[derive(Serialize, Deserialize)]
@@ -81,7 +79,6 @@ pub struct AssetManager {
 
 use std::path::Path;
 use std::path::PathBuf;
-use std::borrow::Borrow;
 use crate::loader::AssetKind::Model;
 
 impl AssetManager {
@@ -111,9 +108,7 @@ impl AssetManager {
         return ass_man;
     }
 
-    pub fn mark_changed_files(&mut self, changes: Vec<PathBuf>) {
-        unimplemented!();
-    }
+    // TODO: implement mark_changed_files(...)
 
     pub fn get_model_index(&self, name: &str ) -> Option<usize> {
         if let Some(asset) = self.assets.values().find(|model|

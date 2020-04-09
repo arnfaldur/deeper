@@ -127,7 +127,6 @@ impl InputState {
 
     pub fn update_from_event(&mut self, event: &winit::event::WindowEvent) {
         use winit::event::WindowEvent::*;
-        use winit::event::ElementState;
         match event {
             KeyboardInput { input, .. } => {
                 if let Some(key) = input.virtual_keycode {

@@ -1,34 +1,25 @@
 use specs::prelude::*;
 use std::f32::consts::{PI, FRAC_PI_2};
-use std::ops::{Mul, Deref, DerefMut};
 use zerocopy::AsBytes;
 
 extern crate cgmath;
 
 use cgmath::{prelude::*, Vector2, Vector3};
 
-use crate::{graphics, components};
+use crate::{graphics};
 use crate::loader;
 use crate::input::{InputState, Key};
 use crate::components::*;
 
-pub struct MovementSystem;
+use self::cgmath::{Matrix4, Vector4, Deg};
+use crate::graphics::{project_screen_to_world};
+use crate::dung_gen::DungGen;
+use rand::{thread_rng, Rng};
+use std::time::{SystemTime};
+use rand::prelude::*;
 
-impl<'a> System<'a> for MovementSystem {
-    type SystemData = (
-        ReadExpect<'a, FrameTime>,
-        WriteStorage<'a, Position>,
-        ReadStorage<'a, Velocity>,
-    );
-
-    fn run(&mut self, (frame_time, mut pos, vel): Self::SystemData) {
-        for (pos, vel) in (&mut pos, &vel).join() {
-            if vel.0.x.is_finite() && vel.0.y.is_finite() && (vel.0 * frame_time.0).magnitude() < 0.5 {
-                pos.0 += vel.0 * frame_time.0;
-            }
-        }
-    }
-}
+pub mod assets;
+pub mod physics;
 
 pub struct SphericalFollowSystem;
 
@@ -48,103 +39,6 @@ impl<'a> System<'a> for SphericalFollowSystem {
             pos3d.0.z += follow.radius * follow.phi.sin();
         }
     }
-}
-
-use notify::{RecommendedWatcher, DebouncedEvent, Watcher, RecursiveMode};
-use std::sync::mpsc::{Sender, Receiver, channel};
-
-pub struct HotLoaderSystem {
-    // pub watcher: RecommendedWatcher,
-    // pub rx: Receiver<DebouncedEvent>,
-    pub shaders_loaded_at: SystemTime,
-    pub hotload_shaders_turned_on: bool,
-}
-
-impl HotLoaderSystem {
-    pub fn new() -> Self {
-        Self { shaders_loaded_at: SystemTime::now(), hotload_shaders_turned_on: false }
-    }
-}
-
-const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
-const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
-
-impl<'a> System<'a> for HotLoaderSystem {
-    type SystemData = (
-        WriteExpect<'a, loader::AssetManager>,
-        WriteExpect<'a, graphics::Context>,
-        ReadExpect<'a, InputState>,
-    );
-
-    fn run(&mut self, (mut ass_man, mut context, input): Self::SystemData) {
-        if input.is_key_pressed(Key::H) {
-            println!("Hotloading shaders turned {}",
-                     if self.hotload_shaders_turned_on {
-                         "OFF"
-                     } else {
-                         "ON"
-                     }
-            );
-            self.hotload_shaders_turned_on = !self.hotload_shaders_turned_on;
-        }
-
-        if input.is_key_pressed(Key::L) {
-            println!("Hotloading models...");
-            ass_man.load_models(&context);
-        }
-
-        if self.hotload_shaders_turned_on {
-            let frag_path = Path::new("shaders/forward.frag");
-            let vert_path = Path::new("shaders/forward.vert");
-
-            let frag_modified = std::fs::metadata(frag_path).unwrap().modified().unwrap();
-            let vert_modified = std::fs::metadata(vert_path).unwrap().modified().unwrap();
-
-            if frag_modified.gt(&self.shaders_loaded_at) || vert_modified.gt(&self.shaders_loaded_at) {
-                let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
-                    if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
-                        if let Ok(sprv) = &wgpu::read_spirv(vs) {
-                            Some(context.device.create_shader_module(sprv))
-                        } else {
-                            println!("Failed to create shader module");
-                            None
-                        }
-                    } else {
-                        println!("Failed to recompile vertex shader");
-                        None
-                    }
-                } else {
-                    println!("Failed to read vertex shader");
-                    None
-                };
-
-                let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
-                    if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
-                        if let Ok(sprv) = &wgpu::read_spirv(fs) {
-                            Some(context.device.create_shader_module(sprv))
-                        } else {
-                            println!("Failed to create shader module");
-                            None
-                        }
-                    } else {
-                        println!("Failed to recompile fragment shader");
-                        None
-                    }
-                } else {
-                    println!("Failed to read fragment shader");
-                    None
-                };
-
-                if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
-                    println!("Recompiling shaders...");
-                    context.recompile_pipeline(vsm, fsm);
-                    self.shaders_loaded_at = SystemTime::now();
-                }
-            }
-        }
-    }
-
-    fn setup(&mut self, world: &mut World) {}
 }
 
 pub struct GraphicsSystem {
@@ -206,7 +100,7 @@ impl<'a> System<'a> for GraphicsSystem {
         let global_uniforms = graphics::GlobalUniforms {
             projection_view_matrix: mx.into(),
             eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
-            time: SystemTime::now().duration_since(self.time_started).unwrap().as_secs_f32()
+            time: SystemTime::now().duration_since(self.time_started).unwrap().as_secs_f32(),
         };
 
         let new_uniform_buf = context.device.create_buffer_with_data(
@@ -267,7 +161,6 @@ impl<'a> System<'a> for GraphicsSystem {
         }
 
         {
-            let tic = SystemTime::now();
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -290,7 +183,7 @@ impl<'a> System<'a> for GraphicsSystem {
             rpass.set_pipeline(&context.pipeline);
             rpass.set_bind_group(0, &context.bind_group, &[]);
 
-            for (model) in (&static_model).join() {
+            for model in (&static_model).join() {
                 rpass.set_bind_group(1, &model.bind_group, &[]);
                 for mesh in &ass_man.models[model.idx].meshes {
                     rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
@@ -311,8 +204,6 @@ impl<'a> System<'a> for GraphicsSystem {
 
         context.queue.submit(&[command_buf]);
     }
-
-    fn setup(&mut self, world: &mut World) {}
 }
 
 pub struct PlayerSystem;
@@ -325,7 +216,6 @@ impl<'a> System<'a> for PlayerSystem {
         WriteStorage<'a, Orientation>,
         WriteStorage<'a, Destination>,
         WriteStorage<'a, SphericalOffset>,
-        WriteStorage<'a, Velocity>,
         ReadExpect<'a, InputState>,
         ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, Player>,
@@ -338,7 +228,7 @@ impl<'a> System<'a> for PlayerSystem {
         ReadStorage<'a, DynamicBody>,
     );
 
-    fn run(&mut self, (ents, updater, mut orient, mut dest, mut offset, mut vel, input, context, player, player_cam, pos, pos3d, cam, faction, hp, dynamic): Self::SystemData) {
+    fn run(&mut self, (ents, updater, mut orient, mut dest, mut offset, input, context, player, player_cam, pos, pos3d, cam, faction, hp, dynamic): Self::SystemData) {
         let camera = cam.get(player_cam.0).unwrap();
         let camera_pos = pos3d.get(player_cam.0).unwrap();
         let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
@@ -441,7 +331,7 @@ impl<'a> System<'a> for AIFollowSystem {
     );
 
     fn run(&mut self, (ents, mut dest, mut orient, follow, pos): Self::SystemData) {
-        for (ent, mut orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
+        for (ent, orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
             if let Some(hunted) = pos.get(follow.target) {
                 let difference: Vector2<f32> = hunted.0 - hunter.0;
                 let distance = difference.magnitude();
@@ -475,7 +365,7 @@ impl<'a> System<'a> for GoToDestinationSystem {
             let time_to_stop = speed.0 / accel.0;
             let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
             let target_velocity = direction * speed.0 * slowdown;
-            let delta: Vector2<f32> = (target_velocity - vel.0);
+            let delta: Vector2<f32> = target_velocity - vel.0;
             let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
 
             if delta != Vector2::unit_x() * 0.0 {
@@ -485,99 +375,6 @@ impl<'a> System<'a> for GoToDestinationSystem {
     }
 }
 
-pub struct Physics2DSystem;
-
-impl<'a> System<'a> for Physics2DSystem {
-    type SystemData = (
-        Entities<'a>,
-        ReadExpect<'a, FrameTime>,
-        ReadStorage<'a, Position>,
-        WriteStorage<'a, Velocity>,
-        ReadStorage<'a, StaticBody>,
-        ReadStorage<'a, DynamicBody>,
-        ReadStorage<'a, CircleCollider>,
-        ReadStorage<'a, SquareCollider>,
-    );
-
-    fn run(&mut self, (ents, frame_time, pos, mut vel, statics, dynamics, circles, squares): Self::SystemData) {
-        // TODO: Move these to an EntityValidationSystem or something like that
-        (&dynamics, &statics).par_join().for_each(|_| {
-            panic!("There's a naughty static body that really feels dynamic inside.");
-        });
-        for _ in (&dynamics, !&vel).join() {
-            panic!("A dynamic entity has no velocity!");
-        }
-        let damping = 4.0;
-        for (_, vel) in (&dynamics, &mut vel).join() {
-            vel.0 *= 1. - (damping * frame_time.0).min(1.);
-        }
-        (&ents, &dynamics, &pos, &circles).join().for_each(|(ent_a, _, pos_a, circle_a)| {
-            (&ents, &dynamics, &pos, &circles).join().for_each(|(ent_b, _, pos_b, circle_b)| {
-                if ent_a != ent_b {
-                    let collision_distance = circle_a.radius + circle_b.radius;
-
-                    // get post move locations
-                    let delta_a = pos_a.0 + frame_time.0 * vel.get(ent_a).unwrap().0;
-                    let delta_b = pos_b.0 + frame_time.0 * vel.get(ent_b).unwrap().0;
-                    // vector from ent_a to ent_b
-                    let position_delta = delta_a - delta_b;
-                    // how much are we colliding?
-                    let collision_depth = collision_distance - position_delta.magnitude();
-                    // same as position_delta but without velocity applied
-                    let collision_direction = position_delta.normalize();
-                    if collision_depth > 0.0 {
-                        //vel.get_mut(ent_a).unwrap().0 += (position_delta.normalize_to(collision_depth));
-                        //vel.get_mut(ent_b).unwrap().0 -= (position_delta.normalize_to(collision_depth));
-
-                        // get_mut is necessary to appease the borrow checker
-                        vel.get_mut(ent_a).unwrap().0 += collision_direction * collision_depth / 2.0 / frame_time.0;
-                        vel.get_mut(ent_b).unwrap().0 -= collision_direction * collision_depth / 2.0 / frame_time.0;
-                    }
-                }
-            });
-        });
-        for (_, pos_a, vel_a, circle_a) in (&dynamics, &pos, &mut vel, &circles).join() {
-            for (_, pos_b, circle_b) in (&statics, &pos, &circles).join() {
-                let collision_distance = circle_a.radius + circle_b.radius;
-                // get post move locations
-                let delta_a = pos_a.0 + vel_a.0 * frame_time.0;
-                let delta_b = pos_b.0;
-                // vector from ent_a to ent_b
-                let position_delta = delta_a - delta_b;
-                // how much are we colliding?
-                let collision_depth = collision_distance - position_delta.magnitude();
-                if collision_depth > 0.0 {
-                    vel_a.0 += (position_delta.normalize_to(collision_depth));
-                }
-            }
-        }
-        (&dynamics, &pos, &mut vel, &circles).join().for_each(|(_, pos_a, vel_a, circle_a)| {
-            for (_, pos_b, square_b) in (&statics, &pos, &squares).join() {
-                let half_side = square_b.side_length / 2.0;
-                let position_difference: Vector2<f32> = pos_a.0 + vel_a.0 * frame_time.0 - pos_b.0;
-                let abs_pos_diff: Vector2<f32> = Vector2::new(position_difference.x.abs(), position_difference.y.abs());
-                let difference_from_corner = abs_pos_diff - Vector2::new(half_side, half_side);
-                if difference_from_corner.magnitude() < circle_a.radius {
-                    let sigference: Vector2<f32> = Vector2::new(position_difference.x.signum(), position_difference.y.signum());
-                    let vel_change = sigference.mul_element_wise(difference_from_corner.normalize()) * (difference_from_corner.magnitude() - circle_a.radius);
-                    vel_a.0 -= vel_change / frame_time.0;
-                }
-                let diff: Vector2<f32> = pos_a.0 + vel_a.0 * frame_time.0 - pos_b.0;
-                let abs_diff: Vector2<f32> = Vector2::new(diff.x.abs(), diff.y.abs());
-                if abs_diff.x <= half_side {
-                    if abs_diff.y < half_side + circle_a.radius {
-                        vel_a.0.y -= (abs_diff.y - circle_a.radius - half_side) * diff.y.signum() / frame_time.0;
-                    }
-                }
-                if abs_diff.y <= half_side {
-                    if abs_diff.x < half_side + circle_a.radius {
-                        vel_a.0.x -= (abs_diff.x - circle_a.radius - half_side) * diff.x.signum() / frame_time.0;
-                    }
-                }
-            }
-        });
-    }
-}
 
 pub struct MapSwitchingSystem;
 
@@ -599,17 +396,6 @@ impl<'a> System<'a> for MapSwitchingSystem {
     }
 }
 
-use self::cgmath::{Matrix4, Vector4, Deg};
-use crate::graphics::{project_screen_to_world, LocalUniforms, to_vec2};
-use crate::dung_gen::DungGen;
-use rand::{thread_rng, Rng};
-use std::time::{SystemTime, Duration};
-use std::path::Path;
-use glsl_to_spirv::ShaderType;
-use futures::SinkExt;
-use rand::prelude::*;
-use std::process::exit;
-
 pub struct DunGenSystem;
 
 impl<'a> System<'a> for DunGenSystem {
@@ -625,7 +411,7 @@ impl<'a> System<'a> for DunGenSystem {
         Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut trans, context, ass_man, player, mut floor, mut ents, tile, factions, updater): Self::SystemData) {
+    fn run(&mut self, (mut trans, context, ass_man, player, mut floor, ents, tile, factions, updater): Self::SystemData) {
         match *trans {
             MapTransition::Deeper => {
                 for (ent, _) in (&ents, &tile).join() {
@@ -712,7 +498,7 @@ impl<'a> System<'a> for DunGenSystem {
                             ass_man.get_model_index("floortile.obj").unwrap(),
                         )
                     };
-                    let mut entity = ents.create();
+                    let entity = ents.create();
                     let model = StaticModel::new(
                         &context,
                         match wall_type {
@@ -749,7 +535,7 @@ impl<'a> System<'a> for DunGenSystem {
                         }
                     }
                     match wall_type {
-                        TileType::Wall(maybe_direction) => {
+                        TileType::Wall(_) => {
                             updater.insert(entity, StaticBody);
                             updater.insert(entity, SquareCollider { side_length: 1.0 });
                         }

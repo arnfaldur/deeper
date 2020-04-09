@@ -6,7 +6,6 @@ use rand::Rng;
 use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
 use std::collections::HashMap;
 use self::rand::thread_rng;
-use specs::prelude::*;
 use crate::components::{TileType, WallDirection};
 
 pub struct DungGen {
