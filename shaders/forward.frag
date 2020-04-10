@@ -254,9 +254,9 @@ void main() {
     color = RGBtoHCY(color);
 
     // Brightness
-    color.z += 0.152;
+    color.z += 0.112;
     // Contrast
-    color.z = contrast(2.0, color.z);
+    color.z = contrast(1.6, color.z);
 
     color = HCYtoRGB(color);
 
