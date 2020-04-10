@@ -88,7 +88,7 @@ async fn run_async() {
         .with(SphericalFollowSystem, "SphericalFollow", &["Movement"])
         .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(DunGenSystem, "DunGen", &["MapSwitching"])
-        .with(GraphicsSystem::new(), "Graphics", &[]).build();
+        .with(rendering::RenderingSystem::new(), "Rendering", &[]).build();
 
     let player = world
         .create_entity()
