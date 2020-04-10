@@ -1,25 +1,22 @@
-use specs::prelude::*;
-use std::f32::consts::{PI, FRAC_PI_2};
-use zerocopy::AsBytes;
-
 extern crate cgmath;
+
+use specs::prelude::*;
+use rand::prelude::*;
+use std::f32::consts::{FRAC_PI_2};
+use zerocopy::AsBytes;
 
 use cgmath::{prelude::*, Vector2, Vector3};
 
-use crate::{graphics};
-use crate::loader;
-use crate::input::{InputState, Key};
+use crate::{loader, graphics};
 use crate::components::*;
 
 use self::cgmath::{Matrix4, Vector4, Deg};
-use crate::graphics::{project_screen_to_world};
 use crate::dung_gen::DungGen;
-use rand::{thread_rng, Rng};
 use std::time::{SystemTime};
-use rand::prelude::*;
 
 pub mod assets;
 pub mod physics;
+pub mod player;
 
 pub struct SphericalFollowSystem;
 
@@ -37,261 +34,6 @@ impl<'a> System<'a> for SphericalFollowSystem {
             pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
             pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
             pos3d.0.z += follow.radius * follow.phi.sin();
-        }
-    }
-}
-
-pub struct GraphicsSystem {
-    time_started: SystemTime,
-}
-
-impl GraphicsSystem {
-    pub fn new() -> Self {
-        Self {
-            time_started: SystemTime::now(),
-        }
-    }
-}
-
-impl<'a> System<'a> for GraphicsSystem {
-    type SystemData = (
-        WriteExpect<'a, graphics::Context>,
-        ReadExpect<'a, loader::AssetManager>,
-        ReadExpect<'a, ActiveCamera>,
-        ReadStorage<'a, Camera>,
-        ReadStorage<'a, Target>,
-        ReadStorage<'a, Position3D>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Orientation>,
-        ReadStorage<'a, Model3D>,
-        ReadStorage<'a, StaticModel>,
-        ReadStorage<'a, HitPoints>,
-    );
-
-    fn run(&mut self, (mut context, ass_man, active_cam, camera, target, pos3d, pos, orient, models, static_model, hp): Self::SystemData) {
-        let frame = context.swap_chain.get_next_texture().unwrap();
-
-        let cam = camera.get(active_cam.0)
-            .expect("No valid active camera entity");
-
-        let cam_pos = pos3d.get(active_cam.0)
-            .expect("Camera entity has no 3D position");
-
-        let cam_target =
-            pos.get(target.get(active_cam.0).unwrap().0).unwrap().to_vec3();
-
-        let mx_correction = graphics::correction_matrix();
-
-        let mx_view = cgmath::Matrix4::look_at(
-            graphics::to_pos3(cam_pos.0),
-            graphics::to_pos3(cam_target),
-            cgmath::Vector3::unit_z(),
-        );
-
-        let mx_projection = cgmath::perspective(
-            cgmath::Deg(cam.fov),
-            context.sc_desc.width as f32 / context.sc_desc.height as f32,
-            1.0,
-            1000.0,
-        );
-
-        let mx = mx_correction * mx_projection * mx_view;
-
-        let global_uniforms = graphics::GlobalUniforms {
-            projection_view_matrix: mx.into(),
-            eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
-            time: SystemTime::now().duration_since(self.time_started).unwrap().as_secs_f32(),
-        };
-
-        let new_uniform_buf = context.device.create_buffer_with_data(
-            global_uniforms.as_bytes(),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-        );
-
-        let mut encoder = context.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: None }
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &new_uniform_buf,
-            0,
-            &context.uniform_buf,
-            0,
-            std::mem::size_of::<graphics::GlobalUniforms>() as u64,
-        );
-
-        let mut uniforms = vec!();
-
-        for (pos, model, rotation, hp) in (&pos, &models, (&orient).maybe(), (&hp).maybe()).join() {
-            let mut matrix = Matrix4::from_scale(model.scale);
-            if let Some(rot) = rotation {
-                matrix = Matrix4::from_angle_z(rot.0) * matrix;
-            }
-            matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
-
-            let bloody_red = Vector4::unit_x() + Vector4::unit_w();
-
-            let alb = Vector4::from(model.material.albedo);
-
-            let mut redder_mat: graphics::Material = model.material.clone();
-            if let Some(hp) = hp {
-                redder_mat.albedo = bloody_red.lerp(alb, hp.health / hp.max).into();
-            }
-
-            let local_uniforms = graphics::LocalUniforms {
-                model_matrix: matrix.into(),
-                material: redder_mat,
-            };
-            uniforms.push(local_uniforms);
-        }
-
-        let temp_buf = context.device.create_buffer_with_data(
-            uniforms.as_bytes(),
-            wgpu::BufferUsage::COPY_SRC,
-        );
-
-        for (i, (pos, model)) in (&pos, &models).join().enumerate() {
-            encoder.copy_buffer_to_buffer(
-                &temp_buf,
-                (i * std::mem::size_of::<graphics::LocalUniforms>()) as u64,
-                &model.uniform_buffer,
-                0,
-                std::mem::size_of::<graphics::LocalUniforms>() as u64,
-            );
-        }
-
-        {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-                }],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                    attachment: &context.depth_view,
-                    depth_load_op: wgpu::LoadOp::Clear,
-                    depth_store_op: wgpu::StoreOp::Store,
-                    clear_depth: 1.0,
-                    stencil_load_op: wgpu::LoadOp::Clear,
-                    stencil_store_op: wgpu::StoreOp::Store,
-                    clear_stencil: 0,
-                }),
-            });
-
-            rpass.set_pipeline(&context.pipeline);
-            rpass.set_bind_group(0, &context.bind_group, &[]);
-
-            for model in (&static_model).join() {
-                rpass.set_bind_group(1, &model.bind_group, &[]);
-                for mesh in &ass_man.models[model.idx].meshes {
-                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
-                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
-                }
-            }
-
-            for (_, model) in (&pos, &models).join() {
-                rpass.set_bind_group(1, &model.bind_group, &[]);
-                for mesh in &ass_man.models[model.idx].meshes {
-                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
-                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
-                }
-            }
-        }
-
-        let command_buf = encoder.finish();
-
-        context.queue.submit(&[command_buf]);
-    }
-}
-
-pub struct PlayerSystem;
-
-// Note(Jökull): Is this really just the input handler?
-impl<'a> System<'a> for PlayerSystem {
-    type SystemData = (
-        Entities<'a>,
-        Read<'a, LazyUpdate>,
-        WriteStorage<'a, Orientation>,
-        WriteStorage<'a, Destination>,
-        WriteStorage<'a, SphericalOffset>,
-        ReadExpect<'a, InputState>,
-        ReadExpect<'a, graphics::Context>,
-        ReadExpect<'a, Player>,
-        ReadExpect<'a, PlayerCamera>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Position3D>,
-        ReadStorage<'a, Camera>,
-        ReadStorage<'a, Faction>,
-        ReadStorage<'a, HitPoints>,
-        ReadStorage<'a, DynamicBody>,
-    );
-
-    fn run(&mut self, (ents, updater, mut orient, mut dest, mut offset, input, context, player, player_cam, pos, pos3d, cam, faction, hp, dynamic): Self::SystemData) {
-        let camera = cam.get(player_cam.0).unwrap();
-        let camera_pos = pos3d.get(player_cam.0).unwrap();
-        let mut camera_offset = offset.get_mut(player_cam.0).unwrap();
-
-        let mouse_pos = input.mouse.pos;
-        let mouse_delta = input.mouse.pos - input.mouse.last_pos;
-
-        // camera orbiting system enabled for now
-        if input.mouse.middle.down {
-            camera_offset.theta += camera_offset.theta_delta * mouse_delta.x;
-            camera_offset.phi += camera_offset.phi_delta * mouse_delta.y;
-            camera_offset.phi = camera_offset.phi.max(0.1 * PI).min(0.25 * PI);
-        }
-
-        let player_pos = pos.get(player.entity)
-            .expect("I have no place in this world.");
-        let mut player_orient = orient.get_mut(player.entity)
-            .expect("We have no direction in life.");
-
-        if input.mouse.left.down {
-            // Note(Jökull): We need a better solution for this
-
-            let mx_view = cgmath::Matrix4::look_at(
-                graphics::to_pos3(camera_pos.0),
-                graphics::to_pos3(player_pos.to_vec3()),
-                cgmath::Vector3::unit_z(),
-            );
-            let mx_projection = cgmath::perspective(
-                cgmath::Deg(camera.fov),
-                1920f32 / 1080f32,
-                1.0,
-                1000.0,
-            );
-
-            if let Some(mouse_world_pos) = project_screen_to_world(
-                Vector3::new(mouse_pos.x, mouse_pos.y, 1.0),
-                graphics::correction_matrix() * mx_projection * mx_view,
-                Vector4::new(0, 0, context.sc_desc.width as i32, context.sc_desc.height as i32),
-            ) {
-                let ray_delta: Vector3<f32> = mouse_world_pos - camera_pos.0;
-                let t: f32 = mouse_world_pos.z / ray_delta.z;
-                let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
-
-                dest.insert(player.entity, Destination(ray_hit));
-
-                let difference: Vector2<f32> = (ray_hit - player_pos.0).normalize();
-
-                let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
-                if difference.x > 0.0 {
-                    new_rotation += 180.0;
-                }
-                (player_orient.0).0 = new_rotation;
-            }
-        }
-        if input.is_key_pressed(Key::Space) {
-            for (ent, pos, &HitPoints { max, health }, &faction, dynamic) in (&ents, &pos, &hp, &faction, &dynamic).join() {
-                let forward_vector = cgmath::Basis2::<f32>::from_angle(player_orient.0).rotate_vector(-Vector2::unit_x());
-                let in_frontness = (pos.0 - player_pos.0).normalize().dot(forward_vector.normalize());
-                if faction == Faction::Enemies && pos.0.distance(player_pos.0) < 2.0 && in_frontness > 0.5 {
-                    updater.insert(ent, HitPoints { max, health: (health - 1.0).max(0.0) });
-                    updater.insert(ent, Velocity((pos.0 - player_pos.0).normalize() * 1.5 / dynamic.0));
-                }
-            }
         }
     }
 }
@@ -573,5 +315,170 @@ impl<'a> System<'a> for DunGenSystem {
             _ => {}
         }
         *trans = MapTransition::None;
+    }
+}
+
+pub struct GraphicsSystem {
+    time_started: SystemTime,
+}
+
+impl GraphicsSystem {
+    pub fn new() -> Self {
+        Self {
+            time_started: SystemTime::now(),
+        }
+    }
+}
+
+impl<'a> System<'a> for GraphicsSystem {
+    type SystemData = (
+        WriteExpect<'a, graphics::Context>,
+        ReadExpect<'a, loader::AssetManager>,
+        ReadExpect<'a, ActiveCamera>,
+        ReadStorage<'a, Camera>,
+        ReadStorage<'a, Target>,
+        ReadStorage<'a, Position3D>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Orientation>,
+        ReadStorage<'a, Model3D>,
+        ReadStorage<'a, StaticModel>,
+        ReadStorage<'a, HitPoints>,
+    );
+
+    fn run(&mut self, (mut context, ass_man, active_cam, camera, target, pos3d, pos, orient, models, static_model, hp): Self::SystemData) {
+        let frame = context.swap_chain.get_next_texture().unwrap();
+
+        let cam = camera.get(active_cam.0)
+            .expect("No valid active camera entity");
+
+        let cam_pos = pos3d.get(active_cam.0)
+            .expect("Camera entity has no 3D position");
+
+        let cam_target =
+            pos.get(target.get(active_cam.0).unwrap().0).unwrap().to_vec3();
+
+        let mx_correction = graphics::correction_matrix();
+
+        let mx_view = cgmath::Matrix4::look_at(
+            graphics::to_pos3(cam_pos.0),
+            graphics::to_pos3(cam_target),
+            cgmath::Vector3::unit_z(),
+        );
+
+        let mx_projection = cgmath::perspective(
+            cgmath::Deg(cam.fov),
+            context.sc_desc.width as f32 / context.sc_desc.height as f32,
+            1.0,
+            1000.0,
+        );
+
+        let mx = mx_correction * mx_projection * mx_view;
+
+        let global_uniforms = graphics::GlobalUniforms {
+            projection_view_matrix: mx.into(),
+            eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
+            time: SystemTime::now().duration_since(self.time_started).unwrap().as_secs_f32(),
+        };
+
+        let new_uniform_buf = context.device.create_buffer_with_data(
+            global_uniforms.as_bytes(),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+        );
+
+        let mut encoder = context.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: None }
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &new_uniform_buf,
+            0,
+            &context.uniform_buf,
+            0,
+            std::mem::size_of::<graphics::GlobalUniforms>() as u64,
+        );
+
+        let mut uniforms = vec!();
+
+        for (pos, model, rotation, hp) in (&pos, &models, (&orient).maybe(), (&hp).maybe()).join() {
+            let mut matrix = Matrix4::from_scale(model.scale);
+            if let Some(rot) = rotation {
+                matrix = Matrix4::from_angle_z(rot.0) * matrix;
+            }
+            matrix = Matrix4::from_translation(pos.to_vec3()) * matrix;
+
+            let bloody_red = Vector4::unit_x() + Vector4::unit_w();
+
+            let alb = Vector4::from(model.material.albedo);
+
+            let mut redder_mat: graphics::Material = model.material.clone();
+            if let Some(hp) = hp {
+                redder_mat.albedo = bloody_red.lerp(alb, hp.health / hp.max).into();
+            }
+
+            let local_uniforms = graphics::LocalUniforms {
+                model_matrix: matrix.into(),
+                material: redder_mat,
+            };
+            uniforms.push(local_uniforms);
+        }
+
+        let temp_buf = context.device.create_buffer_with_data(
+            uniforms.as_bytes(),
+            wgpu::BufferUsage::COPY_SRC,
+        );
+
+        for (i, (pos, model)) in (&pos, &models).join().enumerate() {
+            encoder.copy_buffer_to_buffer(
+                &temp_buf,
+                (i * std::mem::size_of::<graphics::LocalUniforms>()) as u64,
+                &model.uniform_buffer,
+                0,
+                std::mem::size_of::<graphics::LocalUniforms>() as u64,
+            );
+        }
+
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &context.depth_view,
+                    depth_load_op: wgpu::LoadOp::Clear,
+                    depth_store_op: wgpu::StoreOp::Store,
+                    clear_depth: 1.0,
+                    stencil_load_op: wgpu::LoadOp::Clear,
+                    stencil_store_op: wgpu::StoreOp::Store,
+                    clear_stencil: 0,
+                }),
+            });
+
+            rpass.set_pipeline(&context.pipeline);
+            rpass.set_bind_group(0, &context.bind_group, &[]);
+
+            for model in (&static_model).join() {
+                rpass.set_bind_group(1, &model.bind_group, &[]);
+                for mesh in &ass_man.models[model.idx].meshes {
+                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
+                }
+            }
+
+            for (_, model) in (&pos, &models).join() {
+                rpass.set_bind_group(1, &model.bind_group, &[]);
+                for mesh in &ass_man.models[model.idx].meshes {
+                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
+                }
+            }
+        }
+
+        let command_buf = encoder.finish();
+
+        context.queue.submit(&[command_buf]);
     }
 }

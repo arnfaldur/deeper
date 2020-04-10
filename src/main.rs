@@ -1,4 +1,8 @@
+// in development code can have some unused variables
+// should be periodically removed to remove serious redundancies
 #![allow(unused_variables)]
+// TODO: remove actually fix the warnings
+#![allow(unused_must_use)]
 mod loader;
 
 mod dung_gen;
@@ -75,7 +79,7 @@ async fn run_async() {
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
-        .with(PlayerSystem, "Player", &[])
+        .with(player::PlayerSystem, "Player", &[])
         .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
         .with(AIFollowSystem, "AIFollow", &[])
         .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
