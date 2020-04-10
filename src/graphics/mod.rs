@@ -1,6 +1,4 @@
 use zerocopy::{AsBytes, FromBytes};
-use std::sync::Arc;
-use lazy_static::lazy_static;
 
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -130,7 +128,7 @@ use std::path::Path;
 use wavefront_obj::obj;
 use std::fs::File;
 use std::io::Read;
-use wgpu::{BufferDescriptor, TextureView, ShaderModule, RenderPipeline, PipelineLayout, Device};
+use wgpu::{ShaderModule, RenderPipeline, PipelineLayout, Device};
 use cgmath::Vector3;
 use winit::window::Window;
 use winit::dpi::PhysicalSize;
@@ -173,7 +171,7 @@ impl Context {
             wgpu::BackendBit::PRIMARY,
         ).await.unwrap();
 
-        let (device, mut queue) = adapter.request_device(
+        let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
                 extensions: wgpu::Extensions {
                     anisotropic_filtering: false
@@ -182,7 +180,7 @@ impl Context {
             }
         ).await;
 
-        let mut sc_desc = wgpu::SwapChainDescriptor {
+        let sc_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
             format: COLOR_FORMAT,
             width: size.width as u32,
@@ -190,7 +188,7 @@ impl Context {
             present_mode: wgpu::PresentMode::Mailbox,
         };
 
-        let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
         let depth_view = Context::create_depth_view(&device, size);
 
@@ -239,7 +237,7 @@ impl Context {
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
-        let mut bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
             bindings: &[
@@ -275,7 +273,7 @@ impl Context {
 
         let pipeline = Context::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
 
-        let mut context = Context {
+        let context = Context {
             device,
             queue,
             surface,
@@ -383,7 +381,7 @@ impl Context {
     }
 
     pub fn load_model_from_obj(&self, path: &Path) -> Model {
-        let mut vertex_lists = vertex_lists_from_obj(path).unwrap();
+        let vertex_lists = vertex_lists_from_obj(path).unwrap();
         return self.load_model_from_vertex_lists(&vertex_lists);
     }
 
@@ -505,8 +503,8 @@ pub fn to_vec2<T>(vec3: cgmath::Vector3<T>) -> cgmath::Vector2<T> {
 pub fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
     let mx_projection = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 10.0);
     let mx_view = cgmath::Matrix4::look_at(
-        pos3(5.0  * t.cos(), 5.0 * t.sin(), 3.0),
-        pos3(0f32, 0.0, 0.0),
+        pos3(5.  * t.cos(), 5.0 * t.sin(), 3.),
+        pos3(0., 0., 0.),
         cgmath::Vector3::unit_z(),
     );
     let mx_correction = correction_matrix();

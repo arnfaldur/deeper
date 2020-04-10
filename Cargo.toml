@@ -27,6 +27,7 @@ glsl-to-spirv = "0.1"
 zerocopy = "0.3"
 wavefront_obj = "*"
 lazy_static = "1.4.0"
+imgui = "0.3.0"
 
 # loader
 ron = "*"

@@ -1,10 +1,11 @@
+// in development code can have some unused variables
+// should be periodically removed to remove serious redundancies
+#![allow(unused_variables)]
+// TODO: remove actually fix the warnings
+#![allow(unused_must_use)]
 mod loader;
 
-use loader::AssetManager;
-
 mod dung_gen;
-
-use dung_gen::DungGen;
 
 mod graphics;
 mod input;
@@ -12,28 +13,22 @@ mod input;
 mod components;
 mod systems;
 
+use loader::AssetManager;
+
 use crate::components::*;
 use crate::systems::*;
 
-use std::f32::consts::PI;
-use rand::seq::SliceRandom;
 use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 
-use std::{mem, slice};
-use crate::graphics::{Vertex, Model, Mesh};
-use wgpu::{TextureViewDimension, CompareFunction, PrimitiveTopology, BufferDescriptor, CommandEncoder};
 use cgmath::{Vector2, Vector3, Deg};
 
-use zerocopy::AsBytes;
-use crate::input::{EventBucket, InputState};
-use rand::{thread_rng, Rng};
+use crate::input::{InputState};
 use std::time::Instant;
-use glsl_to_spirv::ShaderType::Fragment;
-use std::ops::{DerefMut, Deref};
+use std::ops::{DerefMut};
 
 
 async fn run_async() {
@@ -45,7 +40,7 @@ async fn run_async() {
 
     let size = PhysicalSize { width: ds.screen_width, height: ds.screen_height };
 
-    let mut builder = winit::window::WindowBuilder::new()
+    let builder = winit::window::WindowBuilder::new()
         .with_title("deeper")
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
@@ -57,8 +52,6 @@ async fn run_async() {
     let mut world = World::new();
 
     register_components(&mut world);
-
-    use std::path::Path;
 
     // use rg3d_sound::context::Context as AudioContext;
     // use rg3d_sound::buffer::SoundBuffer;
@@ -85,13 +78,13 @@ async fn run_async() {
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
-        .with(HotLoaderSystem::new(), "HotLoader", &[])
-        .with(PlayerSystem, "Player", &[])
+        .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
+        .with(player::PlayerSystem, "Player", &[])
         .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
         .with(AIFollowSystem, "AIFollow", &[])
         .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
-        .with(Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
-        .with(MovementSystem, "Movement", &["Physics2D", "Player"])
+        .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
+        .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
         .with(SphericalFollowSystem, "SphericalFollow", &["Movement"])
         .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(DunGenSystem, "DunGen", &["MapSwitching"])
@@ -130,7 +123,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
-    world.insert(0 as i64);
+    world.insert(17 as i64);
 
     let input_state = InputState::new();
     world.insert(input_state);

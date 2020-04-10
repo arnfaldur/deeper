@@ -1,6 +1,6 @@
 extern crate specs;
 extern crate cgmath;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes};
 
 use cgmath::{Vector2, Vector3};
 
@@ -11,7 +11,6 @@ use specs::{Component, VecStorage};
 
 use std::f32::consts::PI;
 use crate::graphics;
-use crate::graphics::LocalUniforms;
 use self::cgmath::{Matrix4, Deg};
 
 // Note(Jökull): Begin entity pointers
