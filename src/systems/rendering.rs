@@ -48,8 +48,8 @@ impl<'a> System<'a> for RenderingSystem {
         let cam_pos = pos3d.get(active_cam.0)
             .expect("Camera entity has no 3D position");
 
-        let cam_target =
-            pos.get(target.get(active_cam.0).unwrap().0).unwrap().to_vec3();
+        let cam_target = pos.get(target.get(active_cam.0)
+            .unwrap().0).unwrap().to_vec3();
 
         let mx_correction = graphics::correction_matrix();
 
@@ -113,6 +113,7 @@ impl<'a> System<'a> for RenderingSystem {
                 model_matrix: matrix.into(),
                 material: redder_mat,
             };
+
             uniforms.push(local_uniforms);
         }
 

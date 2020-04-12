@@ -32,13 +32,7 @@ impl<'a> System<'a> for HotLoaderSystem {
 
     fn run(&mut self, (mut ass_man, mut context, input): Self::SystemData) {
         if input.is_key_pressed(Key::H) {
-            println!("Hotloading shaders turned {}",
-                     if self.hotload_shaders_turned_on {
-                         "OFF"
-                     } else {
-                         "ON"
-                     }
-            );
+            println!("Hotloading shaders turned {}", if self.hotload_shaders_turned_on { "OFF" } else { "ON" });
             self.hotload_shaders_turned_on = !self.hotload_shaders_turned_on;
         }
 

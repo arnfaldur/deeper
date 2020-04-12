@@ -4,12 +4,13 @@ version = "0.0.1"
 authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-#[profile.release]
-#debug = true
 
 [dependencies]
+
+# misc
+itertools = "0.9"
+
 # dung_gen
 rand = "0.7"
 ena  = "0.13.1"
@@ -18,16 +19,18 @@ ena  = "0.13.1"
 rg3d-sound = "0.11.0"
 
 # graphics and input
+wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
 cgmath        = "0.17"
 winit         = "0.22"
-wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
 futures       = "0.3"
 env_logger    = "0.7"
 glsl-to-spirv = "0.1"
 zerocopy = "0.3"
-wavefront_obj = "*"
 lazy_static = "1.4.0"
 imgui = "0.3.0"
+
+wavefront_obj = "*"
+gltf = "0.15.2"
 
 # loader
 ron = "*"

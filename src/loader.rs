@@ -138,7 +138,7 @@ impl AssetManager {
                         if let Some(ext) = entry.path().extension() {
                             let ext = ext.to_str().unwrap().to_string();
                             if model_extensions.contains(&ext) {
-                                self.load_model(&path, context);
+                                self.load_model(&path, &ext, context);
                             }
                         }
                     }
@@ -147,8 +147,8 @@ impl AssetManager {
         }
     }
 
-    fn load_model(&mut self, path: &Path, context: &graphics::Context) {
-        // Assumes is a valid model
+    // Assumes is a valid model
+    fn load_model(&mut self, path: &Path, ext: &String, context: &graphics::Context) {
         if let Some(
             Asset{
                 loaded_at_time: time_loaded,
@@ -156,15 +156,28 @@ impl AssetManager {
             }) = self.assets.get(path) {
             let modified = fs::metadata(path).unwrap().modified().unwrap();
             if modified.gt(&time_loaded) {
-                self.models[*idx] = context.load_model_from_obj(path);
+                self.models[*idx] = AssetManager::get_graphics_model(path, ext, context);
                 println!("[loader] Hotloaded: {:?}", path.file_name().unwrap());
                 self.assets.get_mut(path).unwrap().loaded_at_time = SystemTime::now();
             }
         } else {
-            let model = context.load_model_from_obj(path);
-            self.models.push(model);
+            self.models.push(AssetManager::get_graphics_model(path, ext, context));
             println!("[loader] Loaded: {:?}", path.file_name().unwrap());
             self.register_asset(path, AssetKind::Model(self.models.len() - 1));
+        }
+    }
+
+    // Note(Jökull): The graphics layer should possibly deal with this :shrug:
+    fn get_graphics_model(path: &Path, ext: &String, context: &graphics::Context) -> graphics::Model {
+        // TODO: Generalize this
+        match ext.as_str() {
+            "obj"          => context.load_model_from_obj(path),
+            "glb" | "gltf" => context.load_model_from_gltf(path),
+            _ => {
+                // Should not happen
+                println!("[loader] (error): Extension {} not recognized.", ext);
+                graphics::Model { meshes: vec![] }
+            }
         }
     }
 

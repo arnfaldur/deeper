@@ -75,7 +75,6 @@ async fn run_async() {
     //     .unwrap()
     //     .add_source(source);
 
-
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
@@ -123,7 +122,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
-    world.insert(17 as i64);
+    world.insert(0 as i64);
 
     let input_state = InputState::new();
     world.insert(input_state);
@@ -144,7 +143,6 @@ async fn run_async() {
             }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 world.get_mut::<graphics::Context>().unwrap().resize(size);
-                //unimplemented!();
             }
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
             | Event::WindowEvent {

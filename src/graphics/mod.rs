@@ -6,7 +6,7 @@ pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes)]
+#[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub normal: [f32; 3],
@@ -132,6 +132,7 @@ use wgpu::{ShaderModule, RenderPipeline, PipelineLayout, Device};
 use cgmath::Vector3;
 use winit::window::Window;
 use winit::dpi::PhysicalSize;
+use itertools::Itertools;
 
 pub struct Context {
     pub device: wgpu::Device,
@@ -380,6 +381,11 @@ impl Context {
         return depth_texture.create_default_view();
     }
 
+    pub fn load_model_from_gltf(&self, path: &Path) -> Model {
+        let vertex_lists = vertex_lists_from_gltf(path).unwrap();
+        return self.load_model_from_vertex_lists(&vertex_lists);
+    }
+
     pub fn load_model_from_obj(&self, path: &Path) -> Model {
         let vertex_lists = vertex_lists_from_obj(path).unwrap();
         return self.load_model_from_vertex_lists(&vertex_lists);
@@ -407,6 +413,45 @@ impl Context {
         Model { meshes }
     }
 
+}
+
+// TODO: Handle transforms
+pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
+    let (document, buffers, _images) = gltf::import(path)
+        .expect(format!("[graphics/gltf] : File {} could not be opened", path.display()).as_ref());
+
+    // TODO: Add checks for multiple models/scenes, etc.
+
+    let mut vertex_lists = vec!();
+
+    use itertools::multizip;
+
+    for mesh in document.meshes() {
+        let mut vertex_list = vec!();
+        for primitive in mesh.primitives() {
+            // TODO: Is there a more readable way to do this
+            let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+
+            // TODO: This feels ... wrong
+            let mut positions = reader.read_positions().unwrap().collect_vec();
+            let mut normals = reader.read_normals().unwrap().collect_vec();
+            // TODO: What is set?
+            let mut tex_coords = reader.read_tex_coords(0).unwrap().into_f32().collect_vec();
+
+            let indices = reader.read_indices().unwrap().into_u32();
+
+            for idx in indices {
+                let pos = positions.get(idx as usize).unwrap().clone();
+                let normal = normals.get(idx as usize).unwrap().clone();
+                let tex_coord = tex_coords.get(idx as usize).unwrap().clone();
+
+                vertex_list.push(Vertex { pos, normal, tex_coord })
+            }
+        }
+        vertex_lists.push(vertex_list);
+    }
+
+    return Ok(vertex_lists);
 }
 
 pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
