@@ -3,7 +3,7 @@ use specs::prelude::*;
 use crate::{graphics, loader};
 use crate::input::{InputState, Key};
 
-use std::time::{SystemTime};
+use std::time::SystemTime;
 use std::path::Path;
 use glsl_to_spirv::ShaderType;
 
@@ -51,15 +51,15 @@ impl<'a> System<'a> for HotLoaderSystem {
                         if let Ok(sprv) = &wgpu::read_spirv(vs) {
                             Some(context.device.create_shader_module(sprv))
                         } else {
-                            println!("Failed to create shader module");
+                            eprintln!("Failed to create shader module");
                             None
                         }
                     } else {
-                        println!("Failed to recompile vertex shader");
+                        eprintln!("Failed to recompile vertex shader");
                         None
                     }
                 } else {
-                    println!("Failed to read vertex shader");
+                    eprintln!("Failed to read vertex shader");
                     None
                 };
 
@@ -68,15 +68,15 @@ impl<'a> System<'a> for HotLoaderSystem {
                         if let Ok(sprv) = &wgpu::read_spirv(fs) {
                             Some(context.device.create_shader_module(sprv))
                         } else {
-                            println!("Failed to create shader module");
+                            eprintln!("Failed to create shader module");
                             None
                         }
                     } else {
-                        println!("Failed to recompile fragment shader");
+                        eprintln!("Failed to recompile fragment shader");
                         None
                     }
                 } else {
-                    println!("Failed to read fragment shader");
+                    eprintln!("Failed to read fragment shader");
                     None
                 };
 

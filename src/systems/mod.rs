@@ -82,7 +82,7 @@ impl<'a> System<'a> for AIFollowSystem {
     }
 }
 
-pub(crate) struct GoToDestinationSystem;
+pub struct GoToDestinationSystem;
 
 impl<'a> System<'a> for GoToDestinationSystem {
     type SystemData = (
@@ -96,6 +96,10 @@ impl<'a> System<'a> for GoToDestinationSystem {
 
     fn run(&mut self, (frame_time, dest, pos, mut vel, speed, acc): Self::SystemData) {
         for (dest, hunter, vel, speed, accel) in (&dest, &pos, &mut vel, &speed, &acc).join() {
+            // check if straight path is available, line drawing? or just navmesh
+            // if not do A* and add intermediate destination component for next node in path
+            // or just make Destination an object inheriting from the abstract destinations
+            // class.
             let to_dest: Vector2<f32> = dest.0 - hunter.0;
             let direction = to_dest.normalize();
             let time_to_stop = speed.0 / accel.0;
@@ -111,3 +115,14 @@ impl<'a> System<'a> for GoToDestinationSystem {
     }
 }
 
+pub struct IntermediateDestinationSystem;
+
+impl<'a> System<'a> for IntermediateDestinationSystem {
+    type SystemData = (
+
+    );
+
+    fn run(&mut self, (): Self::SystemData) {
+
+    }
+}
