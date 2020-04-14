@@ -1,9 +1,6 @@
 use specs::prelude::*;
 
-extern crate cgmath;
-
-use crate::{graphics};
-use crate::loader;
+use crate::{graphics, loader};
 use crate::input::{InputState, Key};
 
 use std::time::{SystemTime};

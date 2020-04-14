@@ -1,7 +1,5 @@
 use specs::prelude::*;
 
-extern crate cgmath;
-
 use cgmath::{prelude::*, Vector2};
 
 use crate::components::*;

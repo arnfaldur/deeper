@@ -1,15 +1,12 @@
-extern crate cgmath;
-
 use specs::prelude::*;
 use zerocopy::AsBytes;
 
 use cgmath::prelude::*;
+use cgmath::{Matrix4, Vector4};
 
 use crate::{loader, graphics};
 use crate::components::*;
 
-use self::cgmath::{Matrix4, Vector4, Deg};
-use crate::dung_gen::DungGen;
 use std::time::{SystemTime};
 
 pub struct RenderingSystem {
