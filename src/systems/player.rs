@@ -1,14 +1,12 @@
-extern crate cgmath;
 
 use specs::prelude::*;
 use std::f32::consts::PI;
 
-use cgmath::{prelude::*, Vector2, Vector3};
+use cgmath::{prelude::*, Vector2, Vector3, Vector4};
 
 use crate::input::{InputState, Key};
 use crate::components::*;
 
-use self::cgmath::{Vector4};
 use crate::graphics::{Context, project_screen_to_world, to_pos3, correction_matrix};
 
 pub struct PlayerSystem;

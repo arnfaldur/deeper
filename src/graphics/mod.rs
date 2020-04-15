@@ -422,8 +422,6 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
 
     let mut vertex_lists = vec!();
 
-    use itertools::multizip;
-
     for mesh in document.meshes() {
         let mut vertex_list = vec!();
         for primitive in mesh.primitives() {
@@ -431,10 +429,10 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
             let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
 
             // TODO: This feels ... wrong
-            let mut positions = reader.read_positions().unwrap().collect_vec();
-            let mut normals = reader.read_normals().unwrap().collect_vec();
+            let positions = reader.read_positions().unwrap().collect_vec();
+            let normals = reader.read_normals().unwrap().collect_vec();
             // TODO: What is set?
-            let mut tex_coords = reader.read_tex_coords(0).unwrap().into_f32().collect_vec();
+            let tex_coords = reader.read_tex_coords(0).unwrap().into_f32().collect_vec();
 
             let indices = reader.read_indices().unwrap().into_u32();
 

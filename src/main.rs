@@ -85,8 +85,8 @@ async fn run_async() {
         .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
         .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
         .with(SphericalFollowSystem, "SphericalFollow", &["Movement"])
-        .with(MapSwitchingSystem, "MapSwitching", &["Movement"])
-        .with(DunGenSystem, "DunGen", &["MapSwitching"])
+        .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
+        .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
         .with(rendering::RenderingSystem::new(), "Rendering", &[]).build();
 
     let player = world
