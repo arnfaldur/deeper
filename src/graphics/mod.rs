@@ -26,9 +26,7 @@ pub struct GlobalUniforms {
 pub struct Material {
     pub albedo : [f32; 4],
     pub metallic : f32,
-    //_pad1 : [f32; 3],
     pub roughness : f32,
-    //_pad2 : [f32; 3],
 }
 
 impl Material {

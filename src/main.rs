@@ -130,6 +130,8 @@ async fn run_async() {
     // Setup world
     dispatcher.setup(&mut world);
 
+    let mut worlds = vec!();
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::MainEventsCleared => {

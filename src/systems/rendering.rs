@@ -51,25 +51,12 @@ impl<'a> System<'a> for RenderingSystem {
         let cam_target = pos.get(target.get(active_cam.0)
             .unwrap().0).unwrap().to_vec3();
 
-        let mx_correction = graphics::correction_matrix();
+        let aspect_ratio = context.sc_desc.width as f32 / context.sc_desc.height as f32;
 
-        let mx_view = cgmath::Matrix4::look_at(
-            graphics::to_pos3(cam_pos.0),
-            graphics::to_pos3(cam_target),
-            cgmath::Vector3::unit_z(),
-        );
-
-        let mx_projection = cgmath::perspective(
-            cgmath::Deg(cam.fov),
-            context.sc_desc.width as f32 / context.sc_desc.height as f32,
-            1.0,
-            1000.0,
-        );
-
-        let mx = mx_correction * mx_projection * mx_view;
+        let proj_view_matrix = generate_view_matrix(cam, cam_pos, cam_target, aspect_ratio);
 
         let global_uniforms = graphics::GlobalUniforms {
-            projection_view_matrix: mx.into(),
+            projection_view_matrix: proj_view_matrix.into(),
             eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
             time: SystemTime::now().duration_since(self.time_started).unwrap().as_secs_f32(),
         };
@@ -91,7 +78,7 @@ impl<'a> System<'a> for RenderingSystem {
             std::mem::size_of::<graphics::GlobalUniforms>() as u64,
         );
 
-        let mut uniforms = vec!();
+        let mut local_uniforms = vec!();
 
         for (pos, model, rotation, hp) in (&pos, &models, (&orient).maybe(), (&hp).maybe()).join() {
             let mut matrix = Matrix4::from_scale(model.scale);
@@ -109,16 +96,16 @@ impl<'a> System<'a> for RenderingSystem {
                 redder_mat.albedo = bloody_red.lerp(alb, hp.health / hp.max).into();
             }
 
-            let local_uniforms = graphics::LocalUniforms {
+            let model_uniforms = graphics::LocalUniforms {
                 model_matrix: matrix.into(),
                 material: redder_mat,
             };
 
-            uniforms.push(local_uniforms);
+            local_uniforms.push(model_uniforms);
         }
 
         let temp_buf = context.device.create_buffer_with_data(
-            uniforms.as_bytes(),
+            local_uniforms.as_bytes(),
             wgpu::BufferUsage::COPY_SRC,
         );
 
@@ -176,4 +163,22 @@ impl<'a> System<'a> for RenderingSystem {
 
         context.queue.submit(&[command_buf]);
     }
+
+}
+
+fn generate_view_matrix(cam: &Camera, cam_pos: &Position3D, cam_target: cgmath::Vector3<f32>, aspect_ratio: f32 ) -> cgmath::Matrix4<f32> {
+    let mx_correction = graphics::correction_matrix();
+
+    let mx_view = cgmath::Matrix4::look_at(
+        graphics::to_pos3(cam_pos.0),
+        graphics::to_pos3(cam_target),
+        cgmath::Vector3::unit_z(),
+    );
+
+    cgmath::perspective(
+        cgmath::Deg(cam.fov),
+        aspect_ratio,
+        1.0,
+        1000.0,
+    )
 }
