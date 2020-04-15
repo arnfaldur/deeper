@@ -53,27 +53,27 @@ async fn run_async() {
 
     register_components(&mut world);
 
-    // use rg3d_sound::context::Context as AudioContext;
-    // use rg3d_sound::buffer::SoundBuffer;
-    // use rg3d_sound::buffer::DataSource;
-    // use rg3d_sound::source::generic::GenericSourceBuilder;
-    // use rg3d_sound::source::Status;
-    // use rg3d_sound::source::SoundSource;
-    // use rg3d_sound::pool::Handle;
+     use rg3d_sound::context::Context as AudioContext;
+     use rg3d_sound::buffer::SoundBuffer;
+     use rg3d_sound::buffer::DataSource;
+     use rg3d_sound::source::generic::GenericSourceBuilder;
+     use rg3d_sound::source::Status;
+     use rg3d_sound::source::SoundSource;
+     use rg3d_sound::pool::Handle;
 
-    // let mut ac = AudioContext::new().unwrap();
+     let mut ac = AudioContext::new().unwrap();
 
-    // let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/GodlingMusicTest.wav").unwrap()).unwrap();
+     let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/dungexplorer-ambience.wav").unwrap()).unwrap();
 
-    // let source = GenericSourceBuilder::new(buf)
-    //     .with_status(Status::Playing)
-    //     .with_looping(true)
-    //     .build_source()
-    //     .unwrap();
+     let source = GenericSourceBuilder::new(buf)
+         .with_status(Status::Playing)
+         .with_looping(true)
+         .build_source()
+         .unwrap();
 
-    // let _source_handle: Handle<SoundSource> = ac.lock()
-    //     .unwrap()
-    //     .add_source(source);
+     let _source_handle: Handle<SoundSource> = ac.lock()
+         .unwrap()
+         .add_source(source);
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
@@ -129,8 +129,6 @@ async fn run_async() {
 
     // Setup world
     dispatcher.setup(&mut world);
-
-    let mut worlds = vec!();
 
     event_loop.run(move |event, _, control_flow| {
         match event {

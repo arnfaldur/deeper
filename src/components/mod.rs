@@ -159,26 +159,7 @@ impl StaticModel {
             material,
         };
 
-        let uniform_buf = context.device.create_buffer_with_data(
-            local_uniforms.as_bytes(),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
-
-        let bind_group = context.device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                label: None,
-                layout: &context.local_bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..uniforms_size,
-                        }
-                    },
-                ],
-            }
-        );
+        let (_uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(local_uniforms);
 
         Self {idx, bind_group}
     }
@@ -202,27 +183,7 @@ impl Model3D {
 
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
-        let uniform_buf = context.device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: uniforms_size,
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
-        });
-
-        let bind_group = context.device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                label: None,
-                layout: &context.local_bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..uniforms_size,
-                        }
-                    },
-                ],
-            }
-        );
+        let (uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(graphics::LocalUniforms::new());
 
         Self {
             idx: 0,

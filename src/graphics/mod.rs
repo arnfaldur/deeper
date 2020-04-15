@@ -123,14 +123,12 @@ pub struct Model {
 }
 
 use std::path::Path;
-use wavefront_obj::obj;
 use std::fs::File;
 use std::io::Read;
 use wgpu::{ShaderModule, RenderPipeline, PipelineLayout, Device};
 use cgmath::Vector3;
 use winit::window::Window;
 use winit::dpi::PhysicalSize;
-use itertools::Itertools;
 
 pub struct Context {
     pub device: wgpu::Device,
@@ -291,6 +289,35 @@ impl Context {
         return context;
     }
 
+    // Note(Jökull): A step in the right direction, but a bit heavy-handed
+    pub fn model_bind_group_from_uniform_data(&self, local_uniforms: LocalUniforms) -> (wgpu::Buffer, wgpu::BindGroup) {
+
+        let uniforms_size = std::mem::size_of::<LocalUniforms>() as u64;
+
+        let uniform_buf = self.device.create_buffer_with_data(
+            local_uniforms.as_bytes(),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        );
+
+        let bind_group = self.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &self.local_bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..uniforms_size,
+                        }
+                    },
+                ],
+            }
+        );
+
+        (uniform_buf, bind_group)
+    }
+
     pub fn recompile_pipeline(&mut self, vs_module: ShaderModule, fs_module: ShaderModule) {
         self.pipeline = Context::compile_pipeline(&self.device, &self.pipeline_layout, vs_module, fs_module);
     }
@@ -378,131 +405,6 @@ impl Context {
 
         return depth_texture.create_default_view();
     }
-
-    pub fn load_model_from_gltf(&self, path: &Path) -> Model {
-        let vertex_lists = vertex_lists_from_gltf(path).unwrap();
-        return self.load_model_from_vertex_lists(&vertex_lists);
-    }
-
-    pub fn load_model_from_obj(&self, path: &Path) -> Model {
-        let vertex_lists = vertex_lists_from_obj(path).unwrap();
-        return self.load_model_from_vertex_lists(&vertex_lists);
-    }
-
-    pub fn load_model_from_vertex_lists(&self, vertex_lists: &Vec<Vec<Vertex>>) -> Model {
-        let mut meshes = vec!();
-
-        for vertices in vertex_lists {
-
-            let vertex_buf = self.device.create_buffer_with_data(
-                vertices.as_bytes(),
-                wgpu::BufferUsage::VERTEX,
-            );
-
-            meshes.push(
-                Mesh {
-                    num_vertices: vertices.len(),
-                    vertex_buffer: vertex_buf,
-                    offset: [0.0, 0.0, 0.0],
-                }
-            );
-        }
-
-        Model { meshes }
-    }
-
-}
-
-// TODO: Handle transforms
-pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
-    let (document, buffers, _images) = gltf::import(path)
-        .expect(format!("[graphics/gltf] : File {} could not be opened", path.display()).as_ref());
-
-    // TODO: Add checks for multiple models/scenes, etc.
-
-    let mut vertex_lists = vec!();
-
-    for mesh in document.meshes() {
-        let mut vertex_list = vec!();
-        for primitive in mesh.primitives() {
-            // TODO: Is there a more readable way to do this
-            let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
-
-            // TODO: This feels ... wrong
-            let positions = reader.read_positions().unwrap().collect_vec();
-            let normals = reader.read_normals().unwrap().collect_vec();
-            // TODO: What is set?
-            let tex_coords = reader.read_tex_coords(0).unwrap().into_f32().collect_vec();
-
-            let indices = reader.read_indices().unwrap().into_u32();
-
-            for idx in indices {
-                let pos = positions.get(idx as usize).unwrap().clone();
-                let normal = normals.get(idx as usize).unwrap().clone();
-                let tex_coord = tex_coords.get(idx as usize).unwrap().clone();
-
-                vertex_list.push(Vertex { pos, normal, tex_coord })
-            }
-        }
-        vertex_lists.push(vertex_list);
-    }
-
-    return Ok(vertex_lists);
-}
-
-pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
-    let mut f;
-
-    if let Ok(file) = File::open(path) {
-        f = file;
-    } else {
-        return Err(format!("[graphics] : File {} could not be opened.", path.display()));
-    };
-
-    let mut buf = String::new();
-    f.read_to_string(&mut buf);
-
-    let obj_set = obj::parse(buf)
-        .expect("Failed to parse obj file");
-
-    let mut vertex_lists = vec!();
-
-    for obj in &obj_set.objects {
-
-        let mut vertices = vec!();
-
-        for g in &obj.geometry {
-            let mut indices = vec!();
-
-            g.shapes.iter().for_each(|shape| {
-                if let obj::Primitive::Triangle(v1, v2, v3) = shape.primitive {
-                    indices.push(v1);
-                    indices.push(v2);
-                    indices.push(v3);
-                }
-            });
-
-            for idx in &indices {
-                let pos = obj.vertices[idx.0];
-                let normal = match idx.2 {
-                    Some(i) => obj.normals[i],
-                    _ => obj::Normal{ x: 0.0, y: 0.0, z: 0.0}
-                };
-                let tc = match idx.1 {
-                    Some(i) => obj.tex_vertices[i],
-                    _ => obj::TVertex{ u: 0.0, v: 0.0, w: 0.0}
-                };
-                let v = Vertex {
-                    pos: [pos.x as f32, pos.y as f32, pos.z as f32],
-                    normal: [normal.x as f32, normal.y as f32, normal.z as f32],
-                    tex_coord: [tc.u as f32, tc.v as f32]
-                };
-                vertices.push(v);
-            }
-        }
-        vertex_lists.push(vertices);
-    }
-    Ok(vertex_lists)
 
 }
 

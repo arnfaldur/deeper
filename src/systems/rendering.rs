@@ -172,10 +172,12 @@ fn generate_view_matrix(cam: &Camera, cam_pos: &Position3D, cam_target: cgmath::
         cgmath::Vector3::unit_z(),
     );
 
-    cgmath::perspective(
+    let mx_perspective = cgmath::perspective(
         cgmath::Deg(cam.fov),
         aspect_ratio,
         1.0,
         1000.0,
-    )
+    );
+
+    mx_correction * mx_perspective * mx_view
 }

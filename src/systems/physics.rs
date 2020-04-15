@@ -10,14 +10,18 @@ impl<'a> System<'a> for MovementSystem {
     type SystemData = (
         ReadExpect<'a, FrameTime>,
         WriteStorage<'a, Position>,
-        ReadStorage<'a, Velocity>,
+        WriteStorage<'a, Velocity>,
     );
 
-    fn run(&mut self, (frame_time, mut pos, vel): Self::SystemData) {
-        for (pos, vel) in (&mut pos, &vel).join() {
+    fn run(&mut self, (frame_time, mut pos, mut vel): Self::SystemData) {
+        for (pos, vel) in (&mut pos, &mut vel).join() {
             if vel.0.x.is_finite() && vel.0.y.is_finite() {
                 let v = if (vel.0 * frame_time.0).magnitude() < 0.5 { vel.0 * frame_time.0 } else { (vel.0 * frame_time.0).normalize() * 0.5 };
                 pos.0 += v;
+            } else {
+                // We need to deal with this somehow
+                vel.0 = Vector2::new(0.0, 0.0);
+                println!("Velocity Hickup");
             }
         }
     }
