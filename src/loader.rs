@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::AsBytes;
 
 use std::fs;
 use std::fs::File;

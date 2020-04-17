@@ -1,17 +1,13 @@
 extern crate specs;
 extern crate cgmath;
-use zerocopy::{AsBytes};
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{Vector2, Vector3, Matrix4, Deg};
 
-
-// TODO: Switch to legion? https://docs.rs/legion/0.2.1/legion/
 use specs::prelude::*;
 use specs::{Component, VecStorage};
 
 use std::f32::consts::PI;
 use crate::graphics;
-use self::cgmath::{Matrix4, Deg};
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -79,7 +75,19 @@ pub struct AIFollow {
 }
 
 #[derive(Component)]
-pub struct Destination(pub Vector2<f32>);
+pub struct Destination {
+    pub goal: Vector2<f32>,
+    pub next: Vector2<f32>,
+}
+
+impl Destination {
+    pub fn simple(goal: Vector2<f32>) -> Destination {
+        Destination {
+            goal,
+            next: Vector2 { x: 0., y: 0. },
+        }
+    }
+}
 
 #[derive(Component, Eq, PartialEq, Copy, Clone)]
 pub enum Faction {
@@ -161,7 +169,7 @@ impl StaticModel {
 
         let (_uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(local_uniforms);
 
-        Self {idx, bind_group}
+        Self { idx, bind_group }
     }
 }
 
@@ -171,7 +179,7 @@ pub struct Model3D {
     pub offset: Vector3<f32>,
     pub scale: f32,
     pub z_rotation: f32,
-    pub material : graphics::Material,
+    pub material: graphics::Material,
 
     pub bind_group: wgpu::BindGroup,
     pub uniform_buffer: wgpu::Buffer,
@@ -180,7 +188,6 @@ pub struct Model3D {
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
-
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
         let (uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(graphics::LocalUniforms::new());
@@ -239,6 +246,15 @@ pub enum WallDirection {
     South,
     East,
 }
+
+#[derive(Component)]
+pub struct TileNeighbours {
+    n: Option<Entity>,
+    w: Option<Entity>,
+    s: Option<Entity>,
+    e: Option<Entity>,
+}
+
 
 pub fn register_components(world: &mut World) {
     world.register::<Position>();

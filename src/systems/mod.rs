@@ -72,7 +72,7 @@ impl<'a> System<'a> for AIFollowSystem {
                 let difference: Vector2<f32> = hunted.0 - hunter.0;
                 let distance = difference.magnitude();
                 if distance > follow.minimum_distance {
-                    dest.insert(ent, Destination(hunted.0));
+                    dest.insert(ent, Destination::simple(hunted.0));
                     if let Some(orientation) = orient {
                         orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
                     }
@@ -100,7 +100,7 @@ impl<'a> System<'a> for GoToDestinationSystem {
             // if not do A* and add intermediate destination component for next node in path
             // or just make Destination an object inheriting from the abstract destinations
             // class.
-            let to_dest: Vector2<f32> = dest.0 - hunter.0;
+            let to_dest: Vector2<f32> = dest.goal - hunter.0;
             let direction = to_dest.normalize();
             let time_to_stop = speed.0 / accel.0;
             let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
