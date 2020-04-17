@@ -75,7 +75,7 @@ impl<'a> System<'a> for PlayerSystem {
                 let t: f32 = mouse_world_pos.z / ray_delta.z;
                 let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
 
-                dest.insert(player.entity, Destination(ray_hit));
+                dest.insert(player.entity, Destination::simple(ray_hit));
 
                 let difference: Vector2<f32> = (ray_hit - player_pos.0).normalize();
 
