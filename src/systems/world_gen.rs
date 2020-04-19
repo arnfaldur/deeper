@@ -58,8 +58,8 @@ impl<'a> System<'a> for DunGenSystem {
                         ents.delete(ent);
                     }
                 }
-                *floor.0 += 1;
-                println!("You have reached floor {}", *floor.0);
+                floor.0 += 1;
+                println!("You have reached floor {}", floor.0);
                 let dungeon = DungGen::new()
                     .width(60)
                     .height(60)
@@ -195,7 +195,7 @@ impl<'a> System<'a> for DunGenSystem {
                         _ => {}
                     }
                     // Add enemies to floor
-                    if TileType::Floor == tile_type && rng.gen_bool(((*floor - 1) as f64 * 0.05 + 1.).log2().max(1.) as f64) {
+                    if TileType::Floor == tile_type && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64) {
                         let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
                         let enemy = ents.create();
                         updater.insert(enemy, Position(pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3))));

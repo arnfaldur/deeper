@@ -249,10 +249,10 @@ pub enum WallDirection {
 
 #[derive(Component)]
 pub struct TileNeighbours {
-    n: Option<Entity>,
-    w: Option<Entity>,
-    s: Option<Entity>,
-    e: Option<Entity>,
+    pub n: Option<Entity>,
+    pub w: Option<Entity>,
+    pub s: Option<Entity>,
+    pub e: Option<Entity>,
 }
 
 pub struct FloorNumber(pub i32);
@@ -279,4 +279,5 @@ pub fn register_components(world: &mut World) {
     world.register::<MapSwitcher>();
     world.register::<Faction>();
     world.register::<HitPoints>();
+    world.register::<TileNeighbours>();
 }
