@@ -255,6 +255,7 @@ pub struct TileNeighbours {
     e: Option<Entity>,
 }
 
+pub struct FloorNumber(pub i32);
 
 pub fn register_components(world: &mut World) {
     world.register::<Position>();

@@ -95,19 +95,19 @@ impl DungGen {
         // This is how close to the edges of the map floors can be.
         // This parameter is needed since rooms are now simply the floor
         // and are then surrounded afterwards by walls (might change).
-        let margin = 1;
+        let world_edge_size = 1;
 
         // n_rooms is 10 by default but should be set when constructing a room
         while self.room_centers.len() < self.n_rooms {
             // Step 1: Generate a random room in the world
 
             let xmin = rng.gen_range(
-                margin,
-                self.width - (self.room_min + self.room_range) - margin,
+                world_edge_size,
+                self.width - (self.room_min + self.room_range) - world_edge_size,
             );
             let ymin = rng.gen_range(
-                margin,
-                self.height - (self.room_min + self.room_range) - margin,
+                world_edge_size,
+                self.height - (self.room_min + self.room_range) - world_edge_size,
             );
 
             let xmax = xmin + self.room_min + rng.gen_range(0, self.room_range);

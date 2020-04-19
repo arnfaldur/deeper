@@ -1,4 +1,3 @@
-
 use specs::prelude::*;
 use rand::prelude::*;
 use zerocopy::AsBytes;
@@ -8,6 +7,7 @@ use cgmath::{prelude::*, Vector2, Vector3, Deg};
 use crate::{loader, graphics};
 use crate::components::*;
 use crate::dung_gen::DungGen;
+use std::collections::HashMap;
 
 
 pub struct MapSwitchingSystem;
@@ -38,7 +38,7 @@ impl<'a> System<'a> for DunGenSystem {
         ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, loader::AssetManager>,
         ReadExpect<'a, Player>,
-        WriteExpect<'a, i64>,
+        WriteExpect<'a, FloorNumber>,
         Entities<'a>,
         ReadStorage<'a, TileType>,
         ReadStorage<'a, Faction>,
@@ -58,8 +58,8 @@ impl<'a> System<'a> for DunGenSystem {
                         ents.delete(ent);
                     }
                 }
-                *floor += 1;
-                println!("You have reached floor {}", *floor);
+                *floor.0 += 1;
+                println!("You have reached floor {}", *floor.0);
                 let dungeon = DungGen::new()
                     .width(60)
                     .height(60)
@@ -135,10 +135,10 @@ impl<'a> System<'a> for DunGenSystem {
                         ass_man.get_model_index("floortile.obj").unwrap(),
                     )
                 };
+                let mut pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
 
                 for (&(x, y), &tile_type) in dungeon.world.iter() {
                     let pos = Vector2::new(x as f32, y as f32);
-                    let pos3d = pos.extend(0.0);
 
                     let entity = ents.create();
                     let model = StaticModel::new(
@@ -151,15 +151,16 @@ impl<'a> System<'a> for DunGenSystem {
                             TileType::Path => floor_idx,
                             TileType::LadderDown => stairs_down_idx,
                         },
-                        match tile_type {
-                            TileType::Nothing => Vector3::new(x as f32, y as f32, 1.0),
-                            _ => pos3d,
-                        },
+                        pos.extend(match tile_type {
+                            TileType::Nothing => 1.,
+                            _ => 0.,
+                        }),
                         1.0,
                         match tile_type {
+                            TileType::Wall(Some(WallDirection::North)) => 0.,
+                            TileType::Wall(Some(WallDirection::West)) => 90.,
                             TileType::Wall(Some(WallDirection::South)) => 180.,
                             TileType::Wall(Some(WallDirection::East)) => 270.,
-                            TileType::Wall(Some(WallDirection::West)) => 90.,
                             _ => 0.,
                         },
                         match tile_type {
@@ -176,6 +177,7 @@ impl<'a> System<'a> for DunGenSystem {
                             updater.insert(entity, Position(pos));
                         }
                     }
+                    // tile specific behaviors
                     match tile_type {
                         TileType::Wall(_) => {
                             updater.insert(entity, StaticBody);
@@ -186,7 +188,14 @@ impl<'a> System<'a> for DunGenSystem {
                         }
                         _ => {}
                     }
-                    if TileType::Floor == tile_type && rng.gen_bool(((*floor - 1) as f64 * 0.05 + 1.).log2() as f64) {
+                    match tile_type {
+                        TileType::Floor | TileType::Path | TileType::LadderDown => {
+                            pathability_map.insert((x, y), entity);
+                        }
+                        _ => {}
+                    }
+                    // Add enemies to floor
+                    if TileType::Floor == tile_type && rng.gen_bool(((*floor - 1) as f64 * 0.05 + 1.).log2().max(1.) as f64) {
                         let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
                         let enemy = ents.create();
                         updater.insert(enemy, Position(pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3))));
@@ -211,6 +220,15 @@ impl<'a> System<'a> for DunGenSystem {
                                            .with_scale(rad * 1.7));
                     }
                 };
+                // mark pathable neighbours
+                for (&(x, y), &ent) in pathability_map.iter() {
+                    updater.insert(ent, TileNeighbours {
+                        n: pathability_map.get(&(x + 0, y + 1)).cloned(),
+                        w: pathability_map.get(&(x + 1, y + 0)).cloned(),
+                        s: pathability_map.get(&(x + 0, y - 1)).cloned(),
+                        e: pathability_map.get(&(x - 1, y + 0)).cloned(),
+                    });
+                }
             }
             _ => {}
         }
