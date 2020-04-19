@@ -188,12 +188,13 @@ impl<'a> System<'a> for DunGenSystem {
                         }
                         _ => {}
                     }
-                    match tile_type {
-                        TileType::Floor | TileType::Path | TileType::LadderDown => {
-                            pathability_map.insert((x, y), entity);
-                        }
-                        _ => {}
-                    }
+                    // TODO: use or delete for pathfinding
+                    //match tile_type {
+                    //    TileType::Floor | TileType::Path | TileType::LadderDown => {
+                    //        pathability_map.insert((x, y), entity);
+                    //    }
+                    //    _ => {}
+                    //}
                     // Add enemies to floor
                     if TileType::Floor == tile_type && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64) {
                         let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
@@ -220,15 +221,16 @@ impl<'a> System<'a> for DunGenSystem {
                                            .with_scale(rad * 1.7));
                     }
                 };
+                // TODO: use this or delete for a pathfinding system
                 // mark pathable neighbours
-                for (&(x, y), &ent) in pathability_map.iter() {
-                    updater.insert(ent, TileNeighbours {
-                        n: pathability_map.get(&(x + 0, y + 1)).cloned(),
-                        w: pathability_map.get(&(x + 1, y + 0)).cloned(),
-                        s: pathability_map.get(&(x + 0, y - 1)).cloned(),
-                        e: pathability_map.get(&(x - 1, y + 0)).cloned(),
-                    });
-                }
+                //for (&(x, y), &ent) in pathability_map.iter() {
+                //    updater.insert(ent, TileNeighbours {
+                //        n: pathability_map.get(&(x + 0, y + 1)).cloned(),
+                //        w: pathability_map.get(&(x + 1, y + 0)).cloned(),
+                //        s: pathability_map.get(&(x + 0, y - 1)).cloned(),
+                //        e: pathability_map.get(&(x - 1, y + 0)).cloned(),
+                //    });
+                //}
             }
             _ => {}
         }

@@ -247,13 +247,14 @@ pub enum WallDirection {
     East,
 }
 
-#[derive(Component)]
-pub struct TileNeighbours {
-    pub n: Option<Entity>,
-    pub w: Option<Entity>,
-    pub s: Option<Entity>,
-    pub e: Option<Entity>,
-}
+// TODO: use or delete for pathfinding
+//#[derive(Component)]
+//pub struct TileNeighbours {
+//    pub n: Option<Entity>,
+//    pub w: Option<Entity>,
+//    pub s: Option<Entity>,
+//    pub e: Option<Entity>,
+//}
 
 pub struct FloorNumber(pub i32);
 
@@ -279,5 +280,5 @@ pub fn register_components(world: &mut World) {
     world.register::<MapSwitcher>();
     world.register::<Faction>();
     world.register::<HitPoints>();
-    world.register::<TileNeighbours>();
+//    world.register::<TileNeighbours>();
 }
