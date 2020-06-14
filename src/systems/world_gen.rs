@@ -1,4 +1,3 @@
-
 use specs::prelude::*;
 use rand::prelude::*;
 use zerocopy::AsBytes;
@@ -8,6 +7,7 @@ use cgmath::{prelude::*, Vector2, Vector3, Deg};
 use crate::{loader, graphics};
 use crate::components::*;
 use crate::dung_gen::DungGen;
+use std::collections::HashMap;
 
 
 pub struct MapSwitchingSystem;
@@ -39,7 +39,7 @@ impl<'a> System<'a> for DunGenSystem {
         ReadExpect<'a, loader::AssetManager>,
         ReadExpect<'a, Player>,
         ReadExpect<'a, PlayerCamera>,
-        WriteExpect<'a, i64>,
+        WriteExpect<'a, FloorNumber>,
         Entities<'a>,
         ReadStorage<'a, TileType>,
         ReadStorage<'a, Faction>,
@@ -49,16 +49,18 @@ impl<'a> System<'a> for DunGenSystem {
     fn run(&mut self, (mut trans, context, ass_man, player, player_camera, mut floor, ents, tile, factions, updater): Self::SystemData) {
         match *trans {
             MapTransition::Deeper => {
+                // delete ground tiles
                 for (ent, _) in (&ents, &tile).join() {
                     ents.delete(ent);
                 }
+                // delete enemies
                 for (ent, faction) in (&ents, &factions).join() {
                     if let Faction::Enemies = faction {
                         ents.delete(ent);
                     }
                 }
-                *floor += 1;
-                println!("You have reached floor {}", *floor);
+                floor.0 += 1;
+                println!("You have reached floor {}", floor.0);
                 let dungeon = DungGen::new()
                     .width(60)
                     .height(60)
@@ -79,66 +81,72 @@ impl<'a> System<'a> for DunGenSystem {
 
                 // Reset player position and stuff
                 updater.insert(player.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
-                updater.insert(player.entity, Orientation(Deg(0.0)));
+                //updater.insert(player.entity, Orientation(Deg(0.0)));
                 updater.insert(player.entity, Velocity::new());
 
                 updater.insert(player_camera.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
 
-                let mut init_encoder = context.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: None }
-                );
+                // TODO: turn this into make_light(x,y,...)
+                {
+                    let mut init_encoder = context.device.create_command_encoder(
+                        &wgpu::CommandEncoderDescriptor { label: None }
+                    );
 
-                let mut lights: graphics::Lights = Default::default();
+                    let mut lights: graphics::Lights = Default::default();
 
-                lights.directional_light = graphics::DirectionalLight {
-                    direction: [1.0, 0.8, 0.8, 0.0],
-                    ambient: [0.01, 0.015, 0.02, 1.0],
-                    color: [0.02, 0.025, 0.05, 1.0],
-                };
+                    lights.directional_light = graphics::DirectionalLight {
+                        direction: [1.0, 0.8, 0.8, 0.0],
+                        ambient: [0.01, 0.015, 0.02, 1.0],
+                        color: [0.02, 0.025, 0.05, 1.0],
+                    };
 
-                for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
-                    if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
-                    lights.point_lights[i] = Default::default();
-                    lights.point_lights[i].radius = 10.0;
-                    lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
-                    lights.point_lights[i].color = [2.0, 1.0, 0.1, 1.0];
+                    for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
+                        if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
+                        lights.point_lights[i] = Default::default();
+                        lights.point_lights[i].radius = 10.0;
+                        lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
+                        lights.point_lights[i].color = [2.0, 1.0, 0.1, 1.0];
+                    }
+
+                    // TODO: go away
+                    let temp_buf = context.device.create_buffer_with_data(
+                        lights.as_bytes(),
+                        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                    );
+
+                    // TODO: you are not welcome here copy_buffer_to_buffer
+                    init_encoder.copy_buffer_to_buffer(
+                        &temp_buf,
+                        0,
+                        &context.lights_buf,
+                        0,
+                        std::mem::size_of::<graphics::Lights>() as u64,
+                    );
+
+                    let command_buffer = init_encoder.finish();
+
+                    context.queue.submit(&[command_buffer]);
+                    // End graphics shit
                 }
 
-                let temp_buf = context.device.create_buffer_with_data(
-                    lights.as_bytes(),
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-                );
+                let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_idx) = {
+                    (
+                        ass_man.get_model_index("cube.obj").unwrap(),
+                        ass_man.get_model_index("plane.obj").unwrap(),
+                        ass_man.get_model_index("Wall.obj").unwrap(),
+                        ass_man.get_model_index("StairsDown.obj").unwrap(),
+                        ass_man.get_model_index("floortile.obj").unwrap(),
+                    )
+                };
+                let mut pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
 
-                init_encoder.copy_buffer_to_buffer(
-                    &temp_buf,
-                    0,
-                    &context.lights_buf,
-                    0,
-                    std::mem::size_of::<graphics::Lights>() as u64,
-                );
-
-                let command_buffer = init_encoder.finish();
-
-                context.queue.submit(&[command_buffer]);
-                // End graphics shit
-
-                for (&(x, y), &wall_type) in dungeon.world.iter() {
+                for (&(x, y), &tile_type) in dungeon.world.iter() {
                     let pos = Vector2::new(x as f32, y as f32);
-                    let pos3d = Vector3::new(x as f32, y as f32, 0.0);
 
-                    let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_idx) = {
-                        (
-                            ass_man.get_model_index("cube.obj").unwrap(),
-                            ass_man.get_model_index("plane.obj").unwrap(),
-                            ass_man.get_model_index("Wall.obj").unwrap(),
-                            ass_man.get_model_index("StairsDown.obj").unwrap(),
-                            ass_man.get_model_index("floortile.obj").unwrap(),
-                        )
-                    };
                     let entity = ents.create();
                     let model = StaticModel::new(
                         &context,
-                        match wall_type {
+                        match tile_type {
                             TileType::Nothing => plane_idx,
                             TileType::Wall(None) => cube_idx,
                             TileType::Wall(Some(_)) => wall_idx,
@@ -146,32 +154,34 @@ impl<'a> System<'a> for DunGenSystem {
                             TileType::Path => floor_idx,
                             TileType::LadderDown => stairs_down_idx,
                         },
-                        match wall_type {
-                            TileType::Nothing => Vector3::new(x as f32, y as f32, 1.0),
-                            _ => pos3d,
-                        },
+                        pos.extend(match tile_type {
+                            TileType::Nothing => 1.,
+                            _ => 0.,
+                        }),
                         1.0,
-                        match wall_type {
+                        match tile_type {
+                            TileType::Wall(Some(WallDirection::North)) => 0.,
+                            TileType::Wall(Some(WallDirection::West)) => 90.,
                             TileType::Wall(Some(WallDirection::South)) => 180.,
                             TileType::Wall(Some(WallDirection::East)) => 270.,
-                            TileType::Wall(Some(WallDirection::West)) => 90.,
                             _ => 0.,
                         },
-                        match wall_type {
+                        match tile_type {
                             TileType::Nothing => graphics::Material::dark_stone(),
                             TileType::Path => graphics::Material::glossy(Vector3::new(0.1, 0.1, 0.1)),
                             _ => graphics::Material::darkest_stone(),
                         },
                     );
                     updater.insert(entity, model);
-                    updater.insert(entity, wall_type);
-                    match wall_type {
+                    updater.insert(entity, tile_type);
+                    match tile_type {
                         TileType::Nothing => {}
                         _ => {
                             updater.insert(entity, Position(pos));
                         }
                     }
-                    match wall_type {
+                    // tile specific behaviors
+                    match tile_type {
                         TileType::Wall(_) => {
                             updater.insert(entity, StaticBody);
                             updater.insert(entity, SquareCollider { side_length: 1.0 });
@@ -181,7 +191,15 @@ impl<'a> System<'a> for DunGenSystem {
                         }
                         _ => {}
                     }
-                    if TileType::Floor == wall_type && rng.gen_bool(((*floor - 1) as f64 * 0.05 + 1.).log2() as f64) {
+                    // TODO: use or delete for pathfinding
+                    //match tile_type {
+                    //    TileType::Floor | TileType::Path | TileType::LadderDown => {
+                    //        pathability_map.insert((x, y), entity);
+                    //    }
+                    //    _ => {}
+                    //}
+                    // Add enemies to floor
+                    if TileType::Floor == tile_type && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64) {
                         let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
                         let enemy = ents.create();
                         updater.insert(enemy, Position(pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3))));
@@ -206,6 +224,16 @@ impl<'a> System<'a> for DunGenSystem {
                                            .with_scale(rad * 1.7));
                     }
                 };
+                // TODO: use this or delete for a pathfinding system
+                // mark pathable neighbours
+                //for (&(x, y), &ent) in pathability_map.iter() {
+                //    updater.insert(ent, TileNeighbours {
+                //        n: pathability_map.get(&(x + 0, y + 1)).cloned(),
+                //        w: pathability_map.get(&(x + 1, y + 0)).cloned(),
+                //        s: pathability_map.get(&(x + 0, y - 1)).cloned(),
+                //        e: pathability_map.get(&(x - 1, y + 0)).cloned(),
+                //    });
+                //}
             }
             _ => {}
         }

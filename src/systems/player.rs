@@ -54,7 +54,7 @@ impl<'a> System <'a> for CameraControlSystem {
         let mut cam_pos = pos.get_mut(player_cam.entity).unwrap();
         let cam_3d_pos = pos3d.get(player_cam.entity).unwrap();
 
-        let to_center = (cam_pos.to_vec3() - cam_3d_pos.0).normalize() * 0.02;
+        let to_center = (cam_pos.to_vec3() - cam_3d_pos.0).normalize() * 0.04;
         let cam_front = Vector2::new(to_center.x,  to_center.y);
         let cam_right = Vector2::new(to_center.y, -to_center.x);
 
@@ -77,7 +77,7 @@ impl<'a> System <'a> for CameraControlSystem {
 
         // Need to deal with removing the destination also
         if !camera.roaming {
-            dests.insert(player_cam.entity, Destination(pos.get(player.entity).unwrap().0));
+            dests.insert(player_cam.entity, Destination::simple(pos.get(player.entity).unwrap().0));
         }
     }
 }
@@ -142,7 +142,7 @@ impl<'a> System<'a> for PlayerSystem {
                 let t: f32 = mouse_world_pos.z / ray_delta.z;
                 let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
 
-                dest.insert(player.entity, Destination(ray_hit));
+                dest.insert(player.entity, Destination::simple(ray_hit));
                 camera.roaming = false;
 
                 let difference: Vector2<f32> = (ray_hit - player_pos.0).normalize();

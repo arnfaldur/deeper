@@ -3,6 +3,7 @@
 #![allow(unused_variables)]
 // TODO: remove actually fix the warnings
 #![allow(unused_must_use)]
+
 mod loader;
 
 mod dung_gen;
@@ -26,9 +27,9 @@ use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
 
 use cgmath::{Vector2, Vector3, Deg};
 
-use crate::input::{InputState};
+use crate::input::InputState;
 use std::time::Instant;
-use std::ops::{DerefMut};
+use std::ops::DerefMut;
 
 
 async fn run_async() {
@@ -53,27 +54,31 @@ async fn run_async() {
 
     register_components(&mut world);
 
-     use rg3d_sound::context::Context as AudioContext;
-     use rg3d_sound::buffer::SoundBuffer;
-     use rg3d_sound::buffer::DataSource;
-     use rg3d_sound::source::generic::GenericSourceBuilder;
-     use rg3d_sound::source::Status;
-     use rg3d_sound::source::SoundSource;
-     use rg3d_sound::pool::Handle;
+    // TODO: make audio system configurable
+    let audio_system_enabled = false;
+    if audio_system_enabled {
+        use rg3d_sound::context::Context as AudioContext;
+        use rg3d_sound::buffer::SoundBuffer;
+        use rg3d_sound::buffer::DataSource;
+        use rg3d_sound::source::generic::GenericSourceBuilder;
+        use rg3d_sound::source::Status;
+        use rg3d_sound::source::SoundSource;
+        use rg3d_sound::pool::Handle;
 
-     let mut ac= AudioContext::new().unwrap();
+        let mut audio_context = AudioContext::new().unwrap();
 
-     let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/dungexplorer-ambience.wav").unwrap()).unwrap();
+        let sound_buffer = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/dungexplorer-ambience.wav").unwrap()).unwrap();
 
-     let source = GenericSourceBuilder::new(buf)
-         .with_status(Status::Playing)
-         .with_looping(true)
-         .build_source()
-         .unwrap();
+        let source = GenericSourceBuilder::new(sound_buffer)
+            .with_status(Status::Playing)
+            .with_looping(true)
+            .build_source()
+            .unwrap();
 
-     // let _source_handle: Handle<SoundSource> = ac.lock()
-     //     .unwrap()
-     //     .add_source(source);
+        let _source_handle: Handle<SoundSource> = audio_context.lock()
+            .unwrap()
+            .add_source(source);
+    }
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
@@ -100,7 +105,7 @@ async fn run_async() {
         .with(DynamicBody(1.0))
         .with(CircleCollider { radius: 0.3 })
         .with(Model3D::from_index(
-            &context, ass_man.get_model_index("arissa.obj").unwrap()
+            &context, ass_man.get_model_index("arissa.obj").unwrap(),
         ).with_scale(0.5))
         .build();
 
@@ -112,7 +117,7 @@ async fn run_async() {
         .with(Velocity::new())
         .with(components::Camera {
             up: Vector3::unit_z(),
-            fov: 20.0,
+            fov: 30.0,
             roaming: false,
         })
         .with(Position3D(Vector3::new(0.0, 0.0, 0.0)))
@@ -127,8 +132,8 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
-    //
-    world.insert(0 as i64);
+
+    world.insert(FloorNumber(0));
 
     let input_state = InputState::new();
     world.insert(input_state);

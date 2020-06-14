@@ -122,9 +122,6 @@ pub struct Model {
     pub meshes: Vec<Mesh>,
 }
 
-use std::path::Path;
-use std::fs::File;
-use std::io::Read;
 use wgpu::{ShaderModule, RenderPipeline, PipelineLayout, Device};
 use cgmath::Vector3;
 use winit::window::Window;
