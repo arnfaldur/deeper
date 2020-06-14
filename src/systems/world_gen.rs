@@ -86,7 +86,7 @@ impl<'a> System<'a> for DunGenSystem {
 
                 updater.insert(player_camera.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
 
-                // TODO: turn this into make_light(x,y,...)
+                // TODO: Turn lights into entities
                 {
                     let mut init_encoder = context.device.create_command_encoder(
                         &wgpu::CommandEncoderDescriptor { label: None }
@@ -96,8 +96,8 @@ impl<'a> System<'a> for DunGenSystem {
 
                     lights.directional_light = graphics::DirectionalLight {
                         direction: [1.0, 0.8, 0.8, 0.0],
-                        ambient: [0.01, 0.015, 0.02, 1.0],
-                        color: [0.02, 0.025, 0.05, 1.0],
+                        ambient:   [0.01, 0.015, 0.02, 1.0],
+                        color:     [0.02, 0.025, 0.05, 1.0],
                     };
 
                     for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
