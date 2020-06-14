@@ -329,10 +329,10 @@ pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, 
 
         let mut vertices = vec!();
 
-        for g in &obj.geometry {
+        for geometry in &obj.geometry {
             let mut indices = vec!();
 
-            g.shapes.iter().for_each(|shape| {
+            geometry.shapes.iter().for_each(|shape| {
                 if let obj::Primitive::Triangle(v1, v2, v3) = shape.primitive {
                     indices.push(v1);
                     indices.push(v2);
@@ -342,18 +342,21 @@ pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, 
 
             for idx in &indices {
                 let pos = obj.vertices[idx.0];
+
                 let normal = match idx.2 {
                     Some(i) => obj.normals[i],
                     _ => obj::Normal{ x: 0.0, y: 0.0, z: 0.0}
                 };
+
                 let tc = match idx.1 {
                     Some(i) => obj.tex_vertices[i],
                     _ => obj::TVertex{ u: 0.0, v: 0.0, w: 0.0}
                 };
+
                 let v = graphics::Vertex {
-                    pos: [pos.x as f32, pos.y as f32, pos.z as f32],
-                    normal: [normal.x as f32, normal.y as f32, normal.z as f32],
-                    tex_coord: [tc.u as f32, tc.v as f32]
+                    pos:        [pos.x as f32, pos.y as f32, pos.z as f32],
+                    normal:     [normal.x as f32, normal.y as f32, normal.z as f32],
+                    tex_coord:  [tc.u as f32, tc.v as f32]
                 };
                 vertices.push(v);
             }

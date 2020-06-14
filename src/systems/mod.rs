@@ -12,19 +12,19 @@ pub mod player;
 pub mod rendering;
 pub mod world_gen;
 
-pub struct SphericalFollowSystem;
+pub struct SphericalOffsetSystem;
 
-impl<'a> System<'a> for SphericalFollowSystem {
+impl<'a> System<'a> for SphericalOffsetSystem {
     type SystemData = (
         ReadStorage<'a, Position>,
-        ReadStorage<'a, Target>,
         ReadStorage<'a, SphericalOffset>,
         WriteStorage<'a, Position3D>,
     );
 
-    fn run(&mut self, (pos2d, target, follow, mut pos3d): Self::SystemData) {
-        for (target, follow, pos3d) in (&target, &follow, &mut pos3d).join() {
-            pos3d.0 = pos2d.get(target.0).cloned().unwrap().to_vec3();
+    fn run(&mut self, (pos2d, offset, mut pos3d): Self::SystemData) {
+        for (pos2d, follow, pos3d) in (&pos2d, &offset, &mut pos3d).join() {
+            pos3d.0 = pos2d.to_vec3();
+
             pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
             pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
             pos3d.0.z += follow.radius * follow.phi.sin();
@@ -86,30 +86,41 @@ pub struct GoToDestinationSystem;
 
 impl<'a> System<'a> for GoToDestinationSystem {
     type SystemData = (
+        Entities<'a>,
+        Read<'a, LazyUpdate>,
         ReadExpect<'a, FrameTime>,
-        ReadStorage<'a, Destination>,
+        WriteStorage<'a, Destination>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Speed>,
         ReadStorage<'a, Acceleration>,
     );
 
-    fn run(&mut self, (frame_time, dest, pos, mut vel, speed, acc): Self::SystemData) {
-        for (dest, hunter, vel, speed, accel) in (&dest, &pos, &mut vel, &speed, &acc).join() {
+    fn run(&mut self, (ents, updater, frame_time, mut dests, pos, mut vel, speed, acc): Self::SystemData) {
+
+        const EPSILON : f32 = 0.05;
+
+        for (ent, dest, hunter, vel, speed, accel) in (&ents, &mut dests, &pos, &mut vel, &speed, &acc).join() {
             // check if straight path is available, line drawing? or just navmesh
             // if not do A* and add intermediate destination component for next node in path
             // or just make Destination an object inheriting from the abstract destinations
             // class.
             let to_dest: Vector2<f32> = dest.0 - hunter.0;
-            let direction = to_dest.normalize();
-            let time_to_stop = speed.0 / accel.0;
-            let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
-            let target_velocity = direction * speed.0 * slowdown;
-            let delta: Vector2<f32> = target_velocity - vel.0;
-            let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
 
-            if delta != Vector2::unit_x() * 0.0 {
-                vel.0 += delta.normalize() * velocity_change;
+            if to_dest.magnitude() < EPSILON {
+                updater.remove::<Destination>(ent);
+                vel.0 = Vector2::new(0.0, 0.0);
+            } else {
+                let direction = to_dest.normalize();
+                let time_to_stop = speed.0 / accel.0;
+                let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
+                let target_velocity = direction * speed.0 * slowdown;
+                let delta: Vector2<f32> = target_velocity - vel.0;
+                let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
+
+                if delta.magnitude2() != 0.0 {
+                    vel.0 += delta.normalize() * velocity_change;
+                }
             }
         }
     }

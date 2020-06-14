@@ -38,6 +38,7 @@ impl<'a> System<'a> for DunGenSystem {
         ReadExpect<'a, graphics::Context>,
         ReadExpect<'a, loader::AssetManager>,
         ReadExpect<'a, Player>,
+        ReadExpect<'a, PlayerCamera>,
         WriteExpect<'a, i64>,
         Entities<'a>,
         ReadStorage<'a, TileType>,
@@ -45,7 +46,7 @@ impl<'a> System<'a> for DunGenSystem {
         Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut trans, context, ass_man, player, mut floor, ents, tile, factions, updater): Self::SystemData) {
+    fn run(&mut self, (mut trans, context, ass_man, player, player_camera, mut floor, ents, tile, factions, updater): Self::SystemData) {
         match *trans {
             MapTransition::Deeper => {
                 for (ent, _) in (&ents, &tile).join() {
@@ -80,6 +81,8 @@ impl<'a> System<'a> for DunGenSystem {
                 updater.insert(player.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
                 updater.insert(player.entity, Orientation(Deg(0.0)));
                 updater.insert(player.entity, Velocity::new());
+
+                updater.insert(player_camera.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
 
                 let mut init_encoder = context.device.create_command_encoder(
                     &wgpu::CommandEncoderDescriptor { label: None }

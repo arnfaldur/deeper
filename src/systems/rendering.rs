@@ -2,7 +2,7 @@ use specs::prelude::*;
 use zerocopy::AsBytes;
 
 use cgmath::prelude::*;
-use cgmath::{Matrix4, Vector4};
+use cgmath::{Matrix4, Vector4, Vector3};
 
 use crate::{loader, graphics};
 use crate::components::*;
@@ -39,14 +39,13 @@ impl<'a> System<'a> for RenderingSystem {
     fn run(&mut self, (mut context, ass_man, active_cam, camera, target, pos3d, pos, orient, models, static_model, hp): Self::SystemData) {
         let frame = context.swap_chain.get_next_texture().unwrap();
 
-        let cam = camera.get(active_cam.0)
+        let cam = camera.get(active_cam.entity)
             .expect("No valid active camera entity");
 
-        let cam_pos = pos3d.get(active_cam.0)
+        let cam_pos = pos3d.get(active_cam.entity)
             .expect("Camera entity has no 3D position");
 
-        let cam_target = pos.get(target.get(active_cam.0)
-            .unwrap().0).unwrap().to_vec3();
+        let cam_target = pos.get(active_cam.entity).unwrap().to_vec3() + Vector3::new(0.0, 0.0, 0.25);
 
         let aspect_ratio = context.sc_desc.width as f32 / context.sc_desc.height as f32;
 

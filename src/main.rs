@@ -61,7 +61,7 @@ async fn run_async() {
      use rg3d_sound::source::SoundSource;
      use rg3d_sound::pool::Handle;
 
-     let mut ac = AudioContext::new().unwrap();
+     let mut ac= AudioContext::new().unwrap();
 
      let buf = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/dungexplorer-ambience.wav").unwrap()).unwrap();
 
@@ -71,20 +71,21 @@ async fn run_async() {
          .build_source()
          .unwrap();
 
-     let _source_handle: Handle<SoundSource> = ac.lock()
-         .unwrap()
-         .add_source(source);
+     // let _source_handle: Handle<SoundSource> = ac.lock()
+     //     .unwrap()
+     //     .add_source(source);
 
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
         .with(player::PlayerSystem, "Player", &[])
+        .with(player::CameraControlSystem, "CameraControl", &["Player"])
         .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
         .with(AIFollowSystem, "AIFollow", &[])
         .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
         .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
         .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
-        .with(SphericalFollowSystem, "SphericalFollow", &["Movement"])
+        .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
         .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
         .with(rendering::RenderingSystem::new(), "Rendering", &[]).build();
@@ -105,23 +106,28 @@ async fn run_async() {
 
     let player_camera = world
         .create_entity()
+        .with(Position(Vector2::unit_x()))
+        .with(Speed(5.))
+        .with(Acceleration(30.0))
+        .with(Velocity::new())
         .with(components::Camera {
             up: Vector3::unit_z(),
-            fov: 25.0,
+            fov: 20.0,
+            roaming: false,
         })
-        .with(Target(player))
         .with(Position3D(Vector3::new(0.0, 0.0, 0.0)))
-        .with(SphericalOffset::new())
+        .with(SphericalOffset::camera_offset())
         .build();
 
     world.insert(Player { entity: player });
-    world.insert(ActiveCamera(player_camera));
-    world.insert(PlayerCamera(player_camera));
+    world.insert(ActiveCamera{ entity: player_camera });
+    world.insert(PlayerCamera{ entity: player_camera });
     world.insert(context);
     world.insert(ass_man);
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
+    //
     world.insert(0 as i64);
 
     let input_state = InputState::new();

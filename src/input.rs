@@ -1,5 +1,6 @@
 use cgmath::Vector2;
-use winit::event::{Event, MouseButton, ElementState, VirtualKeyCode};
+use winit::event::{Event, MouseButton, ElementState, VirtualKeyCode, MouseScrollDelta};
+use std::borrow::BorrowMut;
 
 
 #[derive(Default)]
@@ -22,17 +23,25 @@ pub struct MouseState {
     pub middle: ButtonState,
     pub pos: Vector2<f32>,
     pub last_pos: Vector2<f32>,
+    pub scroll: f32,
 }
 
 impl MouseState {
     pub fn new() -> Self {
         Self {
-            left: ButtonState::new(),
-            right: ButtonState::new(),
+            left:   ButtonState::new(),
+            right:  ButtonState::new(),
             middle: ButtonState::new(),
-            pos: Vector2::new(0.0, 0.0),
+
+            pos:      Vector2::new(0.0, 0.0),
             last_pos: Vector2::new(0.0, 0.0),
+
+            scroll: 0.0,
         }
+    }
+
+    pub fn delta(&self) -> Vector2<f32> {
+        return self.pos - self.last_pos;
     }
 
     pub fn update_from_mouse_button(&mut self, mouse_button: &MouseButton, state: &ElementState) {
@@ -91,34 +100,35 @@ pub struct InputState {
 impl InputState {
     pub fn new() -> Self {
         let mut keyboard = std::collections::HashMap::new();
-        keyboard.insert(Key::D, ButtonState::new());
-        keyboard.insert(Key::E, ButtonState::new());
-        keyboard.insert(Key::F, ButtonState::new());
-        keyboard.insert(Key::H, ButtonState::new());
-        keyboard.insert(Key::L, ButtonState::new());
-        keyboard.insert(Key::S, ButtonState::new());
-        keyboard.insert(Key::Space, ButtonState::new());
 
-        Self {
-            mouse: MouseState::new(),
-            keyboard,
-        }
+        Self { mouse: MouseState::new(), keyboard }
     }
 
     pub fn is_key_down(&self, key: Key) -> bool {
-        return self.keyboard.get(&key).unwrap().down;
+        return match self.keyboard.get(&key) {
+            Some(state) => state.down,
+            None => false,
+        }
     }
 
     pub fn is_key_pressed(&self, key: Key) -> bool {
-        return self.keyboard.get(&key).unwrap().pressed;
+        return match self.keyboard.get(&key) {
+            Some(state) => state.pressed,
+            None => false,
+        }
     }
 
+    // Fields that don't need re-initialization are really the exception
+    // Maybe consider a less error-prone approach to loading new frame
+    // (Feels like a logic bug waiting to happen)
     pub fn new_frame(&mut self) {
         self.mouse.middle.pressed = false;
         self.mouse.left.pressed = false;
         self.mouse.right.pressed = false;
 
         self.mouse.last_pos = self.mouse.pos;
+
+        self.mouse.scroll = 0.0;
 
         for (x, y) in &mut self.keyboard {
             y.pressed = false;
@@ -130,22 +140,39 @@ impl InputState {
         match event {
             KeyboardInput { input, .. } => {
                 if let Some(key) = input.virtual_keycode {
-                    if let Some(state) = self.keyboard.get_mut(&key) {
-                        match input.state {
-                            ElementState::Pressed => {
-                                if !state.down {
-                                    state.pressed = true;
-                                }
-                                state.down = true;
+
+                    let state = match self.keyboard.get_mut(&key) {
+                        Some(state) => state,
+                        None => {
+                            self.keyboard.insert(key, ButtonState::new());
+                            self.keyboard.get_mut(&key).unwrap() // Ehh..
+                        },
+                    };
+
+                    match input.state {
+                        ElementState::Pressed => {
+                            if !state.down {
+                                state.pressed = true;
                             }
-                            ElementState::Released => {
-                                state.down = false;
-                                state.pressed = false;
-                            }
+                            state.down = true;
+                        }
+                        ElementState::Released => {
+                            state.down = false;
+                            state.pressed = false;
                         }
                     }
                 }
             }
+            MouseWheel { delta, .. } => {
+                match delta {
+                    MouseScrollDelta::LineDelta(lines, rows) => {
+                        self.mouse.scroll = *rows;
+                    },
+                    MouseScrollDelta::PixelDelta(pixels) => {
+                        self.mouse.scroll = pixels.y as f32;
+                    }
+                }
+            },
             MouseInput { button, state, .. } => {
                 self.mouse.update_from_mouse_button(button, state);
             },

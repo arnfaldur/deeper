@@ -1,5 +1,5 @@
 (
     fps : 60,
-    screen_width  : 1920,
-    screen_height : 1080,
+    screen_width  : 2560,
+    screen_height : 1440,
 )
