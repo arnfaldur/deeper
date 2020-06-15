@@ -21,19 +21,20 @@ impl<'a> System <'a> for CameraControlSystem {
         ReadExpect<'a, PlayerCamera>,
         WriteStorage<'a, Camera>,
         ReadStorage<'a, Position3D>,
-        WriteStorage<'a, Position>,
+        ReadStorage<'a, Position>,
         WriteStorage<'a, SphericalOffset>,
         WriteStorage<'a, Destination>,
+        WriteStorage<'a, Velocity>,
     );
 
-    fn run(&mut self, (input, player, player_cam, mut cam, pos3d, mut pos, mut offset, mut dests): Self::SystemData) {
+    fn run(&mut self, (input, player, player_cam, mut cam, pos3d, pos, mut offset, mut dests, mut vels): Self::SystemData) {
 
         // Should these be a feature of the spherical offset?
-        const MINIMUM_PHI : f32 = 0.15  * PI;
-        const MAXIMUM_PHI : f32 = 0.325 * PI;
+        const MINIMUM_PHI : f32 = 0.1 * PI;
+        const MAXIMUM_PHI : f32 = 0.3 * PI;
 
-        const MINIMUM_RADIUS : f32 = 10.0;
-        const MAXIMUM_RADIUS : f32 = 25.0;
+        const MINIMUM_RADIUS : f32 = 5.0;
+        const MAXIMUM_RADIUS : f32 = 20.0;
 
         let mut camera = cam.get_mut(player_cam.entity).unwrap();
         let mut cam_offset = offset.get_mut(player_cam.entity).unwrap();
@@ -51,32 +52,37 @@ impl<'a> System <'a> for CameraControlSystem {
             cam_offset.theta += cam_offset.theta_delta * mouse_delta.x;
         }
 
-        let mut cam_pos = pos.get_mut(player_cam.entity).unwrap();
+        let cam_pos = pos.get(player_cam.entity).unwrap();
         let cam_3d_pos = pos3d.get(player_cam.entity).unwrap();
 
-        let to_center = (cam_pos.to_vec3() - cam_3d_pos.0).normalize() * 0.04;
+        let to_center = (cam_pos.to_vec3() - cam_3d_pos.0).normalize() * 5.0;
         let cam_front = Vector2::new(to_center.x,  to_center.y);
         let cam_right = Vector2::new(to_center.y, -to_center.x);
 
+        let mut new_velocity = Vector2::new(0.0, 0.0);
+
         if input.is_key_down(Key::E) {
-            cam_pos.0 += cam_front;
+            new_velocity += cam_front;
             camera.roaming = true;
         }
         if input.is_key_down(Key::S) {
-            cam_pos.0 -= cam_right;
+            new_velocity -= cam_right;
             camera.roaming = true;
         }
         if input.is_key_down(Key::D) {
-            cam_pos.0 -= cam_front;
+            new_velocity -= cam_front;
             camera.roaming = true;
         }
         if input.is_key_down(Key::F) {
-            cam_pos.0 += cam_right;
+            new_velocity += cam_right;
             camera.roaming = true;
         }
 
         // Need to deal with removing the destination also
-        if !camera.roaming {
+        if camera.roaming {
+            vels.get_mut(player_cam.entity).unwrap().0 = new_velocity;
+            dests.remove(player_cam.entity);
+        } else {
             dests.insert(player_cam.entity, Destination::simple(pos.get(player.entity).unwrap().0));
         }
     }
