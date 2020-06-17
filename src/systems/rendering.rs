@@ -105,7 +105,7 @@ impl<'a> System<'a> for RenderingSystem {
             wgpu::BufferUsage::COPY_SRC,
         );
 
-        for (i, (pos, model)) in (&pos, &models).join().enumerate() {
+        for (i, (_pos, model)) in (&pos, &models).join().enumerate() {
             encoder.copy_buffer_to_buffer(
                 &temp_buf,
                 (i * std::mem::size_of::<graphics::LocalUniforms>()) as u64,
@@ -116,7 +116,8 @@ impl<'a> System<'a> for RenderingSystem {
         }
 
         {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            // initialize render pass
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
@@ -135,22 +136,23 @@ impl<'a> System<'a> for RenderingSystem {
                 }),
             });
 
-            rpass.set_pipeline(&context.pipeline);
-            rpass.set_bind_group(0, &context.bind_group, &[]);
+            render_pass.set_pipeline(&context.pipeline);
+            render_pass.set_bind_group(0, &context.bind_group, &[]);
 
+            // render static meshes
             for model in (&static_model).join() {
-                rpass.set_bind_group(1, &model.bind_group, &[]);
+                render_pass.set_bind_group(1, &model.bind_group, &[]);
                 for mesh in &ass_man.models[model.idx].meshes {
-                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
-                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
+                    render_pass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    render_pass.draw(0..mesh.num_vertices as u32, 0..1)
                 }
             }
-
+            // render dynamic meshes
             for (_, model) in (&pos, &models).join() {
-                rpass.set_bind_group(1, &model.bind_group, &[]);
+                render_pass.set_bind_group(1, &model.bind_group, &[]);
                 for mesh in &ass_man.models[model.idx].meshes {
-                    rpass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
-                    rpass.draw(0..mesh.num_vertices as u32, 0..1)
+                    render_pass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+                    render_pass.draw(0..mesh.num_vertices as u32, 0..1)
                 }
             }
         }
