@@ -127,7 +127,7 @@ async fn run_async() {
     world.insert(Instant::now());
     world.insert(FrameTime(std::f32::EPSILON));
     world.insert(MapTransition::Deeper);
-    world.insert(FloorNumber(0));
+    world.insert(FloorNumber(10));
 
     let input_state = InputState::new();
     world.insert(input_state);
