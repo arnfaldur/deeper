@@ -54,32 +54,6 @@ async fn run_async() {
 
     register_components(&mut world);
 
-    // TODO: make audio system configurable
-    let audio_system_enabled = false;
-    if audio_system_enabled {
-        use rg3d_sound::context::Context as AudioContext;
-        use rg3d_sound::buffer::SoundBuffer;
-        use rg3d_sound::buffer::DataSource;
-        use rg3d_sound::source::generic::GenericSourceBuilder;
-        use rg3d_sound::source::Status;
-        use rg3d_sound::source::SoundSource;
-        use rg3d_sound::pool::Handle;
-
-        let mut audio_context = AudioContext::new().unwrap();
-
-        let sound_buffer = SoundBuffer::new_generic(DataSource::from_file("assets/Audio/dungexplorer-ambience.wav").unwrap()).unwrap();
-
-        let source = GenericSourceBuilder::new(sound_buffer)
-            .with_status(Status::Playing)
-            .with_looping(true)
-            .build_source()
-            .unwrap();
-
-        let _source_handle: Handle<SoundSource> = audio_context.lock()
-            .unwrap()
-            .add_source(source);
-    }
-
     // initialize dispacher with all game systems
     let mut dispatcher = DispatcherBuilder::new()
         .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
@@ -93,7 +67,8 @@ async fn run_async() {
         .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
         .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
         .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
-        .with(rendering::RenderingSystem::new(), "Rendering", &[]).build();
+        .with_thread_local(rendering::RenderingSystem::new())
+        .build();
 
     let player = world
         .create_entity()
@@ -125,8 +100,8 @@ async fn run_async() {
         .build();
 
     world.insert(Player { entity: player });
-    world.insert(ActiveCamera{ entity: player_camera });
-    world.insert(PlayerCamera{ entity: player_camera });
+    world.insert(ActiveCamera { entity: player_camera });
+    world.insert(PlayerCamera { entity: player_camera });
     world.insert(context);
     world.insert(ass_man);
     world.insert(Instant::now());

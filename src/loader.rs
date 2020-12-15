@@ -74,7 +74,6 @@ enum AssetKind {
 
 struct Asset {
     name: String,
-    changed: bool,
     loaded_at_time: SystemTime,
     asset_kind: AssetKind,
 }
@@ -203,7 +202,6 @@ impl AssetManager {
             .to_string();
         self.assets.insert(path.to_path_buf(), Asset {
             name,
-            changed: false,
             loaded_at_time: SystemTime::now(),
             asset_kind
         });

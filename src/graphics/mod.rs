@@ -130,6 +130,10 @@ use winit::dpi::PhysicalSize;
 pub struct Context {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
+    
+    //pub imgui: imgui::Context,
+    //pub imgui_platform: imgui_winit_support::WinitPlatform,
+    //pub imgui_renderer: imgui_wgpu::Renderer,
 
     pub uniform_buf: wgpu::Buffer,
     pub lights_buf: wgpu::Buffer,
@@ -270,6 +274,8 @@ impl Context {
         let context = Context {
             device,
             queue,
+            //imgui,
+            //imgui_platform,
             surface,
             sc_desc,
             swap_chain,

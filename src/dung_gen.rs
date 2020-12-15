@@ -101,17 +101,17 @@ impl DungGen {
         while self.room_centers.len() < self.n_rooms {
             // Step 1: Generate a random room in the world
 
-            let xmin = rng.gen_range(
+            let x_min = rng.gen_range(
                 world_edge_size,
                 self.width - (self.room_min + self.room_range) - world_edge_size,
             );
-            let ymin = rng.gen_range(
+            let y_min = rng.gen_range(
                 world_edge_size,
                 self.height - (self.room_min + self.room_range) - world_edge_size,
             );
 
-            let xmax = xmin + self.room_min + rng.gen_range(0, self.room_range);
-            let ymax = ymin + self.room_min + rng.gen_range(0, self.room_range);
+            let x_max = x_min + self.room_min + rng.gen_range(0, self.room_range);
+            let y_max = y_min + self.room_min + rng.gen_range(0, self.room_range);
 
             // Step 2:  Check if the randomly generated room
             //          intersects with any previously generated room
@@ -119,8 +119,8 @@ impl DungGen {
             // Assume it does not
             let mut valid = true;
             // Check for intersection
-            'outer: for x in xmin..=xmax {
-                for y in ymin..=ymax {
+            'outer: for x in x_min..=x_max {
+                for y in y_min..=y_max {
                     if self.world.contains_key(&(x, y)) {
                         valid = false;
                         break 'outer;
@@ -135,25 +135,25 @@ impl DungGen {
             // Step 3: Paint the room into the world
 
             // Lay down floor
-            for x in xmin..=xmax {
-                for y in ymin..=ymax {
+            for x in x_min..=x_max {
+                for y in y_min..=y_max {
                     self.world.insert((x, y), TileType::Floor);
                 }
             }
 
             // Set walls on the outside of the room
-            for x in xmin - 1..=xmax + 1 {
-                self.world.insert((x, ymin - 1), TileType::Wall(None));
-                self.world.insert((x, ymax + 1), TileType::Wall(None));
+            for x in x_min - 1..=x_max + 1 {
+                self.world.insert((x, y_min - 1), TileType::Wall(None));
+                self.world.insert((x, y_max + 1), TileType::Wall(None));
             }
-            for y in ymin - 1..=ymax + 1 {
-                self.world.insert((xmin - 1, y), TileType::Wall(None));
-                self.world.insert((xmax + 1, y), TileType::Wall(None));
+            for y in y_min - 1..=y_max + 1 {
+                self.world.insert((x_min - 1, y), TileType::Wall(None));
+                self.world.insert((x_max + 1, y), TileType::Wall(None));
             }
 
             // Add the center of the generated room to the list
             self.room_centers
-                .push((xmin + (xmax - xmin) / 2, ymin + (ymax - ymin) / 2));
+                .push((x_min + (x_max - x_min) / 2, y_min + (y_max - y_min) / 2));
         }
 
         // Step 4: Once all rooms are generated, add the centers as
@@ -255,21 +255,21 @@ impl DungGen {
         for (&(x, y), &wall_type) in self.world.iter() {
             let loc = (x, y);
             if let TileType::Wall(_) = wall_type {
-                let N = *self.world.get(&(x, y + 1)).unwrap_or(&TileType::Wall(None));
-                let W = *self.world.get(&(x - 1, y)).unwrap_or(&TileType::Wall(None));
-                let S = *self.world.get(&(x, y - 1)).unwrap_or(&TileType::Wall(None));
-                let E = *self.world.get(&(x + 1, y)).unwrap_or(&TileType::Wall(None));
+                let n = *self.world.get(&(x, y + 1)).unwrap_or(&TileType::Wall(None));
+                let w = *self.world.get(&(x - 1, y)).unwrap_or(&TileType::Wall(None));
+                let s = *self.world.get(&(x, y - 1)).unwrap_or(&TileType::Wall(None));
+                let e = *self.world.get(&(x + 1, y)).unwrap_or(&TileType::Wall(None));
 
-                let NE = *self.world.get(&(x + 1, y + 1)).unwrap_or(&TileType::Wall(None));
-                let NW = *self.world.get(&(x - 1, y + 1)).unwrap_or(&TileType::Wall(None));
-                let SE = *self.world.get(&(x + 1, y - 1)).unwrap_or(&TileType::Wall(None));
-                let SW = *self.world.get(&(x - 1, y - 1)).unwrap_or(&TileType::Wall(None));
+                let ne = *self.world.get(&(x + 1, y + 1)).unwrap_or(&TileType::Wall(None));
+                let nw = *self.world.get(&(x - 1, y + 1)).unwrap_or(&TileType::Wall(None));
+                let se = *self.world.get(&(x + 1, y - 1)).unwrap_or(&TileType::Wall(None));
+                let sw = *self.world.get(&(x - 1, y - 1)).unwrap_or(&TileType::Wall(None));
 
                 for &(a, b, c, d, e, f, typ) in [
-                    (S, E, N, W, NE, NW, TileType::Wall(Some(WallDirection::North))),
-                    (E, N, W, S, SW, NW, TileType::Wall(Some(WallDirection::West))),
-                    (N, W, S, E, SE, SW, TileType::Wall(Some(WallDirection::South))),
-                    (W, S, E, N, SE, NE, TileType::Wall(Some(WallDirection::East))),
+                    (s, e, n, w, ne, nw, TileType::Wall(Some(WallDirection::North))),
+                    (e, n, w, s, sw, nw, TileType::Wall(Some(WallDirection::West))),
+                    (n, w, s, e, se, sw, TileType::Wall(Some(WallDirection::South))),
+                    (w, s, e, n, se, ne, TileType::Wall(Some(WallDirection::East))),
                 ].iter() {
                     if (a == TileType::Floor || a == TileType::Path)
                         && b == TileType::Wall(None)

@@ -1,6 +1,5 @@
 use cgmath::Vector2;
 use winit::event::{Event, MouseButton, ElementState, VirtualKeyCode, MouseScrollDelta};
-use std::borrow::BorrowMut;
 
 
 #[derive(Default)]
@@ -99,7 +98,7 @@ pub struct InputState {
 
 impl InputState {
     pub fn new() -> Self {
-        let mut keyboard = std::collections::HashMap::new();
+        let keyboard = std::collections::HashMap::new();
 
         Self { mouse: MouseState::new(), keyboard }
     }

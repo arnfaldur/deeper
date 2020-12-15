@@ -218,13 +218,13 @@ impl Model3D {
         }
     }
 
-    pub fn from_index(context: &graphics::Context, index: usize) -> Model3D {
+    pub fn from_index(context: &graphics::Context, index: usize) -> Self {
         let mut m = Self::new(context);
         m.idx = index;
         return m;
     }
 
-    pub fn with_offset(mut self, offset: Vector3<f32>) -> Model3D {
+    pub fn with_offset(mut self, offset: Vector3<f32>) -> Self {
         self.offset = offset;
         self
     }

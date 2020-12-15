@@ -46,7 +46,7 @@ impl<'a> System <'a> for CameraControlSystem {
         cam_offset.phi = (cam_offset.radius - MINIMUM_RADIUS) / (MAXIMUM_RADIUS - MINIMUM_RADIUS) * (MAXIMUM_PHI - MINIMUM_PHI) + MINIMUM_PHI;
 
         // camera orbiting system enabled for now
-        if input.mouse.middle.down {
+        if input.mouse.right.down {
             let mouse_delta = input.mouse.delta();
 
             cam_offset.theta += cam_offset.theta_delta * mouse_delta.x;
