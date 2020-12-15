@@ -3,8 +3,7 @@ extern crate cgmath;
 
 use cgmath::{Vector2, Vector3, Matrix4, Deg};
 
-use specs::prelude::*;
-use specs::{Component, VecStorage};
+use legion::Entity;
 
 use std::f32::consts::PI;
 use crate::graphics;
@@ -26,8 +25,7 @@ pub struct PlayerCamera {
 
 pub struct FrameTime(pub f32);
 
-#[derive(Component, Debug, Copy, Clone)]
-#[storage(VecStorage)]
+#[derive(Debug, Copy, Clone)]
 pub struct Position(pub Vector2<f32>);
 
 impl Position {
@@ -36,49 +34,38 @@ impl Position {
     }
 }
 
-#[derive(Component, Debug)]
-#[storage(VecStorage)]
+#[derive(Debug)]
 pub struct Velocity(pub Vector2<f32>);
 
 impl Velocity {
     pub fn new() -> Velocity { Velocity(Vector2::new(0.0, 0.0)) }
 }
 
-#[derive(Component)]
 pub struct Orientation(pub Deg<f32>);
 
-#[derive(Component)]
 pub struct Speed(pub f32);
 
-#[derive(Component)]
 pub struct Acceleration(pub f32);
 
-#[derive(Component)]
 pub struct StaticBody;
 
-#[derive(Component)]
 pub struct DynamicBody(pub f32);
 
-#[derive(Component)]
 pub struct CircleCollider {
     pub radius: f32,
 }
 
-#[derive(Component)]
 pub struct SquareCollider {
     pub side_length: f32,
 }
 
-#[derive(Component)]
 pub struct Agent;
 
-#[derive(Component)]
 pub struct AIFollow {
     pub target: Entity,
     pub minimum_distance: f32,
 }
 
-#[derive(Component)]
 pub struct Destination {
     pub goal: Vector2<f32>,
     pub next: Vector2<f32>,
@@ -93,13 +80,12 @@ impl Destination {
     }
 }
 
-#[derive(Component, Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub enum Faction {
     Enemies,
     Friends,
 }
 
-#[derive(Component)]
 pub struct HitPoints {
     pub max: f32,
     pub health: f32,
@@ -111,24 +97,19 @@ pub enum MapTransition {
     Deeper, // Down to the next floor
 }
 
-#[derive(Component)]
 pub struct MapSwitcher(pub MapTransition);
 
-#[derive(Component)]
 pub struct Camera {
     pub fov: f32,
     pub up: Vector3<f32>,
     pub roaming: bool,
 }
 
-#[derive(Component)]
 pub struct Target(pub Entity);
 
-#[derive(Component)]
 pub struct Position3D(pub Vector3<f32>);
 
 
-#[derive(Component)]
 pub struct SphericalOffset {
     pub phi          : f32,
     pub theta        : f32,
@@ -163,7 +144,6 @@ impl SphericalOffset {
     }
 }
 
-#[derive(Component)]
 pub struct StaticModel {
     pub idx: usize,
     pub bind_group: wgpu::BindGroup,
@@ -188,7 +168,6 @@ impl StaticModel {
     }
 }
 
-#[derive(Component)]
 pub struct Model3D {
     pub idx: usize,
     pub offset: Vector3<f32>,
@@ -245,7 +224,7 @@ impl Model3D {
     }
 }
 
-#[derive(Component, Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub enum TileType {
     Wall(Option<WallDirection>),
     Floor,
@@ -262,38 +241,4 @@ pub enum WallDirection {
     East,
 }
 
-// TODO: use or delete for pathfinding
-//#[derive(Component)]
-//pub struct TileNeighbours {
-//    pub n: Option<Entity>,
-//    pub w: Option<Entity>,
-//    pub s: Option<Entity>,
-//    pub e: Option<Entity>,
-//}
-
 pub struct FloorNumber(pub i32);
-
-pub fn register_components(world: &mut World) {
-    world.register::<Position>();
-    world.register::<Position3D>();
-    world.register::<Orientation>();
-    world.register::<Velocity>();
-    world.register::<Speed>();
-    world.register::<Acceleration>();
-    world.register::<Camera>();
-    world.register::<Target>();
-    world.register::<SphericalOffset>();
-    world.register::<Model3D>();
-    world.register::<StaticModel>();
-    world.register::<TileType>();
-    world.register::<StaticBody>();
-    world.register::<DynamicBody>();
-    world.register::<CircleCollider>();
-    world.register::<SquareCollider>();
-    world.register::<AIFollow>();
-    world.register::<Destination>();
-    world.register::<MapSwitcher>();
-    world.register::<Faction>();
-    world.register::<HitPoints>();
-//    world.register::<TileNeighbours>();
-}

@@ -12,14 +12,22 @@ mod graphics;
 mod input;
 
 mod components;
+
+use std::time::SystemTime;
+
+use crate::components::*;
+//use crate::systems::assets::*;
+
 mod systems;
 
 use loader::AssetManager;
 
-use crate::components::*;
-use crate::systems::*;
+use legion::{
+    World,
+    Schedule,
+    Resources
+};
 
-use specs::prelude::*;
 
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::dpi::PhysicalSize;
@@ -30,6 +38,7 @@ use cgmath::{Vector2, Vector3, Deg};
 use crate::input::InputState;
 use std::time::Instant;
 use std::ops::DerefMut;
+use crate::systems::spherical_offset;
 
 
 async fn run_async() {
@@ -50,85 +59,97 @@ async fn run_async() {
 
     ass_man.load_models(&context);
 
-    let mut world = World::new();
+    let mut world = World::default();
 
-    register_components(&mut world);
 
-    // initialize dispacher with all game systems
-    let mut dispatcher = DispatcherBuilder::new()
-        .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
-        .with(player::PlayerSystem, "Player", &[])
-        .with(player::CameraControlSystem, "CameraControl", &["Player"])
-        .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
-        .with(AIFollowSystem, "AIFollow", &[])
-        .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
-        .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
-        .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
-        .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
-        .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
-        .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
-        .with_thread_local(rendering::RenderingSystem::new())
+
+    let mut schedule = Schedule::builder()
+        .add_system(systems::assets::hot_loading_system(SystemTime::now(), false))
+        .add_system(systems::player::player_system())
+        .add_system(systems::player::camera_control_system())
+        .add_system(systems::spherical_offset_system())
+        .add_system(systems::world_gen::dung_gen_system())
+        .add_system(systems::rendering::rendering_system(SystemTime::now()))
         .build();
 
-    let player = world
-        .create_entity()
-        .with(Position(Vector2::unit_x()))
-        .with(Speed(5.))
-        .with(Acceleration(30.))
-        .with(Orientation(Deg(0.0)))
-        .with(Velocity::new())
-        .with(DynamicBody(1.0))
-        .with(CircleCollider { radius: 0.3 })
-        .with(Model3D::from_index(
+    // initialize dispatcher with all game systems
+    //let mut dispatcher = DispatcherBuilder::new()
+    //    .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
+    //    .with(player::PlayerSystem, "Player", &[])
+    //    .with(player::CameraControlSystem, "CameraControl", &["Player"])
+    //    .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
+    //    .with(AIFollowSystem, "AIFollow", &[])
+    //    .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
+    //    .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
+    //    .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
+    //    .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
+    //    .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
+    //    .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
+    //    .with_thread_local(rendering::RenderingSystem::new())
+    //    .build();
+
+    let player = world.push((
+        Position(Vector2::unit_x()),
+        Speed(5.),
+        Acceleration(30.),
+        Orientation(Deg(0.0)),
+        Velocity::new(),
+        DynamicBody(1.0),
+        CircleCollider { radius: 0.3 },
+        Model3D::from_index(
             &context, ass_man.get_model_index("arissa.obj").unwrap(),
-        ).with_scale(0.5))
-        .build();
+        ).with_scale(0.5),
+    ));
 
-    let player_camera = world
-        .create_entity()
-        .with(Position(Vector2::unit_x()))
-        .with(Speed(5.))
-        .with(Acceleration(30.0))
-        .with(Velocity::new())
-        .with(components::Camera {
+    let player_camera = world.push((
+        Position(Vector2::unit_x()),
+        Speed(5.),
+        Acceleration(30.0),
+        Velocity::new(),
+        components::Camera {
             up: Vector3::unit_z(),
             fov: 30.0,
             roaming: false,
-        })
-        .with(Position3D(Vector3::new(0.0, 0.0, 0.0)))
-        .with(SphericalOffset::camera_offset())
-        .build();
+        },
+        Position3D(Vector3::new(0.0, 0.0, 0.0)),
+        SphericalOffset::camera_offset(),
+    ));
 
-    world.insert(Player { entity: player });
-    world.insert(ActiveCamera { entity: player_camera });
-    world.insert(PlayerCamera { entity: player_camera });
-    world.insert(context);
-    world.insert(ass_man);
-    world.insert(Instant::now());
-    world.insert(FrameTime(std::f32::EPSILON));
-    world.insert(MapTransition::Deeper);
+    let mut resources = Resources::default();
 
-    world.insert(FloorNumber(0));
-
-    let input_state = InputState::new();
-    world.insert(input_state);
+    resources.insert(Player { entity: player });
+    resources.insert(ActiveCamera { entity: player_camera });
+    resources.insert(PlayerCamera { entity: player_camera });
+    resources.insert(context);
+    resources.insert(ass_man);
+    resources.insert(Instant::now());
+    resources.insert(FrameTime(std::f32::EPSILON));
+    resources.insert(MapTransition::Deeper);
+    resources.insert(FloorNumber(0));
+    resources.insert(InputState::new());
 
     // Setup world
-    dispatcher.setup(&mut world);
+    //dispatcher.setup(&mut world);
 
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::MainEventsCleared => {
                 // update frametime information
-                let frame_time = world.read_resource::<Instant>().elapsed();
-                world.write_resource::<FrameTime>().0 = frame_time.as_secs_f32();
-                *world.write_resource::<Instant>().deref_mut() = Instant::now();
-                dispatcher.dispatch(&mut world);
-                world.get_mut::<InputState>().unwrap().new_frame();
-                world.maintain();
+                let frame_time = resources.get::<Instant>().unwrap().elapsed();
+                resources.insert(FrameTime(frame_time.as_secs_f32()));
+                resources.insert(Instant::now());
+                schedule.execute(&mut world, &mut resources);
+                resources.get_mut::<InputState>().unwrap().new_frame();
+                //world.write_resource::<FrameTime>().0 = frame_time.as_secs_f32();
+                //*world.write_resource::<Instant>().deref_mut() = Instant::now();
+                //dispatcher.dispatch(&mut world);
+                //world.get_mut::<InputState>().unwrap().new_frame();
+                //world.maintain();
+                schedule.execute(&mut world, &mut resources);
             }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                world.get_mut::<graphics::Context>().unwrap().resize(size);
+                resources.get_mut::<graphics::Context>().unwrap().resize(size);
+                //world.get_mut::<graphics::Context>().unwrap().resize(size);
             }
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
             | Event::WindowEvent {
@@ -140,7 +161,8 @@ async fn run_async() {
             }
             => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { event, .. } => {
-                world.get_mut::<InputState>().unwrap().update_from_event(&event);
+                resources.get_mut::<InputState>().unwrap().update_from_event(&event);
+                //world.get_mut::<InputState>().unwrap().update_from_event(&event);
             }
             _ => {
                 *control_flow = ControlFlow::Poll;
