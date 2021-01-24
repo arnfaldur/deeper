@@ -69,24 +69,9 @@ async fn run_async() {
         .add_system(systems::player::camera_control_system())
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
+        .add_system(systems::go_to_destination_system())
         .add_system(systems::rendering::rendering_system(SystemTime::now()))
         .build();
-
-    // initialize dispatcher with all game systems
-    //let mut dispatcher = DispatcherBuilder::new()
-    //    .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
-    //    .with(player::PlayerSystem, "Player", &[])
-    //    .with(player::CameraControlSystem, "CameraControl", &["Player"])
-    //    .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
-    //    .with(AIFollowSystem, "AIFollow", &[])
-    //    .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
-    //    .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
-    //    .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
-    //    .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
-    //    .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
-    //    .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
-    //    .with_thread_local(rendering::RenderingSystem::new())
-    //    .build();
 
     let player = world.push((
         Position(Vector2::unit_x()),

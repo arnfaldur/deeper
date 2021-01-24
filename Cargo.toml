@@ -20,7 +20,7 @@ rg3d-sound = "0.11.0"
 
 # graphics and input
 # wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
-wgpu          = "*"
+wgpu          = "0.5.0"
 cgmath        = "0.17"
 winit         = "0.22"
 futures       = "0.3"
@@ -28,7 +28,6 @@ env_logger    = "0.7"
 glsl-to-spirv = "0.1"
 zerocopy      = "0.3"
 lazy_static   = "1.4.0"
-imgui         = "0.4"
 imgui-wgpu    = "0.6.0"
 imgui-winit-support = { version = "0.4", default-features = false, features = ["winit-22"]}
 

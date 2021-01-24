@@ -11,6 +11,7 @@ pub mod rendering;
 pub mod world_gen;
 
 use legion::*;
+use legion::world::SubWorld;
 
 
 #[system(for_each)]
@@ -22,26 +23,15 @@ pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut 
     pos3d.0.z += follow.radius * follow.phi.sin();
 }
 
-//pub struct SphericalOffsetSystem;
-//
-//impl<'a> System<'a> for SphericalOffsetSystem {
-//    type SystemData = (
-//        ReadStorage<'a, Position>,
-//        ReadStorage<'a, SphericalOffset>,
-//        WriteStorage<'a, Position3D>,
-//    );
-//
-//    fn run(&mut self, (pos2d, offset, mut pos3d): Self::SystemData) {
-//        for (pos2d, follow, pos3d) in (&pos2d, &offset, &mut pos3d).join() {
-//            pos3d.0 = pos2d.to_vec3();
-//
-//            pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
-//            pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
-//            pos3d.0.z += follow.radius * follow.phi.sin();
-//        }
-//    }
-//}
-//
+#[system(for_each)]
+pub fn hit_point_regen(frame_time: &FrameTime, hp: &mut HitPoints) {
+    if hp.health <= 0.0 {
+        // remove
+    } else {
+        hp.health += 0.7654321 * frame_time.0;
+        hp.health = hp.max.min(hp.health);
+    }
+}
 //pub struct HitPointRegenSystem;
 //
 //impl<'a> System<'a> for HitPointRegenSystem {
@@ -92,49 +82,52 @@ pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut 
 //    }
 //}
 //
-//pub struct GoToDestinationSystem;
-//
-//impl<'a> System<'a> for GoToDestinationSystem {
-//    type SystemData = (
-//        Entities<'a>,
-//        Read<'a, LazyUpdate>,
-//        ReadExpect<'a, FrameTime>,
-//        WriteStorage<'a, Destination>,
-//        ReadStorage<'a, Position>,
-//        WriteStorage<'a, Velocity>,
-//        ReadStorage<'a, Speed>,
-//        ReadStorage<'a, Acceleration>,
-//    );
-//
-//    fn run(&mut self, (ents, updater, frame_time, mut dests, pos, mut vel, speed, acc): Self::SystemData) {
-//
-//        const EPSILON : f32 = 0.05;
-//
-//        for (ent, dest, hunter, vel, speed, accel) in (&ents, &mut dests, &pos, &mut vel, &speed, &acc).join() {
-//            // check if straight path is available, line drawing? or just navmesh
-//            // if not do A* and add intermediate destination component for next node in path
-//            // or just make Destination an object inheriting from the abstract destinations
-//            // class.
-//            let to_dest: Vector2<f32> = dest.goal - hunter.0;
-//
-//            if to_dest.magnitude() < EPSILON {
-//                updater.remove::<Destination>(ent);
-//                vel.0 = Vector2::new(0.0, 0.0);
-//            } else {
-//                let direction = to_dest.normalize();
-//                let time_to_stop = speed.0 / accel.0;
-//                let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
-//                let target_velocity = direction * speed.0 * slowdown;
-//                let delta: Vector2<f32> = target_velocity - vel.0;
-//                let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
-//
-//                if delta != Vector2::unit_x() * 0.0 {
-//                    vel.0 += delta.normalize() * velocity_change;
-//                }
-//            }
-//        }
-//    }
-//}
+#[system]
+#[write_component(Destination)]
+#[read_component(Position)]
+#[write_component(Velocity)]
+#[read_component(Speed)]
+#[read_component(Acceleration)]
+pub fn go_to_destination(
+    world: &mut SubWorld,
+    commands: &mut legion::systems::CommandBuffer,
+    #[resource] frame_time: &FrameTime,
+) {
+    const EPSILON: f32 = 0.05;
+
+    let mut query = <(
+        Entity,
+        &mut Destination,
+        &Position,
+        &mut Velocity,
+        &Speed,
+        &Acceleration,
+    )>::query();
+
+    for (ent, dest, hunter, vel, speed, accel) in query.iter_mut(world) {
+        // check if straight path is available, line drawing? or just navmesh
+        // if not do A* and add intermediate destination component for next node in path
+        // or just make Destination an object inheriting from the abstract destinations
+        // class.
+        let to_dest: Vector2<f32> = dest.goal - hunter.0;
+
+        if to_dest.magnitude() < EPSILON {
+            commands.remove_component::<Destination>(*ent);
+            vel.0 = Vector2::new(0.0, 0.0);
+        } else {
+            let direction = to_dest.normalize();
+            let time_to_stop = speed.0 / accel.0;
+            let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
+            let target_velocity = direction * speed.0 * slowdown;
+            let delta: Vector2<f32> = target_velocity - vel.0;
+            let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
+
+            if delta != Vector2::unit_x() * 0.0 {
+                vel.0 += delta.normalize() * velocity_change;
+            }
+        }
+    }
+}
 //
 //pub struct IntermediateDestinationSystem;
 //
