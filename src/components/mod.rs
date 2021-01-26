@@ -1,12 +1,14 @@
-extern crate specs;
+mod entity_builder;
+
 extern crate cgmath;
 
-use cgmath::{Vector2, Vector3, Matrix4, Deg};
+use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 
 use legion::Entity;
 
-use std::f32::consts::PI;
+use self::cgmath::ElementWise;
 use crate::graphics;
+use std::f32::consts::PI;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -38,7 +40,9 @@ impl Position {
 pub struct Velocity(pub Vector2<f32>);
 
 impl Velocity {
-    pub fn new() -> Velocity { Velocity(Vector2::new(0.0, 0.0)) }
+    pub fn new() -> Velocity {
+        Velocity(Vector2::new(0.0, 0.0))
+    }
 }
 
 pub struct Orientation(pub Deg<f32>);
@@ -49,7 +53,9 @@ pub struct Acceleration(pub f32);
 
 pub struct StaticBody;
 
-pub struct DynamicBody(pub f32);
+pub struct DynamicBody {
+    pub mass: f32,
+}
 
 pub struct CircleCollider {
     pub radius: f32,
@@ -57,6 +63,33 @@ pub struct CircleCollider {
 
 pub struct SquareCollider {
     pub side_length: f32,
+}
+
+pub struct VelocityAccumulator {
+    vel: Vector2<f32>,
+    changes: i32,
+}
+
+impl VelocityAccumulator {
+    pub fn zero() -> VelocityAccumulator {
+        VelocityAccumulator {
+            vel: Vector2::zero(),
+            changes: 0,
+        }
+    }
+    pub fn new(init: Vector2<f32>) -> VelocityAccumulator {
+        VelocityAccumulator {
+            vel: init,
+            changes: 1,
+        }
+    }
+    pub fn accumulate(&mut self, other: Vector2<f32>) {
+        self.vel += other;
+        self.changes += 1;
+    }
+    pub fn get(&self) -> Vector2<f32> {
+        self.vel / (self.changes as f32).max(1.0)
+    }
 }
 
 pub struct Agent;
@@ -109,36 +142,35 @@ pub struct Target(pub Entity);
 
 pub struct Position3D(pub Vector3<f32>);
 
-
 pub struct SphericalOffset {
-    pub phi          : f32,
-    pub theta        : f32,
-    pub radius       : f32,
-    pub theta_delta  : f32,
-    pub phi_delta    : f32,
-    pub radius_delta : f32,
+    pub phi: f32,
+    pub theta: f32,
+    pub radius: f32,
+    pub theta_delta: f32,
+    pub phi_delta: f32,
+    pub radius_delta: f32,
 }
 
 impl SphericalOffset {
     pub fn new() -> Self {
         Self {
-            phi:          0.0,
-            theta:        0.0,
-            radius:       1.0,
-            theta_delta:  0.0,
-            phi_delta:    0.0,
+            phi: 0.0,
+            theta: 0.0,
+            radius: 1.0,
+            theta_delta: 0.0,
+            phi_delta: 0.0,
             radius_delta: 0.0,
         }
     }
 
     pub fn camera_offset() -> Self {
         Self {
-            phi:    0.2 * PI,
-            theta:  PI / 3.0,
+            phi: 0.2 * PI,
+            theta: PI / 3.0,
             radius: 15.0,
             // TODO: Not satisfactory, but need to limit untraceable magic constants
             theta_delta: -0.005,
-            phi_delta:    0.0025,
+            phi_delta: 0.0025,
             radius_delta: 0.3,
         }
     }
@@ -150,7 +182,14 @@ pub struct StaticModel {
 }
 
 impl StaticModel {
-    pub fn new(context: &graphics::Context, idx: usize, offset: Vector3<f32>, scale: f32, z_rotation: f32, material: graphics::Material) -> Self {
+    pub fn new(
+        context: &graphics::Context,
+        idx: usize,
+        offset: Vector3<f32>,
+        scale: f32,
+        z_rotation: f32,
+        material: graphics::Material,
+    ) -> Self {
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
         let mut matrix = Matrix4::from_scale(scale);
@@ -184,7 +223,8 @@ impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
         let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
 
-        let (uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(graphics::LocalUniforms::new());
+        let (uniform_buf, bind_group) =
+            context.model_bind_group_from_uniform_data(graphics::LocalUniforms::new());
 
         Self {
             idx: 0,

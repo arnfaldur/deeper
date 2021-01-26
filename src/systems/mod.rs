@@ -1,18 +1,17 @@
-use std::f32::consts::{FRAC_PI_2};
+use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{prelude::*, Vector2};
 
 use crate::components::*;
 
 pub mod assets;
-//pub mod physics;
+pub mod physics;
 pub mod player;
 pub mod rendering;
 pub mod world_gen;
 
-use legion::*;
 use legion::world::SubWorld;
-
+use legion::*;
 
 #[system(for_each)]
 pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {
@@ -117,7 +116,9 @@ pub fn go_to_destination(
         } else {
             let direction = to_dest.normalize();
             let time_to_stop = speed.0 / accel.0;
-            let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
+            let slowdown = FRAC_PI_2
+                .min(to_dest.magnitude() / time_to_stop * 0.5)
+                .sin();
             let target_velocity = direction * speed.0 * slowdown;
             let delta: Vector2<f32> = target_velocity - vel.0;
             let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());

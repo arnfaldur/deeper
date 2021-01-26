@@ -1,13 +1,12 @@
 use rand::prelude::*;
 use zerocopy::AsBytes;
 
-use cgmath::{prelude::*, Vector2, Vector3, Deg};
+use cgmath::{prelude::*, Deg, Vector2, Vector3};
 
-use crate::{loader, graphics};
 use crate::components::*;
 use crate::dung_gen::DungGen;
+use crate::{graphics, loader};
 use std::collections::HashMap;
-
 
 //pub struct MapSwitchingSystem;
 //
@@ -30,8 +29,8 @@ use std::collections::HashMap;
 //}
 //
 
-use legion::*;
 use legion::world::SubWorld;
+use legion::*;
 
 #[system]
 #[read_component(TileType)]
@@ -48,7 +47,6 @@ pub fn dung_gen(
 ) {
     match *trans {
         MapTransition::Deeper => {
-
             // TODO(Arnaldur): bruh
             for (entity, _) in <(Entity, &TileType)>::query().iter(world) {
                 commands.remove(*entity);
@@ -77,24 +75,30 @@ pub fn dung_gen(
             let player_start = {
                 let (x, y) = dungeon
                     .room_centers
-                    .choose(&mut rand::thread_rng()).unwrap()
+                    .choose(&mut rand::thread_rng())
+                    .unwrap()
                     .clone();
                 (x + rng.gen_range(-2, 2), y + rng.gen_range(-2, 2))
             };
 
-
             // Reset player position and stuff
-            commands.add_component(player.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
+            commands.add_component(
+                player.entity,
+                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
+            );
             //updater.insert(player.entity, Orientation(Deg(0.0)));
             commands.add_component(player.entity, Velocity::new());
 
-            commands.add_component(player_camera.entity, Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)));
+            commands.add_component(
+                player_camera.entity,
+                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
+            );
 
             // TODO: Turn lights into entities
             {
-                let mut init_encoder = context.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: None }
-                );
+                let mut init_encoder = context
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 let mut lights: graphics::Lights = Default::default();
 
@@ -105,7 +109,9 @@ pub fn dung_gen(
                 };
 
                 for (i, &(x, y)) in dungeon.room_centers.iter().enumerate() {
-                    if i >= graphics::MAX_NR_OF_POINT_LIGHTS { break; }
+                    if i >= graphics::MAX_NR_OF_POINT_LIGHTS {
+                        break;
+                    }
                     lights.point_lights[i] = Default::default();
                     lights.point_lights[i].radius = 10.0;
                     lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
@@ -201,34 +207,52 @@ pub fn dung_gen(
                 //    _ => {}
                 //}
                 // Add enemies to floor
-                if TileType::Floor == tile_type && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64) {
+                if TileType::Floor == tile_type
+                    && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
+                {
                     let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
-                    let enemy = commands.push(
-                        (Position(pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3))),
-                         Speed(rng.gen_range(1., 4.) - 1.6 * rad),
-                         Acceleration(rng.gen_range(3., 9.) + 2.0 * rad),
-                         Orientation(Deg(0.0)),
-                         Velocity::new(),
-                         DynamicBody(rad),
-                         CircleCollider { radius: rad },
-                         Faction::Enemies, ));
-                    commands.add_component(enemy,
-                                           AIFollow {
-                                               target: player.entity,
-                                               minimum_distance: 2.0 + rad,
-                                           });
-
-                    commands.add_component(enemy,
-                                           HitPoints {
-                                               max: rng.gen_range(0., 2.) + 8. * rad,
-                                               health: rng.gen_range(0., 2.) + 8. * rad,
-                                           });
-                    commands.add_component(enemy,
-                                           Model3D::from_index(&context, ass_man.get_model_index("monstroman.obj").unwrap())
-                                               .with_material(graphics::Material::glossy(Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen())))
-                                               .with_scale(rad * 1.7));
+                    let enemy = commands.push((
+                        Position(
+                            pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3)),
+                        ),
+                        Speed(rng.gen_range(1., 4.) - 1.6 * rad),
+                        Acceleration(rng.gen_range(3., 9.) + 2.0 * rad),
+                        Orientation(Deg(0.0)),
+                        Velocity::new(),
+                        VelocityAccumulator::zero(),
+                        DynamicBody { mass: rad },
+                        CircleCollider { radius: rad },
+                    ));
+                    commands.add_component(enemy, Faction::Enemies);
+                    commands.add_component(
+                        enemy,
+                        AIFollow {
+                            target: player.entity,
+                            minimum_distance: 2.0 + rad,
+                        },
+                    );
+                    commands.add_component(
+                        enemy,
+                        HitPoints {
+                            max: rng.gen_range(0., 2.) + 8. * rad,
+                            health: rng.gen_range(0., 2.) + 8. * rad,
+                        },
+                    );
+                    commands.add_component(
+                        enemy,
+                        Model3D::from_index(
+                            &context,
+                            ass_man.get_model_index("monstroman.obj").unwrap(),
+                        )
+                        .with_material(graphics::Material::glossy(Vector3::<f32>::new(
+                            rng.gen(),
+                            rng.gen(),
+                            rng.gen(),
+                        )))
+                        .with_scale(rad * 1.7),
+                    );
                 }
-            };
+            }
             // TODO: use this or delete for a pathfinding system
             // mark pathable neighbours
             //for (&(x, y), &ent) in pathability_map.iter() {

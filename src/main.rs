@@ -22,33 +22,31 @@ mod systems;
 
 use loader::AssetManager;
 
-use legion::{
-    World,
-    Schedule,
-    Resources
-};
+use legion::{Resources, Schedule, World};
 
-
-use winit::event_loop::{EventLoop, ControlFlow};
 use winit::dpi::PhysicalSize;
-use winit::event::{Event, WindowEvent, KeyboardInput, VirtualKeyCode};
+use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
 
-use cgmath::{Vector2, Vector3, Deg};
+use cgmath::{Deg, Vector2, Vector3};
 
 use crate::input::InputState;
-use std::time::Instant;
-use std::ops::DerefMut;
 use crate::systems::spherical_offset;
+use std::ops::DerefMut;
+use std::time::Instant;
 
+use systems::physics::PhysicsBuilderExtender;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
     let ds = ass_man.load_display_settings();
 
-
     let event_loop = EventLoop::new();
 
-    let size = PhysicalSize { width: ds.screen_width, height: ds.screen_height };
+    let size = PhysicalSize {
+        width: ds.screen_width,
+        height: ds.screen_height,
+    };
 
     let builder = winit::window::WindowBuilder::new()
         .with_title("deeper")
@@ -61,15 +59,33 @@ async fn run_async() {
 
     let mut world = World::default();
 
-
+    // initialize dispatcher with all game systems
+    //let mut dispatcher = DispatcherBuilder::new()
+    //    .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
+    //    .with(player::PlayerSystem, "Player", &[])
+    //    .with(player::CameraControlSystem, "CameraControl", &["Player"])
+    //    .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
+    //    .with(AIFollowSystem, "AIFollow", &[])
+    //    .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
+    //    .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
+    //    .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
+    //    .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
+    //    .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
+    //    .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
+    //    .with_thread_local(rendering::RenderingSystem::new())
+    //    .build();
 
     let mut schedule = Schedule::builder()
-        .add_system(systems::assets::hot_loading_system(SystemTime::now(), false))
+        .add_system(systems::assets::hot_loading_system(
+            SystemTime::now(),
+            false,
+        ))
         .add_system(systems::player::player_system())
         .add_system(systems::player::camera_control_system())
+        .add_system(systems::go_to_destination_system())
+        .add_physics_systems()
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
-        .add_system(systems::go_to_destination_system())
         .add_system(systems::rendering::rendering_system(SystemTime::now()))
         .build();
 
@@ -79,12 +95,16 @@ async fn run_async() {
         Acceleration(30.),
         Orientation(Deg(0.0)),
         Velocity::new(),
-        DynamicBody(1.0),
+        VelocityAccumulator::zero(),
+        DynamicBody { mass: 1.0 },
         CircleCollider { radius: 0.3 },
-        Model3D::from_index(
-            &context, ass_man.get_model_index("arissa.obj").unwrap(),
-        ).with_scale(0.5),
     ));
+    if let Some(mut p) = world.entry(player) {
+        p.add_component(
+            Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
+                .with_scale(0.5),
+        )
+    }
 
     let player_camera = world.push((
         Position(Vector2::unit_x()),
@@ -103,14 +123,18 @@ async fn run_async() {
     let mut resources = Resources::default();
 
     resources.insert(Player { entity: player });
-    resources.insert(ActiveCamera { entity: player_camera });
-    resources.insert(PlayerCamera { entity: player_camera });
+    resources.insert(ActiveCamera {
+        entity: player_camera,
+    });
+    resources.insert(PlayerCamera {
+        entity: player_camera,
+    });
     resources.insert(context);
     resources.insert(ass_man);
     resources.insert(Instant::now());
     resources.insert(FrameTime(std::f32::EPSILON));
     resources.insert(MapTransition::Deeper);
-    resources.insert(FloorNumber(0));
+    resources.insert(FloorNumber(8));
     resources.insert(InputState::new());
 
     // Setup world
@@ -132,21 +156,37 @@ async fn run_async() {
                 //world.maintain();
                 schedule.execute(&mut world, &mut resources);
             }
-            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                resources.get_mut::<graphics::Context>().unwrap().resize(size);
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                resources
+                    .get_mut::<graphics::Context>()
+                    .unwrap()
+                    .resize(size);
                 //world.get_mut::<graphics::Context>().unwrap().resize(size);
             }
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
-            | Event::WindowEvent {
-                event: WindowEvent::KeyboardInput {
-                    input: KeyboardInput {
-                        virtual_keycode: Some(VirtualKeyCode::Escape), ..
-                    }, ..
-                }, ..
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
             }
-            => *control_flow = ControlFlow::Exit,
+            | Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { event, .. } => {
-                resources.get_mut::<InputState>().unwrap().update_from_event(&event);
+                resources
+                    .get_mut::<InputState>()
+                    .unwrap()
+                    .update_from_event(&event);
                 //world.get_mut::<InputState>().unwrap().update_from_event(&event);
             }
             _ => {
