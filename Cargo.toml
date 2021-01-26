@@ -42,3 +42,8 @@ notify = "4.0.15"
 # ECS
 specs = { version = "0.16.1", features = ["specs-derive"] }
 legion = "0.3.1"
+
+# physics
+nalgebra = "0.20"
+ncollide2d = "0.22"
+nphysics2d = "0.14"

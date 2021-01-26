@@ -4,15 +4,15 @@ use std::collections::HashMap;
 
 use zerocopy::AsBytes;
 
+use itertools::Itertools;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
-use itertools::Itertools;
 
-use std::time::{SystemTime};
+use std::time::SystemTime;
 
-use wavefront_obj::obj;
 use crate::graphics;
+use wavefront_obj::obj;
 
 #[derive(Serialize, Deserialize)]
 struct PathSettings {
@@ -39,14 +39,12 @@ impl PathSettings {
 
 #[derive(Serialize, Deserialize)]
 struct Extensions {
-    models : Vec<String>,
+    models: Vec<String>,
 }
 
 impl Extensions {
     fn new() -> Self {
-        Self {
-            models: vec![],
-        }
+        Self { models: vec![] }
     }
 }
 
@@ -86,9 +84,9 @@ pub struct AssetManager {
     pub models: Vec<graphics::Model>,
 }
 
+use crate::loader::AssetKind::Model;
 use std::path::Path;
 use std::path::PathBuf;
-use crate::loader::AssetKind::Model;
 
 impl AssetManager {
     pub fn new() -> Self {
@@ -108,7 +106,7 @@ impl AssetManager {
             assets: Default::default(),
             paths,
             extensions: Extensions::new(),
-            models: vec!(),
+            models: vec![],
         };
 
         ass_man.register_extensions(ext_path.as_ref());
@@ -119,9 +117,12 @@ impl AssetManager {
 
     // TODO: implement mark_changed_files(...)
 
-    pub fn get_model_index(&self, name: &str ) -> Option<usize> {
-        if let Some(asset) = self.assets.values().find(|model|
-            model.name == name.to_string()) {
+    pub fn get_model_index(&self, name: &str) -> Option<usize> {
+        if let Some(asset) = self
+            .assets
+            .values()
+            .find(|model| model.name == name.to_string())
+        {
             match asset.asset_kind {
                 Model(idx) => Some(idx),
                 _ => None,
@@ -158,29 +159,35 @@ impl AssetManager {
 
     // Assumes is a valid model
     fn load_model(&mut self, path: &Path, ext: &String, context: &graphics::Context) {
-        if let Some(
-            Asset{
-                loaded_at_time: time_loaded,
-                asset_kind: AssetKind::Model(idx), ..
-            }) = self.assets.get(path) {
+        if let Some(Asset {
+            loaded_at_time: time_loaded,
+            asset_kind: AssetKind::Model(idx),
+            ..
+        }) = self.assets.get(path)
+        {
             let modified = fs::metadata(path).unwrap().modified().unwrap();
-            if modified.gt(&time_loaded) {
+            if modified.gt(time_loaded) {
                 self.models[*idx] = AssetManager::get_graphics_model(path, ext, context);
                 println!("[loader] Hotloaded: {:?}", path.file_name().unwrap());
                 self.assets.get_mut(path).unwrap().loaded_at_time = SystemTime::now();
             }
         } else {
-            self.models.push(AssetManager::get_graphics_model(path, ext, context));
+            self.models
+                .push(AssetManager::get_graphics_model(path, ext, context));
             println!("[loader] Loaded: {:?}", path.file_name().unwrap());
             self.register_asset(path, AssetKind::Model(self.models.len() - 1));
         }
     }
 
     // Note(Jökull): The graphics layer should possibly deal with this :shrug:
-    fn get_graphics_model(path: &Path, ext: &String, context: &graphics::Context) -> graphics::Model {
+    fn get_graphics_model(
+        path: &Path,
+        ext: &String,
+        context: &graphics::Context,
+    ) -> graphics::Model {
         // TODO: Generalize this
         match ext.as_str() {
-            "obj"          => load_model_from_obj(context, path),
+            "obj" => load_model_from_obj(context, path),
             "glb" | "gltf" => load_model_from_gltf(context, path),
             _ => {
                 // Should not happen
@@ -195,16 +202,15 @@ impl AssetManager {
     }
 
     fn register_asset(&mut self, path: &Path, asset_kind: AssetKind) {
-        let name = path.file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-        self.assets.insert(path.to_path_buf(), Asset {
-            name,
-            loaded_at_time: SystemTime::now(),
-            asset_kind
-        });
+        let name = path.file_name().unwrap().to_str().unwrap().to_string();
+        self.assets.insert(
+            path.to_path_buf(),
+            Asset {
+                name,
+                loaded_at_time: SystemTime::now(),
+                asset_kind,
+            },
+        );
     }
 
     fn register_extensions(&mut self, path: &Path) {
@@ -223,14 +229,16 @@ impl AssetManager {
             let data = fs::read_to_string(ds_path.as_path()).unwrap();
             //self.loaded_at_time.insert(ds_path, SystemTime::now());
             self.register_asset(ds_path.as_ref(), AssetKind::Settings);
-            return ron::de::from_str(data.as_str()).unwrap()
+            return ron::de::from_str(data.as_str()).unwrap();
         } else {
-            eprintln!("No display settings found at path: \"{}\"", ds_path.display());
+            eprintln!(
+                "No display settings found at path: \"{}\"",
+                ds_path.display()
+            );
         }
         return DisplaySettings::new();
     }
 }
-
 
 // Model file format handling
 // Note(Jökull): We really only need the device, so...
@@ -246,23 +254,22 @@ fn load_model_from_obj(context: &graphics::Context, path: &Path) -> graphics::Mo
     return load_model_from_vertex_lists(context, &vertex_lists);
 }
 
-fn load_model_from_vertex_lists(context: &graphics::Context, vertex_lists: &Vec<Vec<graphics::Vertex>>) -> graphics::Model {
-    let mut meshes = vec!();
+fn load_model_from_vertex_lists(
+    context: &graphics::Context,
+    vertex_lists: &Vec<Vec<graphics::Vertex>>,
+) -> graphics::Model {
+    let mut meshes = vec![];
 
     for vertices in vertex_lists {
+        let vertex_buf = context
+            .device
+            .create_buffer_with_data(vertices.as_bytes(), wgpu::BufferUsage::VERTEX);
 
-        let vertex_buf = context.device.create_buffer_with_data(
-            vertices.as_bytes(),
-            wgpu::BufferUsage::VERTEX,
-        );
-
-        meshes.push(
-            graphics::Mesh {
-                num_vertices: vertices.len(),
-                vertex_buffer: vertex_buf,
-                offset: [0.0, 0.0, 0.0],
-            }
-        );
+        meshes.push(graphics::Mesh {
+            num_vertices: vertices.len(),
+            vertex_buffer: vertex_buf,
+            offset: [0.0, 0.0, 0.0],
+        });
     }
 
     graphics::Model { meshes }
@@ -270,15 +277,20 @@ fn load_model_from_vertex_lists(context: &graphics::Context, vertex_lists: &Vec<
 
 // TODO: Handle transforms
 pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, String> {
-    let (document, buffers, _images) = gltf::import(path)
-        .expect(format!("[graphics/gltf] : File {} could not be opened", path.display()).as_ref());
+    let (document, buffers, _images) = gltf::import(path).expect(
+        format!(
+            "[graphics/gltf] : File {} could not be opened",
+            path.display()
+        )
+        .as_ref(),
+    );
 
     // TODO: Add checks for multiple models/scenes, etc.
 
-    let mut vertex_lists = vec!();
+    let mut vertex_lists = vec![];
 
     for mesh in document.meshes() {
-        let mut vertex_list = vec!();
+        let mut vertex_list = vec![];
         for primitive in mesh.primitives() {
             // TODO: Is there a more readable way to do this
             let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
@@ -296,7 +308,11 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>,
                 let normal = normals.get(idx as usize).unwrap().clone();
                 let tex_coord = tex_coords.get(idx as usize).unwrap().clone();
 
-                vertex_list.push(graphics::Vertex { pos, normal, tex_coord })
+                vertex_list.push(graphics::Vertex {
+                    pos,
+                    normal,
+                    tex_coord,
+                })
             }
         }
         vertex_lists.push(vertex_list);
@@ -306,29 +322,29 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>,
 }
 
 pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, String> {
-
     let mut f;
 
     if let Ok(file) = File::open(path) {
         f = file;
     } else {
-        return Err(format!("[graphics] : File {} could not be opened.", path.display()));
+        return Err(format!(
+            "[graphics] : File {} could not be opened.",
+            path.display()
+        ));
     };
 
     let mut buf = String::new();
     f.read_to_string(&mut buf);
 
-    let obj_set = obj::parse(buf)
-        .expect("Failed to parse obj file");
+    let obj_set = obj::parse(buf).expect("Failed to parse obj file");
 
-    let mut vertex_lists = vec!();
+    let mut vertex_lists = vec![];
 
     for obj in &obj_set.objects {
-
-        let mut vertices = vec!();
+        let mut vertices = vec![];
 
         for geometry in &obj.geometry {
-            let mut indices = vec!();
+            let mut indices = vec![];
 
             geometry.shapes.iter().for_each(|shape| {
                 if let obj::Primitive::Triangle(v1, v2, v3) = shape.primitive {
@@ -343,18 +359,26 @@ pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, 
 
                 let normal = match idx.2 {
                     Some(i) => obj.normals[i],
-                    _ => obj::Normal{ x: 0.0, y: 0.0, z: 0.0}
+                    _ => obj::Normal {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 };
 
                 let tc = match idx.1 {
                     Some(i) => obj.tex_vertices[i],
-                    _ => obj::TVertex{ u: 0.0, v: 0.0, w: 0.0}
+                    _ => obj::TVertex {
+                        u: 0.0,
+                        v: 0.0,
+                        w: 0.0,
+                    },
                 };
 
                 let v = graphics::Vertex {
-                    pos:        [pos.x as f32, pos.y as f32, pos.z as f32],
-                    normal:     [normal.x as f32, normal.y as f32, normal.z as f32],
-                    tex_coord:  [tc.u as f32, tc.v as f32]
+                    pos: [pos.x as f32, pos.y as f32, pos.z as f32],
+                    normal: [normal.x as f32, normal.y as f32, normal.z as f32],
+                    tex_coord: [tc.u as f32, tc.v as f32],
                 };
                 vertices.push(v);
             }
