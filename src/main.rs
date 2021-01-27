@@ -40,6 +40,7 @@ use std::ops::DerefMut;
 use std::time::Instant;
 
 use systems::physics::PhysicsBuilderExtender;
+use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -90,7 +91,7 @@ async fn run_async() {
         .add_physics_systems()
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
-        .add_thread_local(systems::rendering::rendering_system(SystemTime::now()))
+        .add_render_systems()
         .build();
 
     let player = world.push((
@@ -133,10 +134,12 @@ async fn run_async() {
     resources.insert(context);
     resources.insert(ass_man);
     resources.insert(Instant::now());
+    resources.insert(SystemTime::now());
     resources.insert(FrameTime(std::f32::EPSILON));
     resources.insert(MapTransition::Deeper);
-    resources.insert(FloorNumber(0));
+    resources.insert(FloorNumber(8));
     resources.insert(InputState::new());
+    resources.insert(systems::rendering::RenderState::new());
 
     // Setup world
     //dispatcher.setup(&mut world);

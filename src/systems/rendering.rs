@@ -10,61 +10,62 @@ use std::time::SystemTime;
 
 use legion::*;
 use legion::world::SubWorld;
+use crate::graphics::LocalUniforms;
+use wgpu::CommandBuffer;
+
+pub struct RenderState {
+    command_buffers: Vec<CommandBuffer>,
+}
+
+impl RenderState {
+    pub fn new() -> Self {
+        return Self { command_buffers: vec![] };
+    }
+}
+
+pub trait RenderBuilderExtender {
+    fn add_render_systems(&mut self) -> &mut Self;
+}
+
+impl RenderBuilderExtender for legion::systems::Builder {
+    fn add_render_systems(&mut self) -> &mut Self {
+        self.add_thread_local(render_init_system())
+            .add_thread_local(render_gen_global_uniforms_system())
+            .add_thread_local(render_gen_local_uniforms_system(vec!()))
+            .add_thread_local(render_lighting_pass_system())
+    }
+}
 
 #[system]
-#[read_component(Camera)]
-#[read_component(Target)]
-#[read_component(Position3D)]
-#[read_component(Position)]
-#[read_component(Orientation)]
-#[read_component(Model3D)]
-#[read_component(StaticModel)]
-#[read_component(HitPoints)]
-pub fn rendering(
-    world: &SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
-    #[state] time_started: &mut SystemTime,
+pub fn render_init(
     #[resource] context: &mut graphics::Context,
-    #[resource] ass_man: &loader::AssetManager,
-    #[resource] active_cam: &ActiveCamera,
+    #[resource] render_state: &mut RenderState,
 ) {
-    let frame = context.swap_chain.get_next_texture()
-        .expect("Failure to get next texture in swap chain.");
+    render_state.command_buffers.clear();
+}
 
-    let (cam, cam_pos, cam_target) = {
-        <(&Camera, &Position3D, &Position)>::query().get(world, active_cam.entity).unwrap()
-    };
-
-    let proj_view_matrix = generate_view_matrix(cam, cam_pos, cam_target.into(), &context.sc_desc);
-
-    let global_uniforms = graphics::GlobalUniforms {
-        projection_view_matrix: proj_view_matrix.into(),
-        eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
-        time: SystemTime::now().duration_since(*time_started).unwrap().as_secs_f32(),
-    };
-
-    let new_uniform_buf = context.device.create_buffer_with_data(
-        global_uniforms.as_bytes(),
-        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-    );
+#[system]
+#[read_component(Position)]
+#[read_component(Model3D)]
+#[read_component(Orientation)]
+#[read_component(HitPoints)]
+pub fn render_gen_local_uniforms(
+    world: &SubWorld,
+    #[state] local_uniforms: &mut Vec<LocalUniforms>,
+    #[resource] context: &mut graphics::Context,
+    #[resource] render_state: &mut RenderState,
+) {
+    // Clear the vector of local_uniforms
+    // This serves essentially as a memory arena that expands as needed
+    local_uniforms.clear();
 
     let mut encoder = context.device.create_command_encoder(
         &wgpu::CommandEncoderDescriptor { label: None }
     );
 
-    encoder.copy_buffer_to_buffer(
-        &new_uniform_buf,
-        0,
-        &context.uniform_buf,
-        0,
-        std::mem::size_of::<graphics::GlobalUniforms>() as u64,
-    );
+    let mut model_query = <(&Position, &Model3D, TryRead<Orientation>, TryRead<HitPoints>)>::query();
 
-    let mut local_uniforms = vec!();
-
-    let mut query = <(&Position, &Model3D, TryRead<Orientation>, TryRead<HitPoints>)>::query();
-
-    for (pos, model, rotation, hp) in query.iter(world) {
+    for (pos, model, rotation, hp) in model_query.iter(world) {
 
         let mut matrix = Matrix4::from_scale(model.scale);
 
@@ -78,6 +79,7 @@ pub fn rendering(
         let alb = Vector4::from(model.material.albedo);
 
         let mut redder_mat: graphics::Material = model.material.clone();
+
         if let Some(hp) = hp {
             redder_mat.albedo = bloody_red.lerp(alb, hp.health / hp.max).into();
         }
@@ -104,6 +106,72 @@ pub fn rendering(
             std::mem::size_of::<graphics::LocalUniforms>() as u64,
         );
     }
+
+    render_state.command_buffers.push(encoder.finish());
+
+}
+
+#[system]
+#[read_component(Camera)]
+#[read_component(Position3D)]
+#[read_component(Position)]
+pub fn render_gen_global_uniforms(
+    world: &SubWorld,
+    #[resource] context: &mut graphics::Context,
+    #[resource] render_state: &mut RenderState,
+    #[resource] time_started: &mut SystemTime,
+    #[resource] active_cam: &ActiveCamera,
+) {
+    let mut encoder = context.device.create_command_encoder(
+        &wgpu::CommandEncoderDescriptor { label: None }
+    );
+
+    let (cam, cam_pos, cam_target) = {
+        <(&Camera, &Position3D, &Position)>::query().get(world, active_cam.entity).unwrap()
+    };
+
+    let proj_view_matrix = generate_view_matrix(cam, cam_pos, cam_target.into(), &context.sc_desc);
+
+    let global_uniforms = graphics::GlobalUniforms {
+        projection_view_matrix: proj_view_matrix.into(),
+        eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
+        time: SystemTime::now().duration_since(*time_started).unwrap().as_secs_f32(),
+    };
+
+    let new_uniform_buf = context.device.create_buffer_with_data(
+        global_uniforms.as_bytes(),
+        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+    );
+
+    encoder.copy_buffer_to_buffer(
+        &new_uniform_buf,
+        0,
+        &context.uniform_buf,
+        0,
+        std::mem::size_of::<graphics::GlobalUniforms>() as u64,
+    );
+
+    render_state.command_buffers.push(encoder.finish());
+}
+
+
+
+#[system]
+#[read_component(Model3D)]
+#[read_component(StaticModel)]
+#[read_component(Position)]
+pub fn render_lighting_pass(
+    world: &SubWorld,
+    #[resource] context: &mut graphics::Context,
+    #[resource] render_state: &mut RenderState,
+    #[resource] ass_man: &loader::AssetManager,
+) {
+    let frame = context.swap_chain.get_next_texture()
+        .expect("Failure to get next texture in swap chain.");
+
+    let mut encoder = context.device.create_command_encoder(
+        &wgpu::CommandEncoderDescriptor { label: None }
+    );
 
     {
         // initialize render pass
@@ -147,9 +215,10 @@ pub fn rendering(
         }
     }
 
-    let command_buf = encoder.finish();
+    //let render_pass_buffer = encoder.finish();
+    render_state.command_buffers.push(encoder.finish());
 
-    context.queue.submit(&[command_buf]);
+    context.queue.submit(&*render_state.command_buffers);
 }
 
 fn generate_view_matrix(cam: &Camera, cam_pos: &Position3D, cam_target: cgmath::Vector3<f32>, sc_desc: &wgpu::SwapChainDescriptor) -> cgmath::Matrix4<f32> {
