@@ -69,7 +69,7 @@ async fn run_async() {
         .add_system(systems::player::camera_control_system())
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
-        .add_system(systems::rendering::rendering_system(SystemTime::now()))
+        .add_thread_local(systems::rendering::rendering_system(SystemTime::now()))
         .build();
 
     // initialize dispatcher with all game systems

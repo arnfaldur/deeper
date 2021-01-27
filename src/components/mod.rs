@@ -34,6 +34,18 @@ impl Position {
     }
 }
 
+impl Into<Vector3<f32>> for Position {
+    fn into(self) -> Vector3<f32> {
+        return self.0.extend(0.0);
+    }
+}
+
+impl Into<Vector3<f32>> for &Position {
+    fn into(self) -> Vector3<f32> {
+        return self.0.extend(0.0);
+    }
+}
+
 #[derive(Debug)]
 pub struct Velocity(pub Vector2<f32>);
 
