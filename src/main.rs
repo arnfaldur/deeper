@@ -34,28 +34,7 @@ use loader::AssetManager;
 use systems::spherical_offset;
 //use crate::systems::assets::*;
 
-use crate::systems::physics::PhysicsResource;
 use systems::physics::PhysicsBuilderExtender;
-
-// TODO: maybe give this a better name
-pub struct Universe {
-    world: legion::World,
-    resources: legion::Resources,
-}
-struct BodyReceiver(crossbeam_channel::Receiver<legion::world::Event>);
-// TODO: this should probably find a better home
-impl Universe {
-    fn new(mut world: legion::World, mut resources: legion::Resources) -> Self {
-        let (tx, rx) = crossbeam_channel::unbounded::<legion::world::Event>();
-        world.subscribe(
-            tx,
-            legion::component::<nphysics2d::object::RigidBody<f32>>()
-                | legion::component::<nphysics2d::object::Multibody<f32>>(),
-        );
-        resources.insert(BodyReceiver(rx));
-        return Universe { world, resources };
-    }
-}
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -78,6 +57,10 @@ async fn run_async() {
     ass_man.load_models(&context);
 
     let mut world = World::default();
+    let mut resources = Resources::default();
+    println!("present");
+    let mut body: nphysics2d::object::RigidBodyDesc<f32> = nphysics2d::object::RigidBodyDesc::new();
+    println!("past");
 
     // initialize dispatcher with all game systems
     //let mut dispatcher = DispatcherBuilder::new()
@@ -103,7 +86,7 @@ async fn run_async() {
         .add_system(systems::player::player_system())
         .add_system(systems::player::camera_control_system())
         .add_system(systems::go_to_destination_system())
-        .add_physics_systems()
+        .add_physics_systems(&mut world, &mut resources)
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
         .add_system(systems::rendering::rendering_system(SystemTime::now()))
@@ -115,7 +98,6 @@ async fn run_async() {
         Acceleration(30.),
         Orientation(Deg(0.0)),
         Velocity::new(),
-        VelocityAccumulator::zero(),
         DynamicBody { mass: 1.0 },
         CircleCollider { radius: 0.3 },
     ));
@@ -140,8 +122,6 @@ async fn run_async() {
         SphericalOffset::camera_offset(),
     ));
 
-    let mut resources = Resources::default();
-
     resources.insert(Player { entity: player });
     resources.insert(ActiveCamera {
         entity: player_camera,
@@ -156,9 +136,6 @@ async fn run_async() {
     resources.insert(MapTransition::Deeper);
     resources.insert(FloorNumber(8));
     resources.insert(InputState::new());
-
-    // Physics resources TODO: move this to the physics module
-    resources.insert(PhysicsResource::new());
 
     // Setup world
     //dispatcher.setup(&mut world);

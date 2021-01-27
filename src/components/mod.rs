@@ -65,33 +65,6 @@ pub struct SquareCollider {
     pub side_length: f32,
 }
 
-pub struct VelocityAccumulator {
-    vel: Vector2<f32>,
-    changes: i32,
-}
-
-impl VelocityAccumulator {
-    pub fn zero() -> VelocityAccumulator {
-        VelocityAccumulator {
-            vel: Vector2::zero(),
-            changes: 0,
-        }
-    }
-    pub fn new(init: Vector2<f32>) -> VelocityAccumulator {
-        VelocityAccumulator {
-            vel: init,
-            changes: 1,
-        }
-    }
-    pub fn accumulate(&mut self, other: Vector2<f32>) {
-        self.vel += other;
-        self.changes += 1;
-    }
-    pub fn get(&self) -> Vector2<f32> {
-        self.vel / (self.changes as f32).max(1.0)
-    }
-}
-
 pub struct Agent;
 
 pub struct AIFollow {

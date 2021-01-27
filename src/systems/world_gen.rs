@@ -219,7 +219,6 @@ pub fn dung_gen(
                         Acceleration(rng.gen_range(3., 9.) + 2.0 * rad),
                         Orientation(Deg(0.0)),
                         Velocity::new(),
-                        VelocityAccumulator::zero(),
                         DynamicBody { mass: rad },
                         CircleCollider { radius: rad },
                     ));
