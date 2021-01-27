@@ -4,23 +4,16 @@
 // TODO: remove actually fix the warnings
 #![allow(unused_must_use)]
 
-mod loader;
-
+mod components;
 mod dung_gen;
-
 mod graphics;
 mod input;
-
-mod components;
-
-use std::time::SystemTime;
-
-use crate::components::*;
-//use crate::systems::assets::*;
-
+mod loader;
 mod systems;
 
-use loader::AssetManager;
+use std::ops::DerefMut;
+use std::time::Instant;
+use std::time::SystemTime;
 
 use legion::{Resources, Schedule, World};
 
@@ -30,12 +23,39 @@ use winit::event_loop::{ControlFlow, EventLoop};
 
 use cgmath::{Deg, Vector2, Vector3};
 
-use crate::input::InputState;
-use crate::systems::spherical_offset;
-use std::ops::DerefMut;
-use std::time::Instant;
+use nphysics2d::force_generator::DefaultForceGeneratorSet;
+use nphysics2d::joint::DefaultJointConstraintSet;
+use nphysics2d::object::{DefaultBodySet, DefaultColliderSet};
+use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
+use components::*;
+use input::InputState;
+use loader::AssetManager;
+use systems::spherical_offset;
+//use crate::systems::assets::*;
+
+use crate::systems::physics::PhysicsResource;
 use systems::physics::PhysicsBuilderExtender;
+
+// TODO: maybe give this a better name
+pub struct Universe {
+    world: legion::World,
+    resources: legion::Resources,
+}
+struct BodyReceiver(crossbeam_channel::Receiver<legion::world::Event>);
+// TODO: this should probably find a better home
+impl Universe {
+    fn new(mut world: legion::World, mut resources: legion::Resources) -> Self {
+        let (tx, rx) = crossbeam_channel::unbounded::<legion::world::Event>();
+        world.subscribe(
+            tx,
+            legion::component::<nphysics2d::object::RigidBody<f32>>()
+                | legion::component::<nphysics2d::object::Multibody<f32>>(),
+        );
+        resources.insert(BodyReceiver(rx));
+        return Universe { world, resources };
+    }
+}
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -136,6 +156,9 @@ async fn run_async() {
     resources.insert(MapTransition::Deeper);
     resources.insert(FloorNumber(8));
     resources.insert(InputState::new());
+
+    // Physics resources TODO: move this to the physics module
+    resources.insert(PhysicsResource::new());
 
     // Setup world
     //dispatcher.setup(&mut world);
