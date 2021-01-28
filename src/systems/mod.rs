@@ -10,6 +10,7 @@ pub mod player;
 pub mod rendering;
 pub mod world_gen;
 
+use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
 
@@ -23,37 +24,22 @@ pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut 
 }
 
 #[system(for_each)]
-pub fn hit_point_regen(frame_time: &FrameTime, hp: &mut HitPoints) {
+pub fn hit_point_regen(
+    world: &mut SubWorld,
+    commands: &mut CommandBuffer,
+    #[resource] frame_time: &FrameTime,
+    ent: &Entity,
+    hp: &mut HitPoints,
+) {
     if hp.health <= 0.0 {
-        // remove
+        commands.remove_component::<AIFollow>(*ent);
+        commands.remove_component::<Destination>(*ent);
     } else {
         hp.health += 0.7654321 * frame_time.0;
         hp.health = hp.max.min(hp.health);
     }
 }
-//pub struct HitPointRegenSystem;
-//
-//impl<'a> System<'a> for HitPointRegenSystem {
-//    type SystemData = (
-//        Entities<'a>,
-//        ReadExpect<'a, FrameTime>,
-//        WriteStorage<'a, HitPoints>,
-//        Read<'a, LazyUpdate>,
-//    );
-//
-//    fn run(&mut self, (ents, frame_time, mut hp, updater): Self::SystemData) {
-//        for (ent, hp) in (&ents, &mut hp).join() {
-//            if hp.health <= 0.0 {
-//                updater.remove::<AIFollow>(ent);
-//                updater.remove::<Destination>(ent);
-//            } else {
-//                hp.health += 0.7654321 * frame_time.0;
-//                hp.health = hp.max.min(hp.health);
-//            }
-//        }
-//    }
-//}
-//
+
 //pub struct AIFollowSystem;
 //
 //impl<'a> System<'a> for AIFollowSystem {
@@ -129,7 +115,7 @@ pub fn go_to_destination(
         }
     }
 }
-//
+
 //pub struct IntermediateDestinationSystem;
 //
 //impl<'a> System<'a> for IntermediateDestinationSystem {
@@ -141,4 +127,3 @@ pub fn go_to_destination(
 //
 //    }
 //}
-//

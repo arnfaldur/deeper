@@ -2,12 +2,12 @@ use legion::query::{FilterResult, LayoutFilter};
 use legion::storage::{
     ArchetypeSource, ArchetypeWriter, ComponentSource, ComponentTypeId, EntityLayout,
 };
-use legion::systems::CommandBuffer;
+
 use legion::*;
 
 use crate::components::*;
-use nphysics2d::algebra::Force2;
-use rg3d_sound::buffer::DataSource::File;
+
+
 
 pub struct EntityBuilder {
     position: Option<Position>,

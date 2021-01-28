@@ -132,7 +132,7 @@ pub fn rendering(
         render_pass.set_bind_group(0, &context.bind_group, &[]);
 
         // render static meshes
-        for model in <(Read<StaticModel>)>::query().iter(world) {
+        for model in <Read<StaticModel>>::query().iter(world) {
             render_pass.set_bind_group(1, &model.bind_group, &[]);
             for mesh in &ass_man.models[model.idx].meshes {
                 render_pass.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);

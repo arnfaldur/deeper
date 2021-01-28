@@ -6,7 +6,6 @@ use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 
 use legion::Entity;
 
-use self::cgmath::ElementWise;
 use crate::graphics;
 use std::f32::consts::PI;
 
@@ -22,6 +21,8 @@ pub struct ActiveCamera {
 pub struct PlayerCamera {
     pub entity: Entity,
 }
+
+pub struct Parent(pub Entity);
 
 // end entity pointers
 

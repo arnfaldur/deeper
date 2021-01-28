@@ -1,7 +1,10 @@
+// warnings are really only relevant when doing cleanup
+// and are distracting otherwise
+// TODO: remove actually fix the warnings
+#![allow(warnings)]
 // in development code can have some unused variables
 // should be periodically removed to remove serious redundancies
 #![allow(unused_variables)]
-// TODO: remove actually fix the warnings
 #![allow(unused_must_use)]
 
 mod components;
@@ -11,7 +14,6 @@ mod input;
 mod loader;
 mod systems;
 
-use std::ops::DerefMut;
 use std::time::Instant;
 use std::time::SystemTime;
 
@@ -22,17 +24,11 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use cgmath::{Deg, Vector2, Vector3};
-use nphysics2d::algebra::Force2;
-
-use nphysics2d::force_generator::DefaultForceGeneratorSet;
-use nphysics2d::joint::DefaultJointConstraintSet;
-use nphysics2d::object::{DefaultBodySet, DefaultColliderSet};
-use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
 use components::*;
 use input::InputState;
 use loader::AssetManager;
-use systems::spherical_offset;
+
 //use crate::systems::assets::*;
 
 use systems::physics::PhysicsBuilderExtender;
@@ -107,6 +103,7 @@ async fn run_async() {
     }
 
     let player_camera = world.push((
+        Parent(player),
         Position(Vector2::unit_x()),
         Speed(5.),
         Acceleration(30.0),

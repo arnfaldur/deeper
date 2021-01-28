@@ -8,7 +8,7 @@ use cgmath::{
 
 use crate::input::{InputState, Key};
 use crate::components::*;
-use crate::graphics::{Context, project_screen_to_world, to_pos3, correction_matrix};
+use crate::graphics::{project_screen_to_world, to_pos3, correction_matrix};
 use crate::graphics;
 
 use legion::*;
@@ -38,7 +38,7 @@ pub fn camera_control(
 
     let (mut camera_world, mut world) = world.split::<&mut Camera>();
     let (mut offset_world, mut world) = world.split::<&mut SphericalOffset>();
-    let (mut velocity_world, mut world) = world.split::<&mut Velocity>();
+    let (mut velocity_world, world) = world.split::<&mut Velocity>();
 
     let mut player_cam_entity = camera_world.entry_mut(player_cam.entity).unwrap();
     let mut camera = {
@@ -201,7 +201,7 @@ pub fn player(
     // We need to do this to get mutable accesses to multiple components at once.
     // It is possible that we can fix this by creating more systems
     let (mut camera_world, mut world) = world.split::<&mut Camera>();
-    let (mut orient_world, mut world) = world.split::<&mut Orientation>();
+    let (mut orient_world, world) = world.split::<&mut Orientation>();
 
     let mouse_pos = input.mouse.pos;
 

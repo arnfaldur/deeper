@@ -1,7 +1,7 @@
 use rand::prelude::*;
 use zerocopy::AsBytes;
 
-use cgmath::{prelude::*, Deg, Vector2, Vector3};
+use cgmath::{Deg, Vector2, Vector3};
 
 use crate::components::*;
 use crate::dung_gen::DungGen;
@@ -52,7 +52,7 @@ pub fn dung_gen(
                 commands.remove(*entity);
             }
 
-            for mut chunk in <(&Faction)>::query().iter_chunks_mut(world) {
+            for chunk in <&Faction>::query().iter_chunks_mut(world) {
                 for (entity, faction) in chunk.into_iter_entities() {
                     if let Faction::Enemies = faction {
                         commands.remove(entity);
@@ -148,7 +148,7 @@ pub fn dung_gen(
                     ass_man.get_model_index("floortile.obj").unwrap(),
                 )
             };
-            let mut pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
+            let pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
 
             for (&(x, y), &tile_type) in dungeon.world.iter() {
                 let pos = Vector2::new(x as f32, y as f32);

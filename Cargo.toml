@@ -4,6 +4,8 @@ version = "0.0.1"
 authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
 edition = "2018"
 
+[profile.release]
+lto = "thin"
 
 [dependencies]
 

@@ -1,23 +1,21 @@
 use cgmath::{prelude::*, Vector2};
 
-use crate::components::*;
-
 use legion::systems::{Builder, CommandBuffer};
 use legion::world::{ComponentError, EntityAccessError, EntryRef, Event, EventSender, SubWorld};
 use legion::*;
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::Receiver;
 
 use nalgebra::Isometry2;
-use nphysics2d::algebra::Force2;
-use nphysics2d::algebra::ForceType::VelocityChange;
+
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
 use nphysics2d::object::{
-    Body, BodyStatus, DefaultBodyHandle, DefaultBodySet, DefaultColliderSet, RigidBody,
-    RigidBodyDesc,
+    Body, BodyStatus, DefaultBodyHandle, DefaultBodySet, DefaultColliderSet, RigidBodyDesc,
 };
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
+
+use crate::components::*;
 
 pub(crate) trait PhysicsBuilderExtender {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self;
@@ -25,7 +23,7 @@ pub(crate) trait PhysicsBuilderExtender {
 
 impl PhysicsBuilderExtender for Builder {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self {
-        let mut phyre = resources.get_mut_or_default::<PhysicsResource>();
+        let phyre = resources.get_mut_or_default::<PhysicsResource>();
         let (sender, receiver) = crossbeam_channel::unbounded::<Event>();
         world.subscribe(
             sender,
@@ -278,7 +276,6 @@ fn physics_world_to_entity_world(
                 v.0 = n2c(bod.velocity().linear);
             }
             if let Some(o) = ori {
-                // TODO: check if this is deg or rad
                 o.0 = cgmath::Deg::from(cgmath::Rad(bod.position().rotation.angle()));
             }
         });
