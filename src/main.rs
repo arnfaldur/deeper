@@ -22,6 +22,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use cgmath::{Deg, Vector2, Vector3};
+use nphysics2d::algebra::Force2;
 
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
@@ -43,8 +44,8 @@ async fn run_async() {
     let event_loop = EventLoop::new();
 
     let size = PhysicalSize {
-        width: ds.screen_width,
-        height: ds.screen_height,
+        width: ds.screen_width / 2,
+        height: ds.screen_height / 2,
     };
 
     let builder = winit::window::WindowBuilder::new()
@@ -58,9 +59,6 @@ async fn run_async() {
 
     let mut world = World::default();
     let mut resources = Resources::default();
-    println!("present");
-    let mut body: nphysics2d::object::RigidBodyDesc<f32> = nphysics2d::object::RigidBodyDesc::new();
-    println!("past");
 
     // initialize dispatcher with all game systems
     //let mut dispatcher = DispatcherBuilder::new()

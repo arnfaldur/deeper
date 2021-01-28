@@ -96,7 +96,7 @@ pub fn go_to_destination(
 
     let mut query = <(
         Entity,
-        &mut Destination,
+        &Destination,
         &Position,
         &mut Velocity,
         &Speed,

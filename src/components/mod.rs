@@ -45,6 +45,13 @@ impl Velocity {
     }
 }
 
+pub struct Force(pub nphysics2d::algebra::Force2<f32>);
+impl Default for Force {
+    fn default() -> Self {
+        Force(nphysics2d::algebra::Force2::zero())
+    }
+}
+
 pub struct Orientation(pub Deg<f32>);
 
 pub struct Speed(pub f32);
