@@ -7,6 +7,7 @@ use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 use legion::Entity;
 
 use crate::graphics;
+use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 use std::f32::consts::PI;
 
 // Note(Jökull): Begin entity pointers
@@ -68,6 +69,9 @@ pub struct CircleCollider {
 pub struct SquareCollider {
     pub side_length: f32,
 }
+
+pub struct BodyHandle(pub DefaultBodyHandle);
+pub struct ColliderHandle(pub DefaultColliderHandle);
 
 pub struct Agent;
 

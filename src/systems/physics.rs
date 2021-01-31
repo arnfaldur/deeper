@@ -11,8 +11,8 @@ use nalgebra::Isometry2;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
 use nphysics2d::object::{
-    Body, BodyPartHandle, BodyStatus, ColliderDesc, DefaultBodyHandle, DefaultBodySet,
-    DefaultColliderHandle, DefaultColliderSet, RigidBodyDesc,
+    Body, BodyPartHandle, BodyStatus, ColliderDesc, DefaultBodySet, DefaultColliderSet,
+    RigidBodyDesc,
 };
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
@@ -27,20 +27,16 @@ pub(crate) trait PhysicsBuilderExtender {
 
 impl PhysicsBuilderExtender for Builder {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self {
-        let phyre = resources.get_mut_or_default::<PhysicsResource>();
-        let (sender, receiver) = crossbeam_channel::unbounded::<Event>();
-        let (collider_sender, collider_receiver) = crossbeam_channel::unbounded::<Event>();
-        world.subscribe(
-            sender,
-            component::<DynamicBody>()
-                | component::<StaticBody>()
-                | component::<DisabledBody>()
-                | component::<CircleCollider>()
-                | component::<SquareCollider>(),
-        );
+        resources.insert(PhysicsResource::default());
         return self
             .add_system(validate_physics_entities_system())
-            .add_system(samsara_system(receiver))
+            .add_system(make_body_handles_system())
+            .add_system(remove_body_handles_system())
+            .add_system(flush_command_buffer_system())
+            .add_system(make_collider_handles_system())
+            .add_system(remove_collider_handles_system())
+            .add_system(flush_command_buffer_system())
+            .add_system(garbage_system())
             .add_system(entity_world_to_physics_world_system())
             .add_system(step_physics_world_system())
             .add_system(physics_world_to_entity_world_system());
@@ -152,192 +148,108 @@ fn validate_physics_entities(world: &mut SubWorld, commands: &mut CommandBuffer)
 }
 
 #[system(for_each)]
-#[filter(!component::<DefaultBodyHandle>())]
-fn make_dynamic_body_handles(
+#[filter((component::<DynamicBody>() | component::<StaticBody>() | component::<DisabledBody>()) & !component::<BodyHandle>())]
+//#[filter(component::<DynamicBody>() | component::<StaticBody>() | component::<DisabledBody>())]
+fn make_body_handles(
+    world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
     #[resource] physics: &mut PhysicsResource,
-    entity: Entity,
-    dynamic: &DynamicBody,
+    entity: &Entity,
+    dynamic: Option<&DynamicBody>,
+    stat: Option<&StaticBody>,
+    disabled: Option<&DisabledBody>,
 ) {
-    let body = RigidBodyDesc::<f32>::new()
-        .gravity_enabled(false)
-        .mass(dynamic.mass)
-        .status(BodyStatus::Dynamic)
-        .build();
-    let handle = physics.bodies.insert(body);
-    commands.add_component(entity, handle);
+    let body = if let Some(dyna) = dynamic {
+        RigidBodyDesc::<f32>::new()
+            .status(BodyStatus::Dynamic)
+            .gravity_enabled(false)
+            .mass(dyna.mass)
+    } else if let Some(_) = stat {
+        RigidBodyDesc::<f32>::new().status(BodyStatus::Static)
+    } else if let Some(_) = disabled {
+        RigidBodyDesc::<f32>::new().status(BodyStatus::Disabled)
+    } else {
+        unreachable!() // the filter should take care of this
+    };
+    let handle = BodyHandle(physics.bodies.insert(body.build()));
+    commands.add_component(*entity, handle);
 }
 
 #[system(for_each)]
-#[filter(component::<StaticBody> & !component::<DefaultBodyHandle>())]
-fn make_static_body_handles(
+#[filter(!component::<DynamicBody>() & !component::<StaticBody>() & !component::<DisabledBody>())]
+fn remove_body_handles(
     commands: &mut legion::systems::CommandBuffer,
     #[resource] physics: &mut PhysicsResource,
-    entity: Entity,
-    stat: &StaticBody,
+    entity: &Entity,
+    handle: &BodyHandle,
 ) {
-    let body = RigidBodyDesc::<f32>::new()
-        .status(BodyStatus::Static)
-        .build();
-    let handle = physics.bodies.insert(body);
-    commands.add_component(entity, handle);
+    physics.bodies.remove(handle.0);
+    commands.remove_component::<BodyHandle>(*entity);
 }
 
 #[system(for_each)]
-#[filter(component::<DisabledBody> & !component::<DefaultBodyHandle>())]
-fn make_disabled_body_handles(
+fn flush_command_buffer(world: &mut World, commands: &mut legion::systems::CommandBuffer) {
+    commands.flush(world);
+}
+
+#[system(for_each)]
+#[filter((component::<CircleCollider>() | component::<SquareCollider>()) & !component::<ColliderHandle>())]
+fn make_collider_handles(
+    world: &SubWorld,
     commands: &mut legion::systems::CommandBuffer,
     #[resource] physics: &mut PhysicsResource,
-    entity: Entity,
+    entity: &Entity,
+    body_handle: &BodyHandle,
+    circle: Option<&CircleCollider>,
+    square: Option<&SquareCollider>,
 ) {
-    let body = RigidBodyDesc::<f32>::new()
-        .status(BodyStatus::Disabled)
-        .build();
-    let handle = physics.bodies.insert(body);
-    commands.add_component(entity, handle);
+    let shape_handle = if let Some(c) = circle {
+        ShapeHandle::new(Ball::new(c.radius))
+    } else if let Some(s) = square {
+        let side_length = s.side_length / 2.0;
+        let sides_vec = nalgebra::Vector2::new(side_length, side_length);
+        ShapeHandle::new(Cuboid::new(sides_vec))
+    } else {
+        unreachable!() // the filter should prevent this
+    };
+    let mut collider = ColliderDesc::<f32>::new(shape_handle);
+    let handle = ColliderHandle(
+        physics
+            .colliders
+            .insert(collider.build(BodyPartHandle(body_handle.0, 0))),
+    );
+    commands.add_component(*entity, handle);
+}
+
+#[system(for_each)]
+#[filter(!component::<CircleCollider>() & !component::<SquareCollider>())]
+fn remove_collider_handles(
+    commands: &mut legion::systems::CommandBuffer,
+    #[resource] physics: &mut PhysicsResource,
+    entity: &Entity,
+    body_handle: &ColliderHandle,
+) {
+    physics.colliders.remove(body_handle.0);
+    commands.remove_component::<ColliderHandle>(*entity);
 }
 
 #[system]
+#[read_component(BodyHandle)]
 #[read_component(Position)]
 #[read_component(Velocity)]
 #[read_component(Orientation)]
 #[read_component(DynamicBody)]
-#[read_component(StaticBody)]
-fn samsara(
-    // Samsara = the cycle of birth and death
-    world: &mut SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
-    #[resource] physics: &mut PhysicsResource,
-    #[state] receiver: &mut Receiver<Event>,
-) {
-    while let Ok(event) = receiver.try_recv() {
-        match event {
-            Event::EntityInserted(entity, a) => {
-                if let Ok(entry) = world.entry_ref(entity) {
-                    let body_handle = match entry.get_component::<DefaultBodyHandle>() {
-                        Ok(handle) => Some(*handle),
-                        Err(_) => {
-                            let body_description =
-                                if let Ok(dyn_body) = entry.get_component::<DynamicBody>() {
-                                    // println!("dynamic body");
-                                    Some(get_dyn_body_desc(&entry, dyn_body))
-                                } else if let Ok(_) = entry.get_component::<StaticBody>() {
-                                    // println!("static body");
-                                    Some(get_static_body_desc(&entry))
-                                } else if let Ok(_) = entry.get_component::<DisabledBody>() {
-                                    println!("disabled body");
-                                    Some(RigidBodyDesc::new().status(BodyStatus::Disabled))
-                                } else {
-                                    println!("nobody");
-                                    None
-                                };
-
-                            if let Some(body) = body_description {
-                                let body = body.build();
-                                let handle = physics.bodies.insert(body);
-                                commands.add_component(entity, handle);
-                                // this is kind of a return statement:
-                                Some(handle)
-                            } else {
-                                None
-                            }
-                        }
-                    };
-                    if let Some(bhandle) = body_handle {
-                        let shape_handle = if let Ok(circle_collider) =
-                            entry.get_component::<CircleCollider>()
-                        {
-                            println!("circle collider");
-                            Some(ShapeHandle::new(Ball::new(circle_collider.radius)))
-                        } else if let Ok(square_collider) = entry.get_component::<SquareCollider>()
-                        {
-                            println!("square collider");
-                            let side_length = square_collider.side_length / 2.0;
-                            let sides_vec = nalgebra::Vector2::new(side_length, side_length);
-                            Some(ShapeHandle::new(Cuboid::new(sides_vec)))
-                        } else {
-                            // println!("no collider");
-                            None
-                        };
-                        if let Some(shape) = shape_handle {
-                            let collider = ColliderDesc::new(shape);
-                            let collider = collider.build(BodyPartHandle(bhandle, 0));
-                            let handle = physics.colliders.insert(collider);
-                            commands.add_component(entity, handle);
-                            println!("adding collider ;)");
-                        }
-                    }
-                }
-            }
-            Event::EntityRemoved(entity, _) => {
-                if let Ok(e) = world.entry_mut(entity) {
-                    if let Ok(b) = e.get_component::<DefaultBodyHandle>() {
-                        physics.bodies.remove(*b);
-                    }
-                    if let Ok(c) = e.get_component::<DefaultColliderHandle>() {
-                        physics.colliders.remove(*c);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-fn get_dyn_body_desc(entry: &EntryRef, dyn_body: &DynamicBody) -> RigidBodyDesc<f32> {
-    let mut body = RigidBodyDesc::<f32>::new()
-        .gravity_enabled(false)
-        .mass(dyn_body.mass)
-        .status(BodyStatus::Dynamic);
-    if let Ok(spd) = entry.get_component::<Speed>() {
-        body = body.max_linear_velocity(spd.0);
-    }
-    if let Ok(pos) = entry.get_component::<Position>() {
-        body = body.translation(c2n(pos.0));
-    }
-    if let Ok(vel) = entry.get_component::<Velocity>() {
-        body = body.velocity(nphysics2d::algebra::Velocity2::new(c2n(vel.0), 0.0));
-    }
-    if let Ok(orient) = entry.get_component::<Orientation>() {
-        body = body.rotation(cgmath::Rad::from(orient.0).0);
-    }
-    return body;
-}
-
-fn get_static_body_desc(entry: &EntryRef) -> RigidBodyDesc<f32> {
-    let mut body = RigidBodyDesc::<f32>::new()
-        .gravity_enabled(false)
-        .status(BodyStatus::Static);
-    if let Ok(p) = entry.get_component::<Position>() {
-        body = body.translation(c2n(p.0));
-    }
-    if let Ok(o) = entry.get_component::<Orientation>() {
-        body = body.rotation(cgmath::Rad::from(o.0).0);
-    }
-    return body;
-}
-
-#[system]
-#[read_component(DefaultBodyHandle)]
-#[read_component(Position)]
-#[read_component(Velocity)]
-#[read_component(Orientation)]
-#[read_component(DynamicBody)]
-fn entity_world_to_physics_world(
-    world: &mut SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
-    #[resource] physics: &mut PhysicsResource,
-) {
+fn entity_world_to_physics_world(world: &SubWorld, #[resource] physics: &mut PhysicsResource) {
     let mut query = <(
         Entity,
-        Read<DefaultBodyHandle>,
+        Read<BodyHandle>,
         Read<Position>,
         Read<Velocity>,
         Read<Orientation>,
     )>::query()
     .filter(component::<DynamicBody>());
     for (ent, han, pos, vel, ori) in query.iter(world) {
-        if let Some(body) = physics.bodies.rigid_body_mut(*han) {
+        if let Some(body) = physics.bodies.rigid_body_mut(han.0) {
             body.set_position(Isometry2::new(c2n(pos.0), cgmath::Rad::from(ori.0).0));
             body.set_linear_velocity(c2n(vel.0));
             // and force?
@@ -346,17 +258,10 @@ fn entity_world_to_physics_world(
 }
 
 #[system]
-#[read_component(Position)]
-fn step_physics_world(
-    world: &mut SubWorld,
-    commands: &mut CommandBuffer,
-    #[resource] physics: &mut PhysicsResource,
-) {
-    physics.step();
-}
+fn step_physics_world(#[resource] physics: &mut PhysicsResource) { physics.step(); }
 
 #[system]
-#[read_component(DefaultBodyHandle)]
+#[read_component(BodyHandle)]
 #[write_component(Position)]
 #[write_component(Velocity)]
 #[write_component(Orientation)]
@@ -366,14 +271,14 @@ fn physics_world_to_entity_world(
     #[resource] physics: &PhysicsResource,
 ) {
     let mut query = <(
-        Read<DefaultBodyHandle>,
+        Read<BodyHandle>,
         TryWrite<Position>,
         TryWrite<Velocity>,
         TryWrite<Orientation>,
     )>::query()
-    .filter(component::<DynamicBody>());
+    .filter(component::<DynamicBody>() & maybe_changed::<BodyHandle>());
     for (body, pos, vel, ori) in query.iter_mut(world) {
-        physics.bodies.rigid_body(*body).map(|bod| {
+        if let Some(bod) = physics.bodies.rigid_body(body.0) {
             if let Some(p) = pos {
                 p.0 = n2c(bod.position().translation.vector);
             }
@@ -383,7 +288,7 @@ fn physics_world_to_entity_world(
             if let Some(o) = ori {
                 o.0 = cgmath::Deg::from(cgmath::Rad(bod.position().rotation.angle()));
             }
-        });
+        }
     }
 }
 

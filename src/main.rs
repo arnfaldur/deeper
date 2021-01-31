@@ -129,7 +129,7 @@ async fn run_async() {
     resources.insert(Instant::now());
     resources.insert(FrameTime(std::f32::EPSILON));
     resources.insert(MapTransition::Deeper);
-    resources.insert(FloorNumber(8));
+    resources.insert(FloorNumber(7));
     resources.insert(InputState::new());
 
     // Setup world
@@ -191,6 +191,4 @@ async fn run_async() {
     });
 }
 
-fn main() {
-    futures::executor::block_on(run_async());
-}
+fn main() { futures::executor::block_on(run_async()); }

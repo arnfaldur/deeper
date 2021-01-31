@@ -40,33 +40,33 @@ pub fn hit_point_regen(
     }
 }
 
-//pub struct AIFollowSystem;
-//
-//impl<'a> System<'a> for AIFollowSystem {
-//    type SystemData = (
-//        Entities<'a>,
-//        WriteStorage<'a, Destination>,
-//        WriteStorage<'a, Orientation>,
-//        ReadStorage<'a, AIFollow>,
-//        ReadStorage<'a, Position>,
-//    );
-//
-//    fn run(&mut self, (ents, mut dest, mut orient, follow, pos): Self::SystemData) {
-//        for (ent, orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
-//            if let Some(hunted) = pos.get(follow.target) {
-//                let difference: Vector2<f32> = hunted.0 - hunter.0;
-//                let distance = difference.magnitude();
-//                if distance > follow.minimum_distance {
-//                    dest.insert(ent, Destination::simple(hunted.0));
-//                    if let Some(orientation) = orient {
-//                        orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
-//
+#[system]
+#[write_component(Destination)]
+#[write_component(Orientation)]
+#[read_component(AIFollow)]
+#[read_component(Position)]
+fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
+    let mut query = <(Entity, TryWrite<Orientation>, &AIFollow, &Position)>::query();
+    let (mut hunter_world, mut hunted_world) = world.split_for_query(&query);
+    for (ent, orient, follow, hunter) in query.iter_mut(&mut hunter_world) {
+        if let Some(hunted) = hunted_world
+            .entry_ref(follow.target)
+            .ok()
+            .map(|e| e.into_component::<Position>().ok())
+            .flatten()
+        {
+            let difference: Vector2<f32> = hunted.0 - hunter.0;
+            let distance = difference.magnitude();
+            if distance > follow.minimum_distance {
+                command.add_component(*ent, Destination::simple(hunted.0));
+                if let Some(orientation) = orient {
+                    orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
+                }
+            }
+        }
+    }
+}
+
 #[system]
 #[write_component(Destination)]
 #[read_component(Position)]
