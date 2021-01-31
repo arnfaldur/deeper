@@ -5,7 +5,8 @@ authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokul
 edition = "2018"
 
 [profile.release]
-lto = "thin"
+opt-level = 2
+#lto = "thin"
 
 [dependencies]
 

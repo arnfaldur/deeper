@@ -32,25 +32,19 @@ pub struct FrameTime(pub f32);
 pub struct Position(pub Vector2<f32>);
 
 impl Position {
-    pub fn to_vec3(self) -> Vector3<f32> {
-        Vector3::new(self.0.x, self.0.y, 0.0)
-    }
+    pub fn to_vec3(self) -> Vector3<f32> { Vector3::new(self.0.x, self.0.y, 0.0) }
 }
 
 #[derive(Debug)]
 pub struct Velocity(pub Vector2<f32>);
 
 impl Velocity {
-    pub fn new() -> Velocity {
-        Velocity(Vector2::new(0.0, 0.0))
-    }
+    pub fn new() -> Velocity { Velocity(Vector2::new(0.0, 0.0)) }
 }
 
 pub struct Force(pub nphysics2d::algebra::Force2<f32>);
 impl Default for Force {
-    fn default() -> Self {
-        Force(nphysics2d::algebra::Force2::zero())
-    }
+    fn default() -> Self { Force(nphysics2d::algebra::Force2::zero()) }
 }
 
 pub struct Orientation(pub Deg<f32>);
@@ -58,6 +52,8 @@ pub struct Orientation(pub Deg<f32>);
 pub struct Speed(pub f32);
 
 pub struct Acceleration(pub f32);
+
+pub struct DisabledBody;
 
 pub struct StaticBody;
 
