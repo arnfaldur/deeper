@@ -1,2 +1,5 @@
 fn_single_line = true
 use_field_init_shorthand = true
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+merge_derives = false
