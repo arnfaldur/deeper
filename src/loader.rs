@@ -43,9 +43,7 @@ struct Extensions {
 }
 
 impl Extensions {
-    fn new() -> Self {
-        Self { models: vec![] }
-    }
+    fn new() -> Self { Self { models: vec![] } }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -87,6 +85,7 @@ pub struct AssetManager {
 use crate::loader::AssetKind::Model;
 use std::path::Path;
 use std::path::PathBuf;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 impl AssetManager {
     pub fn new() -> Self {
@@ -197,9 +196,7 @@ impl AssetManager {
         }
     }
 
-    fn update_time_loaded(&mut self, resource: &Path) {
-        if self.assets.contains_key(resource) {}
-    }
+    fn update_time_loaded(&mut self, resource: &Path) { if self.assets.contains_key(resource) {} }
 
     fn register_asset(&mut self, path: &Path, asset_kind: AssetKind) {
         let name = path.file_name().unwrap().to_str().unwrap().to_string();
@@ -261,9 +258,19 @@ fn load_model_from_vertex_lists(
     let mut meshes = vec![];
 
     for vertices in vertex_lists {
+        let vertex_buf = context.device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: vertices.as_bytes(),
+            usage: wgpu::BufferUsage::VERTEX,
+        });
+
         let vertex_buf = context
             .device
-            .create_buffer_with_data(vertices.as_bytes(), wgpu::BufferUsage::VERTEX);
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: vertices.as_bytes(),
+                usage: wgpu::BufferUsage::VERTEX,
+            });
 
         meshes.push(graphics::Mesh {
             num_vertices: vertices.len(),

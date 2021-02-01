@@ -7,6 +7,8 @@
 #![allow(unused_variables)]
 #![allow(unused_must_use)]
 
+extern crate shaderc;
+
 mod components;
 mod dung_gen;
 mod graphics;
@@ -37,6 +39,8 @@ use loader::AssetManager;
 
 use systems::physics::PhysicsBuilderExtender;
 use crate::systems::rendering::RenderBuilderExtender;
+use crate::graphics::GuiContext;
+use winit::window::Window;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -45,8 +49,8 @@ async fn run_async() {
     let event_loop = EventLoop::new();
 
     let size = PhysicalSize {
-        width: ds.screen_width / 2,
-        height: ds.screen_height / 2,
+        width: ds.screen_width,
+        height: ds.screen_height,
     };
 
     let builder = winit::window::WindowBuilder::new()
@@ -56,26 +60,12 @@ async fn run_async() {
 
     let context = graphics::Context::new(&window).await;
 
+    let gui_context = graphics::GuiContext::new(&window, &context);
+
     ass_man.load_models(&context);
 
     let mut world = World::default();
     let mut resources = Resources::default();
-
-    // initialize dispatcher with all game systems
-    //let mut dispatcher = DispatcherBuilder::new()
-    //    .with(assets::HotLoaderSystem::new(), "HotLoader", &[])
-    //    .with(player::PlayerSystem, "Player", &[])
-    //    .with(player::CameraControlSystem, "CameraControl", &["Player"])
-    //    .with(HitPointRegenSystem, "HitPointRegen", &["Player"])
-    //    .with(AIFollowSystem, "AIFollow", &[])
-    //    .with(GoToDestinationSystem, "GoToDestination", &["AIFollow"])
-    //    .with(physics::Physics2DSystem, "Physics2D", &["GoToDestination", "Player", "AIFollow"])
-    //    .with(physics::MovementSystem, "Movement", &["Physics2D", "Player"])
-    //    .with(SphericalOffsetSystem, "SphericalFollow", &["Movement"])
-    //    .with(world_gen::MapSwitchingSystem, "MapSwitching", &["Movement"])
-    //    .with(world_gen::DunGenSystem, "DunGen", &["MapSwitching"])
-    //    .with_thread_local(rendering::RenderingSystem::new())
-    //    .build();
 
     let mut schedule = Schedule::builder()
         .add_system(systems::assets::hot_loading_system(
@@ -127,6 +117,8 @@ async fn run_async() {
     resources.insert(ActiveCamera { entity: player_camera });
     resources.insert(PlayerCamera { entity: player_camera });
     resources.insert(context);
+    resources.insert(gui_context);
+    resources.insert(window);
     resources.insert(ass_man);
     resources.insert(Instant::now());
     resources.insert(SystemTime::now());
@@ -137,7 +129,6 @@ async fn run_async() {
     resources.insert(systems::rendering::RenderState::new());
 
     // Setup world
-    //dispatcher.setup(&mut world);
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -148,11 +139,6 @@ async fn run_async() {
                 resources.insert(Instant::now());
                 schedule.execute(&mut world, &mut resources);
                 resources.get_mut::<InputState>().unwrap().new_frame();
-                //world.write_resource::<FrameTime>().0 = frame_time.as_secs_f32();
-                //*world.write_resource::<Instant>().deref_mut() = Instant::now();
-                //dispatcher.dispatch(&mut world);
-                //world.get_mut::<InputState>().unwrap().new_frame();
-                //world.maintain();
                 schedule.execute(&mut world, &mut resources);
             }
             Event::WindowEvent {
@@ -163,7 +149,6 @@ async fn run_async() {
                     .get_mut::<graphics::Context>()
                     .unwrap()
                     .resize(size);
-                //world.get_mut::<graphics::Context>().unwrap().resize(size);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -181,17 +166,23 @@ async fn run_async() {
                     },
                 ..
             } => *control_flow = ControlFlow::Exit,
-            Event::WindowEvent { event, .. } => {
+            Event::WindowEvent { ref event, .. } => {
                 resources
                     .get_mut::<InputState>()
                     .unwrap()
                     .update_from_event(&event);
-                //world.get_mut::<InputState>().unwrap().update_from_event(&event);
             }
             _ => {
                 *control_flow = ControlFlow::Poll;
             }
         }
+
+
+       resources.get_mut::<GuiContext>().unwrap()
+           .handle_event(
+               &mut *resources.get_mut::<winit::window::Window>().unwrap(),
+               &event
+           )
     });
 }
 

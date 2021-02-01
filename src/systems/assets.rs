@@ -5,9 +5,6 @@ use legion::*;
 
 use std::time::SystemTime;
 use std::path::Path;
-use glsl_to_spirv::ShaderType;
-
-
 
 #[system]
 pub fn hot_loading(
@@ -34,15 +31,17 @@ pub fn hot_loading(
         let frag_modified = std::fs::metadata(frag_path).unwrap().modified().unwrap();
         let vert_modified = std::fs::metadata(vert_path).unwrap().modified().unwrap();
 
+        let mut compiler = shaderc::Compiler::new().unwrap();
+
         if frag_modified.gt(shaders_loaded_at) || vert_modified.gt(shaders_loaded_at) {
             let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
-                if let Ok(vs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Vertex) {
-                    if let Ok(sprv) = &wgpu::read_spirv(vs) {
-                        Some(context.device.create_shader_module(sprv))
-                    } else {
-                        eprintln!("Failed to create shader module");
-                        None
-                    }
+                if let Ok(vs_spirv) = compiler.compile_into_spirv(
+                    data.as_str(),
+                    shaderc::ShaderKind::Vertex,
+                    "forward.vert", "main",
+                    None
+                ) {
+                    Some(context.device.create_shader_module(wgpu::util::make_spirv(&vs_spirv.as_binary_u8())))
                 } else {
                     eprintln!("Failed to recompile vertex shader");
                     None
@@ -53,13 +52,14 @@ pub fn hot_loading(
             };
 
             let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
-                if let Ok(fs) = glsl_to_spirv::compile(data.as_str(), ShaderType::Fragment) {
-                    if let Ok(sprv) = &wgpu::read_spirv(fs) {
-                        Some(context.device.create_shader_module(sprv))
-                    } else {
-                        eprintln!("Failed to create shader module");
-                        None
-                    }
+                if let Ok(fs_spirv) = compiler.compile_into_spirv(
+                    data.as_str(),
+                    shaderc::ShaderKind::Fragment,
+                    "forward.frag", "main",
+                    None
+                ) {
+                    Some(context.device.create_shader_module(wgpu::util::make_spirv(&fs_spirv.as_binary_u8())))
+
                 } else {
                     eprintln!("Failed to recompile fragment shader");
                     None

@@ -1,6 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{prelude::*, Vector2, Vector3};
+use cgmath::{prelude::*, Vector2};
 
 use crate::components::*;
 

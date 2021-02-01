@@ -102,16 +102,16 @@ impl DungGen {
             // Step 1: Generate a random room in the world
 
             let x_min = rng.gen_range(
-                world_edge_size,
+                world_edge_size..
                 self.width - (self.room_min + self.room_range) - world_edge_size,
             );
             let y_min = rng.gen_range(
-                world_edge_size,
+                world_edge_size..
                 self.height - (self.room_min + self.room_range) - world_edge_size,
             );
 
-            let x_max = x_min + self.room_min + rng.gen_range(0, self.room_range);
-            let y_max = y_min + self.room_min + rng.gen_range(0, self.room_range);
+            let x_max = x_min + self.room_min + rng.gen_range(0..self.room_range);
+            let y_max = y_min + self.room_min + rng.gen_range(0..self.room_range);
 
             // Step 2:  Check if the randomly generated room
             //          intersects with any previously generated room
@@ -300,7 +300,7 @@ impl DungGen {
         // Step 4.5: make a thing
 
         let mut rng = thread_rng();
-        let ladder_loc = rng.gen_range(0, self.room_centers.len());
+        let ladder_loc = rng.gen_range(0..self.room_centers.len());
         self.world.insert(self.room_centers[ladder_loc], TileType::LadderDown);
 
         return self;

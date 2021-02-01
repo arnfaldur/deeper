@@ -31,6 +31,7 @@ use std::collections::HashMap;
 
 use legion::world::SubWorld;
 use legion::*;
+use wgpu::util::DeviceExt;
 
 #[system]
 #[read_component(TileType)]
@@ -78,7 +79,7 @@ pub fn dung_gen(
                     .choose(&mut rand::thread_rng())
                     .unwrap()
                     .clone();
-                (x + rng.gen_range(-2, 2), y + rng.gen_range(-2, 2))
+                (x + rng.gen_range(-2..2), y + rng.gen_range(-2..2))
             };
 
             // Reset player position and stuff
@@ -119,9 +120,12 @@ pub fn dung_gen(
                 }
 
                 // TODO: go away
-                let temp_buf = context.device.create_buffer_with_data(
-                    lights.as_bytes(),
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                let temp_buf = context.device.create_buffer_init(
+                    &wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        contents: lights.as_bytes(),
+                        usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                    }
                 );
 
                 // TODO: you are not welcome here copy_buffer_to_buffer
@@ -135,7 +139,7 @@ pub fn dung_gen(
 
                 let command_buffer = init_encoder.finish();
 
-                context.queue.submit(&[command_buffer]);
+                context.queue.submit(std::iter::once(command_buffer));
                 // End graphics shit
             }
 
@@ -210,13 +214,14 @@ pub fn dung_gen(
                 if TileType::Floor == tile_type
                     && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
                 {
-                    let rad = rng.gen_range(0.1, 0.4) + rng.gen_range(0.0, 0.1);
+                    let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
                     let enemy = commands.push((
                         Position(
-                            pos + Vector2::new(rng.gen_range(-0.3, 0.3), rng.gen_range(-0.3, 0.3)),
+                            pos + Vector2::new(rng.gen_range(-0.3..0.3),
+                                               rng.gen_range(-0.3..0.3)),
                         ),
-                        Speed(rng.gen_range(1., 4.) - 1.6 * rad),
-                        Acceleration(rng.gen_range(3., 9.) + 2.0 * rad),
+                        Speed(rng.gen_range(1.0..4.0) - 1.6 * rad),
+                        Acceleration(rng.gen_range(3.0..9.0) + 2.0 * rad),
                         Orientation(Deg(0.0)),
                         Velocity::new(),
                         DynamicBody { mass: rad },
@@ -233,8 +238,8 @@ pub fn dung_gen(
                     commands.add_component(
                         enemy,
                         HitPoints {
-                            max: rng.gen_range(0., 2.) + 8. * rad,
-                            health: rng.gen_range(0., 2.) + 8. * rad,
+                            max: rng.gen_range(0.0..2.0) + 8. * rad,
+                            health: rng.gen_range(0.0..2.0) + 8. * rad,
                         },
                     );
                     commands.add_component(
