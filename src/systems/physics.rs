@@ -4,7 +4,7 @@ use legion::systems::{Builder, CommandBuffer};
 use legion::world::{ComponentError, EntityAccessError, EntryRef, Event, EventSender, SubWorld};
 use legion::*;
 
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, TryRecvError};
 
 use nalgebra::Isometry2;
 
@@ -17,6 +17,7 @@ use nphysics2d::object::{
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
 use crate::components::*;
+use legion::query::ComponentFilter;
 use legion::storage::ArchetypeIndex;
 use ncollide2d::shape::ShapeHandle;
 use nphysics2d::ncollide2d::shape::{Ball, Cuboid};
@@ -28,15 +29,20 @@ pub(crate) trait PhysicsBuilderExtender {
 impl PhysicsBuilderExtender for Builder {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self {
         resources.insert(PhysicsResource::default());
+        let (sender, receiver) = crossbeam_channel::unbounded::<Event>();
+        world.subscribe(
+            sender,
+            component::<BodyHandle>() | component::<ColliderHandle>(),
+        );
         return self
             .add_system(validate_physics_entities_system())
             .add_system(make_body_handles_system())
             .add_system(remove_body_handles_system())
-            .add_system(flush_command_buffer_system())
+            // .add_system(flush_command_buffer_system())
             .add_system(make_collider_handles_system())
             .add_system(remove_collider_handles_system())
-            .add_system(flush_command_buffer_system())
-            .add_system(garbage_system())
+            //.add_system(handle_entity_removal_system(receiver))
+            // .add_system(flush_command_buffer_system())
             .add_system(entity_world_to_physics_world_system())
             .add_system(step_physics_world_system())
             .add_system(physics_world_to_entity_world_system());
@@ -79,12 +85,6 @@ impl Default for PhysicsResource {
         }
     }
 }
-
-fn n2c(input: nalgebra::Vector2<f32>) -> Vector2<f32> {
-    return cgmath::Vector2::new(input.x, input.y);
-}
-
-fn c2n(input: cgmath::Vector2<f32>) -> nalgebra::Vector2<f32> { return [input.x, input.y].into(); }
 
 #[system]
 #[read_component(Position)]
@@ -149,7 +149,6 @@ fn validate_physics_entities(world: &mut SubWorld, commands: &mut CommandBuffer)
 
 #[system(for_each)]
 #[filter((component::<DynamicBody>() | component::<StaticBody>() | component::<DisabledBody>()) & !component::<BodyHandle>())]
-//#[filter(component::<DynamicBody>() | component::<StaticBody>() | component::<DisabledBody>())]
 fn make_body_handles(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
@@ -158,15 +157,21 @@ fn make_body_handles(
     dynamic: Option<&DynamicBody>,
     stat: Option<&StaticBody>,
     disabled: Option<&DisabledBody>,
+    position: Option<&Position>,
 ) {
     let body = if let Some(dyna) = dynamic {
         RigidBodyDesc::<f32>::new()
             .status(BodyStatus::Dynamic)
             .gravity_enabled(false)
             .mass(dyna.mass)
-    } else if let Some(_) = stat {
-        RigidBodyDesc::<f32>::new().status(BodyStatus::Static)
-    } else if let Some(_) = disabled {
+    } else if stat.is_some() {
+        RigidBodyDesc::<f32>::new()
+            .status(BodyStatus::Static)
+            .position(Isometry2::new(
+                c2n(position.unwrap_or(&Position(cgmath::vec2(0., 0.))).0),
+                0.,
+            ))
+    } else if disabled.is_some() {
         RigidBodyDesc::<f32>::new().status(BodyStatus::Disabled)
     } else {
         unreachable!() // the filter should take care of this
@@ -227,10 +232,48 @@ fn remove_collider_handles(
     commands: &mut legion::systems::CommandBuffer,
     #[resource] physics: &mut PhysicsResource,
     entity: &Entity,
-    body_handle: &ColliderHandle,
+    collider_handle: &ColliderHandle,
 ) {
-    physics.colliders.remove(body_handle.0);
+    physics.colliders.remove(collider_handle.0);
     commands.remove_component::<ColliderHandle>(*entity);
+}
+
+#[system]
+#[read_component(BodyHandle)]
+#[read_component(ColliderHandle)]
+fn handle_entity_removal(
+    world: &SubWorld,
+    commands: &mut legion::systems::CommandBuffer,
+    #[resource] physics: &mut PhysicsResource,
+    #[state] receiver: &Receiver<Event>,
+) {
+    for event in receiver.try_iter() {
+        match event {
+            Event::EntityRemoved(entity, arch) => {
+                // FIXME: find a better solution or figure out how to know when an entity is being completely removed
+                if let Some(body_handle) = world
+                    .entry_ref(entity)
+                    .ok()
+                    .map(|e| e.into_component::<BodyHandle>().ok())
+                    .flatten()
+                {
+                    physics.bodies.remove(body_handle.0);
+                    commands.remove_component::<BodyHandle>(entity);
+                }
+                if let Some(collider_handle) = world
+                    .entry_ref(entity)
+                    .ok()
+                    .map(|e| e.into_component::<ColliderHandle>().ok())
+                    .flatten()
+                {
+                    physics.colliders.remove(collider_handle.0);
+                    commands.remove_component::<ColliderHandle>(entity);
+                }
+            }
+            Event::ArchetypeCreated(arch) => {}
+            _ => {}
+        }
+    }
 }
 
 #[system]
@@ -307,3 +350,9 @@ fn movement(#[resource] frame_time: &FrameTime, pos: &mut Position, vel: &mut Ve
         println!("Velocity Hickup");
     }
 }
+
+fn n2c(input: nalgebra::Vector2<f32>) -> Vector2<f32> {
+    return cgmath::Vector2::new(input.x, input.y);
+}
+
+fn c2n(input: cgmath::Vector2<f32>) -> nalgebra::Vector2<f32> { return [input.x, input.y].into(); }
