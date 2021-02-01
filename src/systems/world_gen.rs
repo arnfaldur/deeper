@@ -1,13 +1,15 @@
-use rand::prelude::*;
-use zerocopy::AsBytes;
+use std::collections::HashMap;
 
 use cgmath::{Deg, Vector2, Vector3};
+use legion::world::SubWorld;
+use legion::*;
+use rand::prelude::*;
+use wgpu::util::DeviceExt;
+use zerocopy::AsBytes;
 
 use crate::components::*;
 use crate::dung_gen::DungGen;
 use crate::{graphics, loader};
-use std::collections::HashMap;
-
 //pub struct MapSwitchingSystem;
 //
 //impl<'a> System<'a> for MapSwitchingSystem {
@@ -28,10 +30,6 @@ use std::collections::HashMap;
 //    }
 //}
 //
-
-use legion::world::SubWorld;
-use legion::*;
-use wgpu::util::DeviceExt;
 
 #[system]
 #[read_component(TileType)]
@@ -120,13 +118,14 @@ pub fn dung_gen(
                 }
 
                 // TODO: go away
-                let temp_buf = context.device.create_buffer_init(
-                    &wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: lights.as_bytes(),
-                        usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-                    }
-                );
+                let temp_buf =
+                    context
+                        .device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: None,
+                            contents: lights.as_bytes(),
+                            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                        });
 
                 // TODO: you are not welcome here copy_buffer_to_buffer
                 init_encoder.copy_buffer_to_buffer(
@@ -217,8 +216,7 @@ pub fn dung_gen(
                     let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
                     let enemy = commands.push((
                         Position(
-                            pos + Vector2::new(rng.gen_range(-0.3..0.3),
-                                               rng.gen_range(-0.3..0.3)),
+                            pos + Vector2::new(rng.gen_range(-0.3..0.3), rng.gen_range(-0.3..0.3)),
                         ),
                         Speed(rng.gen_range(1.0..4.0) - 1.6 * rad),
                         Acceleration(rng.gen_range(3.0..9.0) + 2.0 * rad),

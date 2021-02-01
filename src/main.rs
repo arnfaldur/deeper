@@ -19,28 +19,20 @@ mod systems;
 use std::time::Instant;
 use std::time::SystemTime;
 
-use legion::{
-    World,
-    Schedule,
-    Resources
-};
-
+use cgmath::{Deg, Vector2, Vector3};
+use components::*;
+use input::InputState;
+use legion::{Resources, Schedule, World};
+use loader::AssetManager;
+//use crate::systems::assets::*;
+use systems::physics::PhysicsBuilderExtender;
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-
-use cgmath::{Deg, Vector2, Vector3};
-
-use components::*;
-use input::InputState;
-use loader::AssetManager;
-
-//use crate::systems::assets::*;
-
-use systems::physics::PhysicsBuilderExtender;
-use crate::systems::rendering::RenderBuilderExtender;
-use crate::graphics::GuiContext;
 use winit::window::Window;
+
+use crate::graphics::GuiContext;
+use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -114,8 +106,12 @@ async fn run_async() {
     ));
 
     resources.insert(Player { entity: player });
-    resources.insert(ActiveCamera { entity: player_camera });
-    resources.insert(PlayerCamera { entity: player_camera });
+    resources.insert(ActiveCamera {
+        entity: player_camera,
+    });
+    resources.insert(PlayerCamera {
+        entity: player_camera,
+    });
     resources.insert(context);
     resources.insert(gui_context);
     resources.insert(window);
@@ -177,12 +173,10 @@ async fn run_async() {
             }
         }
 
-
-       resources.get_mut::<GuiContext>().unwrap()
-           .handle_event(
-               &mut *resources.get_mut::<winit::window::Window>().unwrap(),
-               &event
-           )
+        resources.get_mut::<GuiContext>().unwrap().handle_event(
+            &mut *resources.get_mut::<winit::window::Window>().unwrap(),
+            &event,
+        )
     });
 }
 

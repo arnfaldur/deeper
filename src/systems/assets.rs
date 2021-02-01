@@ -1,10 +1,10 @@
-use crate::{graphics, loader};
-use crate::input::{InputState, Key};
+use std::path::Path;
+use std::time::SystemTime;
 
 use legion::*;
 
-use std::time::SystemTime;
-use std::path::Path;
+use crate::input::{InputState, Key};
+use crate::{graphics, loader};
 
 #[system]
 pub fn hot_loading(
@@ -15,7 +15,14 @@ pub fn hot_loading(
     #[resource] input: &InputState,
 ) {
     if input.is_key_pressed(Key::H) {
-        println!("Hotloading shaders turned {}", if *hotload_shaders_turned_on { "OFF" } else { "ON" });
+        println!(
+            "Hotloading shaders turned {}",
+            if *hotload_shaders_turned_on {
+                "OFF"
+            } else {
+                "ON"
+            }
+        );
         *hotload_shaders_turned_on = !*hotload_shaders_turned_on;
     }
 
@@ -38,10 +45,15 @@ pub fn hot_loading(
                 if let Ok(vs_spirv) = compiler.compile_into_spirv(
                     data.as_str(),
                     shaderc::ShaderKind::Vertex,
-                    "forward.vert", "main",
-                    None
+                    "forward.vert",
+                    "main",
+                    None,
                 ) {
-                    Some(context.device.create_shader_module(wgpu::util::make_spirv(&vs_spirv.as_binary_u8())))
+                    Some(
+                        context
+                            .device
+                            .create_shader_module(wgpu::util::make_spirv(&vs_spirv.as_binary_u8())),
+                    )
                 } else {
                     eprintln!("Failed to recompile vertex shader");
                     None
@@ -55,11 +67,15 @@ pub fn hot_loading(
                 if let Ok(fs_spirv) = compiler.compile_into_spirv(
                     data.as_str(),
                     shaderc::ShaderKind::Fragment,
-                    "forward.frag", "main",
-                    None
+                    "forward.frag",
+                    "main",
+                    None,
                 ) {
-                    Some(context.device.create_shader_module(wgpu::util::make_spirv(&fs_spirv.as_binary_u8())))
-
+                    Some(
+                        context
+                            .device
+                            .create_shader_module(wgpu::util::make_spirv(&fs_spirv.as_binary_u8())),
+                    )
                 } else {
                     eprintln!("Failed to recompile fragment shader");
                     None

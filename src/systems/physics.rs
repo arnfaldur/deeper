@@ -1,15 +1,15 @@
 use cgmath::{prelude::*, Vector2};
-
+use crossbeam_channel::{Receiver, TryRecvError};
+use legion::query::ComponentFilter;
+use legion::storage::ArchetypeIndex;
 use legion::systems::{Builder, CommandBuffer};
 use legion::world::{ComponentError, EntityAccessError, EntryRef, Event, EventSender, SubWorld};
 use legion::*;
-
-use crossbeam_channel::{Receiver, TryRecvError};
-
 use nalgebra::Isometry2;
-
+use ncollide2d::shape::ShapeHandle;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
+use nphysics2d::ncollide2d::shape::{Ball, Cuboid};
 use nphysics2d::object::{
     Body, BodyPartHandle, BodyStatus, ColliderDesc, DefaultBodySet, DefaultColliderSet,
     RigidBodyDesc,
@@ -17,10 +17,6 @@ use nphysics2d::object::{
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
 use crate::components::*;
-use legion::query::ComponentFilter;
-use legion::storage::ArchetypeIndex;
-use ncollide2d::shape::ShapeHandle;
-use nphysics2d::ncollide2d::shape::{Ball, Cuboid};
 
 pub(crate) trait PhysicsBuilderExtender {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self;

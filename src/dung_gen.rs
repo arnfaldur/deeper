@@ -1,10 +1,11 @@
 extern crate ena;
 extern crate rand;
 
+use std::collections::HashMap;
+
 use rand::Rng;
 
 use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
-use std::collections::HashMap;
 use self::rand::thread_rng;
 use crate::components::{TileType, WallDirection};
 
@@ -34,15 +35,9 @@ struct UnitKey(u32);
 
 impl UnifyKey for UnitKey {
     type Value = ();
-    fn index(&self) -> u32 {
-        self.0
-    }
-    fn from_index(u: u32) -> UnitKey {
-        UnitKey(u)
-    }
-    fn tag() -> &'static str {
-        "UnitKey"
-    }
+    fn index(&self) -> u32 { self.0 }
+    fn from_index(u: u32) -> UnitKey { UnitKey(u) }
+    fn tag() -> &'static str { "UnitKey" }
 }
 
 // note(Jökull): There are better builder patterns
@@ -102,12 +97,10 @@ impl DungGen {
             // Step 1: Generate a random room in the world
 
             let x_min = rng.gen_range(
-                world_edge_size..
-                self.width - (self.room_min + self.room_range) - world_edge_size,
+                world_edge_size..self.width - (self.room_min + self.room_range) - world_edge_size,
             );
             let y_min = rng.gen_range(
-                world_edge_size..
-                self.height - (self.room_min + self.room_range) - world_edge_size,
+                world_edge_size..self.height - (self.room_min + self.room_range) - world_edge_size,
             );
 
             let x_max = x_min + self.room_min + rng.gen_range(0..self.room_range);
@@ -260,17 +253,63 @@ impl DungGen {
                 let s = *self.world.get(&(x, y - 1)).unwrap_or(&TileType::Wall(None));
                 let e = *self.world.get(&(x + 1, y)).unwrap_or(&TileType::Wall(None));
 
-                let ne = *self.world.get(&(x + 1, y + 1)).unwrap_or(&TileType::Wall(None));
-                let nw = *self.world.get(&(x - 1, y + 1)).unwrap_or(&TileType::Wall(None));
-                let se = *self.world.get(&(x + 1, y - 1)).unwrap_or(&TileType::Wall(None));
-                let sw = *self.world.get(&(x - 1, y - 1)).unwrap_or(&TileType::Wall(None));
+                let ne = *self
+                    .world
+                    .get(&(x + 1, y + 1))
+                    .unwrap_or(&TileType::Wall(None));
+                let nw = *self
+                    .world
+                    .get(&(x - 1, y + 1))
+                    .unwrap_or(&TileType::Wall(None));
+                let se = *self
+                    .world
+                    .get(&(x + 1, y - 1))
+                    .unwrap_or(&TileType::Wall(None));
+                let sw = *self
+                    .world
+                    .get(&(x - 1, y - 1))
+                    .unwrap_or(&TileType::Wall(None));
 
                 for &(a, b, c, d, e, f, typ) in [
-                    (s, e, n, w, ne, nw, TileType::Wall(Some(WallDirection::North))),
-                    (e, n, w, s, sw, nw, TileType::Wall(Some(WallDirection::West))),
-                    (n, w, s, e, se, sw, TileType::Wall(Some(WallDirection::South))),
-                    (w, s, e, n, se, ne, TileType::Wall(Some(WallDirection::East))),
-                ].iter() {
+                    (
+                        s,
+                        e,
+                        n,
+                        w,
+                        ne,
+                        nw,
+                        TileType::Wall(Some(WallDirection::North)),
+                    ),
+                    (
+                        e,
+                        n,
+                        w,
+                        s,
+                        sw,
+                        nw,
+                        TileType::Wall(Some(WallDirection::West)),
+                    ),
+                    (
+                        n,
+                        w,
+                        s,
+                        e,
+                        se,
+                        sw,
+                        TileType::Wall(Some(WallDirection::South)),
+                    ),
+                    (
+                        w,
+                        s,
+                        e,
+                        n,
+                        se,
+                        ne,
+                        TileType::Wall(Some(WallDirection::East)),
+                    ),
+                ]
+                .iter()
+                {
                     if (a == TileType::Floor || a == TileType::Path)
                         && b == TileType::Wall(None)
                         && c == TileType::Wall(None)
@@ -301,7 +340,8 @@ impl DungGen {
 
         let mut rng = thread_rng();
         let ladder_loc = rng.gen_range(0..self.room_centers.len());
-        self.world.insert(self.room_centers[ladder_loc], TileType::LadderDown);
+        self.world
+            .insert(self.room_centers[ladder_loc], TileType::LadderDown);
 
         return self;
     }

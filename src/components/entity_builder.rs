@@ -2,12 +2,9 @@ use legion::query::{FilterResult, LayoutFilter};
 use legion::storage::{
     ArchetypeSource, ArchetypeWriter, ComponentSource, ComponentTypeId, EntityLayout,
 };
-
 use legion::*;
 
 use crate::components::*;
-
-
 
 pub struct EntityBuilder {
     position: Option<Position>,
@@ -71,13 +68,9 @@ impl LayoutFilter for EntityBuilder {
 impl ArchetypeSource for EntityBuilder {
     type Filter = Self;
 
-    fn filter(&self) -> Self::Filter {
-        unimplemented!()
-    }
+    fn filter(&self) -> Self::Filter { unimplemented!() }
 
-    fn layout(&mut self) -> EntityLayout {
-        unimplemented!()
-    }
+    fn layout(&mut self) -> EntityLayout { unimplemented!() }
 }
 
 impl ComponentSource for EntityBuilder {

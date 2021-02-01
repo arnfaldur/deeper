@@ -1,6 +1,9 @@
 use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{prelude::*, Vector2};
+use legion::systems::CommandBuffer;
+use legion::world::SubWorld;
+use legion::*;
 
 use crate::components::*;
 
@@ -9,10 +12,6 @@ pub mod physics;
 pub mod player;
 pub mod rendering;
 pub mod world_gen;
-
-use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
-use legion::*;
 
 #[system(for_each)]
 pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {

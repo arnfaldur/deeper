@@ -1,18 +1,16 @@
-use zerocopy::AsBytes;
+use std::time::SystemTime;
 
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector4};
-
-use crate::components::*;
-use crate::{graphics, loader};
-
-use std::time::SystemTime;
-
-use crate::graphics::LocalUniforms;
 use legion::world::SubWorld;
 use legion::*;
 use wgpu::util::DeviceExt;
 use wgpu::CommandBuffer;
+use zerocopy::AsBytes;
+
+use crate::components::*;
+use crate::graphics::LocalUniforms;
+use crate::{graphics, loader};
 
 pub struct RenderState {
     command_buffers: Vec<CommandBuffer>,

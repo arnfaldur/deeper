@@ -1,18 +1,15 @@
-use serde::{Deserialize, Serialize};
-
 use std::collections::HashMap;
-
-use zerocopy::AsBytes;
-
-use itertools::Itertools;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
-
 use std::time::SystemTime;
 
-use crate::graphics;
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use wavefront_obj::obj;
+use zerocopy::AsBytes;
+
+use crate::graphics;
 
 #[derive(Serialize, Deserialize)]
 struct PathSettings {
@@ -82,10 +79,12 @@ pub struct AssetManager {
     pub models: Vec<graphics::Model>,
 }
 
-use crate::loader::AssetKind::Model;
 use std::path::Path;
 use std::path::PathBuf;
+
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
+
+use crate::loader::AssetKind::Model;
 
 impl AssetManager {
     pub fn new() -> Self {

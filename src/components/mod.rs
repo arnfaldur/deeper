@@ -2,13 +2,13 @@ mod entity_builder;
 
 extern crate cgmath;
 
-use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
+use std::f32::consts::PI;
 
+use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 use legion::Entity;
+use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
 use crate::graphics;
-use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
-use std::f32::consts::PI;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -37,15 +37,11 @@ impl Position {
 }
 
 impl Into<Vector3<f32>> for Position {
-    fn into(self) -> Vector3<f32> {
-        return self.0.extend(0.0);
-    }
+    fn into(self) -> Vector3<f32> { return self.0.extend(0.0); }
 }
 
 impl Into<Vector3<f32>> for &Position {
-    fn into(self) -> Vector3<f32> {
-        return self.0.extend(0.0);
-    }
+    fn into(self) -> Vector3<f32> { return self.0.extend(0.0); }
 }
 
 #[derive(Debug)]
