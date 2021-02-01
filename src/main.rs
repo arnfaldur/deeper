@@ -17,7 +17,11 @@ mod systems;
 use std::time::Instant;
 use std::time::SystemTime;
 
-use legion::{Resources, Schedule, World};
+use legion::{
+    World,
+    Schedule,
+    Resources
+};
 
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
@@ -32,6 +36,7 @@ use loader::AssetManager;
 //use crate::systems::assets::*;
 
 use systems::physics::PhysicsBuilderExtender;
+use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -83,7 +88,7 @@ async fn run_async() {
         .add_physics_systems(&mut world, &mut resources)
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
-        .add_system(systems::rendering::rendering_system(SystemTime::now()))
+        .add_render_systems()
         .build();
 
     let player = world.push((
@@ -95,6 +100,7 @@ async fn run_async() {
         DynamicBody { mass: 1.0 },
         CircleCollider { radius: 0.3 },
     ));
+
     if let Some(mut p) = world.entry(player) {
         p.add_component(
             Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
@@ -118,19 +124,17 @@ async fn run_async() {
     ));
 
     resources.insert(Player { entity: player });
-    resources.insert(ActiveCamera {
-        entity: player_camera,
-    });
-    resources.insert(PlayerCamera {
-        entity: player_camera,
-    });
+    resources.insert(ActiveCamera { entity: player_camera });
+    resources.insert(PlayerCamera { entity: player_camera });
     resources.insert(context);
     resources.insert(ass_man);
     resources.insert(Instant::now());
+    resources.insert(SystemTime::now());
     resources.insert(FrameTime(std::f32::EPSILON));
     resources.insert(MapTransition::Deeper);
     resources.insert(FloorNumber(7));
     resources.insert(InputState::new());
+    resources.insert(systems::rendering::RenderState::new());
 
     // Setup world
     //dispatcher.setup(&mut world);

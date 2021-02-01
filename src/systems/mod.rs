@@ -1,6 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{prelude::*, Vector2};
+use cgmath::{prelude::*, Vector2, Vector3};
 
 use crate::components::*;
 
@@ -16,7 +16,7 @@ use legion::*;
 
 #[system(for_each)]
 pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {
-    pos3d.0 = pos2d.to_vec3();
+    pos3d.0 = pos2d.into();
 
     pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
     pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
