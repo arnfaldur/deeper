@@ -2,13 +2,13 @@ mod entity_builder;
 
 extern crate cgmath;
 
-use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
+use std::f32::consts::PI;
 
+use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 use legion::Entity;
+use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
 use crate::graphics;
-use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
-use std::f32::consts::PI;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -37,15 +37,11 @@ impl Position {
 }
 
 impl Into<Vector3<f32>> for Position {
-    fn into(self) -> Vector3<f32> {
-        return self.0.extend(0.0);
-    }
+    fn into(self) -> Vector3<f32> { return self.0.extend(0.0); }
 }
 
 impl Into<Vector3<f32>> for &Position {
-    fn into(self) -> Vector3<f32> {
-        return self.0.extend(0.0);
-    }
+    fn into(self) -> Vector3<f32> { return self.0.extend(0.0); }
 }
 
 #[derive(Debug)]
@@ -181,15 +177,15 @@ impl StaticModel {
         offset: Vector3<f32>,
         scale: f32,
         z_rotation: f32,
-        material: graphics::Material,
+        material: graphics::data::Material,
     ) -> Self {
-        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+        let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
         let mut matrix = Matrix4::from_scale(scale);
         matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
         matrix = Matrix4::from_translation(offset) * matrix;
 
-        let local_uniforms = graphics::LocalUniforms {
+        let local_uniforms = graphics::data::LocalUniforms {
             model_matrix: matrix.into(),
             material,
         };
@@ -205,7 +201,7 @@ pub struct Model3D {
     pub offset: Vector3<f32>,
     pub scale: f32,
     pub z_rotation: f32,
-    pub material: graphics::Material,
+    pub material: graphics::data::Material,
 
     pub bind_group: wgpu::BindGroup,
     pub uniform_buffer: wgpu::Buffer,
@@ -214,15 +210,15 @@ pub struct Model3D {
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
-        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+        let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
         let (uniform_buf, bind_group) =
-            context.model_bind_group_from_uniform_data(graphics::LocalUniforms::new());
+            context.model_bind_group_from_uniform_data(graphics::data::LocalUniforms::new());
 
         Self {
             idx: 0,
             offset: Vector3::new(0.0, 0.0, 0.0),
-            material: graphics::Material::default(),
+            material: graphics::data::Material::default(),
             bind_group,
             scale: 1.0,
             z_rotation: 0.0,
@@ -251,7 +247,7 @@ impl Model3D {
         self
     }
 
-    pub fn with_material(mut self, material: graphics::Material) -> Self {
+    pub fn with_material(mut self, material: graphics::data::Material) -> Self {
         self.material = material;
         self
     }
