@@ -16,15 +16,13 @@ mod input;
 mod loader;
 mod systems;
 
-use std::time::Instant;
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 use cgmath::{Deg, Vector2, Vector3};
 use components::*;
 use input::InputState;
 use legion::{Resources, Schedule, World};
 use loader::AssetManager;
-//use crate::systems::assets::*;
 use systems::physics::PhysicsBuilderExtender;
 use wgpu::SwapChainFrame;
 use winit::dpi::PhysicalSize;
@@ -92,7 +90,7 @@ async fn run_async() {
 
     if let Some(mut p) = world.entry(player) {
         p.add_component(
-            Model3D::from_index(&context, ass_man.get_model_index("cube.obj").unwrap())
+            Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
                 .with_scale(0.5),
         )
     }
@@ -131,8 +129,6 @@ async fn run_async() {
     resources.insert(InputState::new());
     resources.insert(systems::rendering::RenderState::new());
 
-    // Setup world
-
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::MainEventsCleared => {
@@ -141,7 +137,8 @@ async fn run_async() {
                 resources.insert(FrameTime(frame_time.as_secs_f32()));
                 resources.insert(Instant::now());
                 resources.insert(sc_desc.clone());
-                //resource.get_mut::<wgpu::SwapChainFrame>();
+                // Explicitly drop the current swap frame in preparation
+                // for the next.
                 drop(resources.remove::<wgpu::SwapChainFrame>());
                 resources.insert(swap_chain.get_current_frame().unwrap());
                 schedule.execute(&mut world, &mut resources);
@@ -158,6 +155,8 @@ async fn run_async() {
                     .unwrap()
                     .resize(size, &sc_desc, &surface);
             }
+            // note(Jökull): Can we make this more readable somehow?
+            // It is not clear that these two events result in Exit
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..

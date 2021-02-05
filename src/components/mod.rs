@@ -29,7 +29,8 @@ pub struct Parent(pub Entity);
 
 pub struct FrameTime(pub f32);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
+#[derive(Copy, Clone)]
 pub struct Position(pub Vector2<f32>);
 
 impl Position {
@@ -102,7 +103,8 @@ impl Destination {
     }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq)]
+#[derive(Copy, Clone)]
 pub enum Faction {
     Enemies,
     Friends,
@@ -120,6 +122,12 @@ pub enum MapTransition {
 }
 
 pub struct MapSwitcher(pub MapTransition);
+
+pub struct GuiWindow {
+    pub size: [f32; 2],
+    pub name: String,
+    pub view: Box<dyn FnOnce(&imgui::Ui)>,
+}
 
 pub struct Camera {
     pub fov: f32,
@@ -205,6 +213,9 @@ pub struct Model3D {
 
     pub bind_group: wgpu::BindGroup,
     pub uniform_buffer: wgpu::Buffer,
+
+    // TODO: Move out of Model3D
+    pub local_uniforms_cache: graphics::data::LocalUniforms,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
@@ -212,7 +223,7 @@ impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
         let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
-        let (uniform_buf, bind_group) =
+        let (uniform_buffer, bind_group) =
             context.model_bind_group_from_uniform_data(graphics::data::LocalUniforms::new());
 
         Self {
@@ -222,7 +233,8 @@ impl Model3D {
             bind_group,
             scale: 1.0,
             z_rotation: 0.0,
-            uniform_buffer: uniform_buf,
+            uniform_buffer,
+            local_uniforms_cache: graphics::data::LocalUniforms::new(),
         }
     }
 
