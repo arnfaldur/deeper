@@ -2,14 +2,16 @@ use std::time::SystemTime;
 
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector4};
+use imgui::Ui;
 use legion::world::SubWorld;
 use legion::*;
+use nphysics2d::utils::UserData;
 use wgpu::util::DeviceExt;
-use wgpu::CommandBuffer;
+use wgpu::{CommandBuffer, SwapChainDescriptor, SwapChainTexture};
 use zerocopy::AsBytes;
 
 use crate::components::*;
-use crate::graphics::LocalUniforms;
+use crate::graphics::data::LocalUniforms;
 use crate::{graphics, loader};
 
 pub struct RenderState {
@@ -30,29 +32,52 @@ pub trait RenderBuilderExtender {
 
 impl RenderBuilderExtender for legion::systems::Builder {
     fn add_render_systems(&mut self) -> &mut Self {
-        self.add_thread_local(render_init_system())
+        self.add_system(render_cache_local_uniforms_system())
+            .add_thread_local(render_init_system())
             .add_thread_local(render_gen_global_uniforms_system())
             .add_thread_local(render_gen_local_uniforms_system(vec![]))
             .add_thread_local(render_lighting_pass_system())
+            .add_thread_local(render_gui_pass_system())
+            .add_thread_local(render_queue_submit_system())
     }
 }
 
 #[system]
 pub fn render_init(
-    #[resource] context: &mut graphics::Context,
     #[resource] render_state: &mut RenderState,
+    #[resource] context: &mut graphics::Context,
 ) {
     render_state.command_buffers.clear();
 }
 
 #[system]
+#[write_component(Model3D)]
 #[read_component(Position)]
-#[read_component(Model3D)]
 #[read_component(Orientation)]
-#[read_component(HitPoints)]
+pub fn render_cache_local_uniforms(world: &mut SubWorld) {
+    let mut model_query = <(&Position, &mut Model3D, TryRead<Orientation>)>::query();
+
+    for (pos, mut model, rotation) in model_query.iter_mut(world) {
+        let mut matrix = Matrix4::from_scale(model.scale);
+
+        if let Some(rot) = rotation {
+            matrix = Matrix4::from_angle_z(rot.0) * matrix;
+        }
+
+        matrix = Matrix4::from_translation(pos.into()) * matrix;
+
+        model.local_uniforms_cache = LocalUniforms {
+            model_matrix: matrix.into(),
+            material: model.material,
+        };
+    }
+}
+
+#[system]
+#[read_component(Model3D)]
 pub fn render_gen_local_uniforms(
     world: &SubWorld,
-    #[state] local_uniforms: &mut Vec<LocalUniforms>,
+    #[state] local_uniforms: &mut Vec<graphics::data::LocalUniforms>,
     #[resource] context: &mut graphics::Context,
     #[resource] render_state: &mut RenderState,
 ) {
@@ -64,37 +89,8 @@ pub fn render_gen_local_uniforms(
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-    let mut model_query = <(
-        &Position,
-        &Model3D,
-        TryRead<Orientation>,
-        TryRead<HitPoints>,
-    )>::query();
-
-    for (pos, model, rotation, hp) in model_query.iter(world) {
-        let mut matrix = Matrix4::from_scale(model.scale);
-
-        if let Some(rot) = rotation {
-            matrix = Matrix4::from_angle_z(rot.0) * matrix;
-        }
-        matrix = Matrix4::from_translation(pos.into()) * matrix;
-
-        let bloody_red = Vector4::unit_x() + Vector4::unit_w();
-
-        let alb = Vector4::from(model.material.albedo);
-
-        let mut redder_mat: graphics::Material = model.material.clone();
-
-        if let Some(hp) = hp {
-            redder_mat.albedo = bloody_red.lerp(alb, hp.health / hp.max).into();
-        }
-
-        let model_uniforms = graphics::LocalUniforms {
-            model_matrix: matrix.into(),
-            material: redder_mat,
-        };
-
-        local_uniforms.push(model_uniforms);
+    for (model) in <(Read<Model3D>)>::query().iter(world) {
+        local_uniforms.push(model.local_uniforms_cache);
     }
 
     let temp_buf = context
@@ -105,13 +101,13 @@ pub fn render_gen_local_uniforms(
             usage: wgpu::BufferUsage::COPY_SRC,
         });
 
-    for (i, (_, model)) in <(&Position, &Model3D)>::query().iter(world).enumerate() {
+    for (i, (model)) in <(&Model3D)>::query().iter(world).enumerate() {
         encoder.copy_buffer_to_buffer(
             &temp_buf,
-            (i * std::mem::size_of::<graphics::LocalUniforms>()) as u64,
+            (i * std::mem::size_of::<LocalUniforms>()) as u64,
             &model.uniform_buffer,
             0,
-            std::mem::size_of::<graphics::LocalUniforms>() as u64,
+            std::mem::size_of::<LocalUniforms>() as u64,
         );
     }
 
@@ -128,6 +124,7 @@ pub fn render_gen_global_uniforms(
     #[resource] render_state: &mut RenderState,
     #[resource] time_started: &mut SystemTime,
     #[resource] active_cam: &ActiveCamera,
+    #[resource] sc_desc: &wgpu::SwapChainDescriptor,
 ) {
     let mut encoder = context
         .device
@@ -139,9 +136,9 @@ pub fn render_gen_global_uniforms(
             .unwrap()
     };
 
-    let proj_view_matrix = generate_view_matrix(cam, cam_pos, cam_target.into(), &context.sc_desc);
+    let proj_view_matrix = generate_view_matrix(cam, cam_pos, cam_target.into(), &sc_desc);
 
-    let global_uniforms = graphics::GlobalUniforms {
+    let global_uniforms = graphics::data::GlobalUniforms {
         projection_view_matrix: proj_view_matrix.into(),
         eye_position: [cam_pos.0.x, cam_pos.0.y, cam_pos.0.z, 1.0],
         time: SystemTime::now()
@@ -163,7 +160,7 @@ pub fn render_gen_global_uniforms(
         0,
         &context.uniform_buf,
         0,
-        std::mem::size_of::<graphics::GlobalUniforms>() as u64,
+        std::mem::size_of::<graphics::data::GlobalUniforms>() as u64,
     );
 
     render_state.command_buffers.push(encoder.finish());
@@ -177,13 +174,9 @@ pub fn render_lighting_pass(
     world: &SubWorld,
     #[resource] context: &mut graphics::Context,
     #[resource] render_state: &mut RenderState,
+    #[resource] current_frame: &wgpu::SwapChainFrame,
     #[resource] ass_man: &loader::AssetManager,
 ) {
-    let current_frame = context
-        .swap_chain
-        .get_current_frame()
-        .expect("Failure to get next texture in swap chain.");
-
     let mut encoder = context
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -233,8 +226,78 @@ pub fn render_lighting_pass(
         }
     }
 
+    //let render_pass_buffer = encoder.finish();
     render_state.command_buffers.push(encoder.finish());
+}
 
+#[system]
+pub fn render_gui_pass(
+    #[resource] context: &mut graphics::Context,
+    #[resource] gui_context: &mut graphics::GuiContext,
+    #[resource] window: &winit::window::Window,
+    #[resource] render_state: &mut RenderState,
+    #[resource] current_frame: &wgpu::SwapChainFrame,
+) {
+    use imgui::{im_str, Condition, Window};
+
+    gui_context
+        .imgui_platform
+        .prepare_frame(gui_context.imgui.io_mut(), &window)
+        .expect("Failed to prepare imgui frame");
+
+    let ui = gui_context.imgui.frame();
+
+    {
+        let window = Window::new(im_str!("Test window"));
+
+        window
+            .size([300.0, 100.0], Condition::FirstUseEver)
+            .build(&ui, || {
+                ui.text(im_str!("Welcome to deeper."));
+                ui.separator();
+                let mouse_pos = ui.io().mouse_pos;
+                ui.text(im_str!(
+                    "Mouse Position: ({:.1},{:.1})",
+                    mouse_pos[0],
+                    mouse_pos[1]
+                ));
+                ui.text(im_str!("FPS: ({:.2})", ui.io().framerate))
+            });
+    }
+
+    let mut encoder = context
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+    gui_context.imgui_platform.prepare_render(&ui, &window);
+
+    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+            attachment: &current_frame.output.view,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: true,
+            },
+        }],
+        depth_stencil_attachment: None,
+    });
+
+    gui_context
+        .imgui_renderer
+        .render(ui.render(), &context.queue, &context.device, &mut rpass)
+        .expect("Rendering failed");
+
+    drop(rpass);
+
+    render_state.command_buffers.push(encoder.finish());
+}
+
+#[system]
+fn render_queue_submit(
+    #[resource] context: &mut graphics::Context,
+    #[resource] render_state: &mut RenderState,
+) {
     context.queue.submit(render_state.command_buffers.drain(..));
 }
 

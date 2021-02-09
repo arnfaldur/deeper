@@ -16,33 +16,34 @@ mod input;
 mod loader;
 mod systems;
 
-use std::time::Instant;
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 use cgmath::{Deg, Vector2, Vector3};
 use components::*;
 use input::InputState;
 use legion::{Resources, Schedule, World};
 use loader::AssetManager;
-//use crate::systems::assets::*;
 use systems::physics::PhysicsBuilderExtender;
+use wgpu::SwapChainFrame;
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 
-use crate::graphics::GuiContext;
+use crate::graphics::{sc_desc_from_size, GuiContext};
 use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+
     let mut ass_man = AssetManager::new();
     let ds = ass_man.load_display_settings();
 
     let event_loop = EventLoop::new();
 
     let size = PhysicalSize {
-        width: ds.screen_width,
-        height: ds.screen_height,
+        width: ds.screen_width as u32,
+        height: ds.screen_height as u32,
     };
 
     let builder = winit::window::WindowBuilder::new()
@@ -50,9 +51,13 @@ async fn run_async() {
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
 
-    let context = graphics::Context::new(&window).await;
+    let context = graphics::Context::new(&window, &instance).await;
 
     let gui_context = graphics::GuiContext::new(&window, &context);
+
+    let surface = unsafe { instance.create_surface(&window) };
+    let mut sc_desc = sc_desc_from_size(&size);
+    let mut swap_chain = context.device.create_swap_chain(&surface, &sc_desc);
 
     ass_man.load_models(&context);
 
@@ -124,8 +129,6 @@ async fn run_async() {
     resources.insert(InputState::new());
     resources.insert(systems::rendering::RenderState::new());
 
-    // Setup world
-
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::MainEventsCleared => {
@@ -133,6 +136,11 @@ async fn run_async() {
                 let frame_time = resources.get::<Instant>().unwrap().elapsed();
                 resources.insert(FrameTime(frame_time.as_secs_f32()));
                 resources.insert(Instant::now());
+                resources.insert(sc_desc.clone());
+                // Explicitly drop the current swap frame in preparation
+                // for the next.
+                drop(resources.remove::<wgpu::SwapChainFrame>());
+                resources.insert(swap_chain.get_current_frame().unwrap());
                 schedule.execute(&mut world, &mut resources);
                 resources.get_mut::<InputState>().unwrap().new_frame();
                 schedule.execute(&mut world, &mut resources);
@@ -141,11 +149,14 @@ async fn run_async() {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                resources
+                sc_desc = sc_desc_from_size(&size);
+                swap_chain = resources
                     .get_mut::<graphics::Context>()
                     .unwrap()
-                    .resize(size);
+                    .resize(size, &sc_desc, &surface);
             }
+            // note(Jökull): Can we make this more readable somehow?
+            // It is not clear that these two events result in Exit
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..

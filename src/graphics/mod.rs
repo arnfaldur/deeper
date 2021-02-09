@@ -5,136 +5,34 @@ pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
-pub struct Vertex {
-    pub pos: [f32; 3],
-    pub normal: [f32; 3],
-    pub tex_coord: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct GlobalUniforms {
-    pub projection_view_matrix: [[f32; 4]; 4],
-    pub eye_position: [f32; 4],
-    pub time: f32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct Material {
-    pub albedo: [f32; 4],
-    pub metallic: f32,
-    pub roughness: f32,
-}
-
-impl Material {
-    pub fn default() -> Self {
-        let mut mat: Self = Default::default();
-        mat.albedo = [1.0, 1.0, 1.0, 1.0];
-        mat.metallic = 0.1;
-        mat.roughness = 0.15;
-        return mat;
-    }
-
-    pub fn glossy(color: Vector3<f32>) -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = [color.x, color.y, color.z, 1.0];
-        mat.roughness = 0.2;
-        mat.metallic = 0.2;
-        return mat;
-    }
-
-    pub fn darkest_stone() -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = [0.05, 0.05, 0.05, 1.0];
-        mat.metallic = 0.0;
-        mat.roughness = 0.5;
-        return mat;
-    }
-
-    pub fn dark_stone() -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = [0.07, 0.07, 0.07, 1.0];
-        mat.metallic = 0.0;
-        mat.roughness = 0.7;
-        return mat;
-    }
-
-    pub fn bright_stone() -> Self {
-        let mut mat: Self = Default::default();
-        mat.albedo = [0.2, 0.2, 0.2, 1.0];
-        mat.metallic = 0.01;
-        mat.roughness = 0.6;
-        return mat;
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes)]
-pub struct LocalUniforms {
-    pub model_matrix: [[f32; 4]; 4],
-    pub material: Material,
-}
-
-impl LocalUniforms {
-    pub fn new() -> Self {
-        use cgmath::SquareMatrix;
-        Self {
-            model_matrix: cgmath::Matrix4::identity().into(),
-            material: Material::default(),
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct DirectionalLight {
-    pub direction: [f32; 4],
-    pub ambient: [f32; 4],
-    pub color: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct PointLight {
-    pub radius: f32,
-    pub pad: [f32; 3],
-    pub position: [f32; 4],
-    pub color: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct Lights {
-    pub directional_light: DirectionalLight,
-    pub point_lights: [PointLight; MAX_NR_OF_POINT_LIGHTS],
-}
-
-pub struct Mesh {
-    pub num_vertices: usize,
-    pub vertex_buffer: wgpu::Buffer,
-    pub offset: [f32; 3],
-}
-
-pub struct Model {
-    pub meshes: Vec<Mesh>,
-}
+pub mod data;
 
 use cgmath::Vector3;
 use imgui::FontSource;
 use imgui_wgpu::RendererConfig;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    Device, PipelineLayout, RenderPipeline, ShaderModule, StencilStateDescriptor,
-    SwapChainDescriptor,
+    Device, PipelineLayout, RenderPipeline, ShaderModule, StencilStateDescriptor, Surface,
+    SwapChain, SwapChainDescriptor,
 };
 use winit::dpi::PhysicalSize;
 use winit::event::Event;
 use winit::window::Window;
 
+// How dirty of me
+use crate::graphics::data::*;
+
 extern crate imgui_winit_support;
+
+pub fn sc_desc_from_size(size: &PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
+    wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        format: COLOR_FORMAT,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Mailbox,
+    }
+}
 
 /// Contains everything necessary to render GUI elements.
 ///
@@ -179,7 +77,7 @@ impl GuiContext {
             &context.device,
             &context.queue,
             RendererConfig {
-                texture_format: context.sc_desc.format,
+                texture_format: crate::graphics::COLOR_FORMAT,
                 ..Default::default()
             },
         );
@@ -221,20 +119,13 @@ pub struct Context {
     pub pipeline: wgpu::RenderPipeline,
 
     pub depth_view: wgpu::TextureView,
-
-    pub surface: wgpu::Surface,
-    pub sc_desc: wgpu::SwapChainDescriptor,
-    pub swap_chain: wgpu::SwapChain,
 }
 
 const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
 const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
 
 impl Context {
-    pub async fn new(window: &Window) -> Self {
-        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
-        let surface = unsafe { instance.create_surface(window) };
-
+    pub async fn new(window: &Window, instance: &wgpu::Instance) -> Self {
         let size = window.inner_size();
 
         let adapter = instance
@@ -256,16 +147,6 @@ impl Context {
             )
             .await
             .unwrap();
-
-        let sc_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: COLOR_FORMAT,
-            width: size.width as u32,
-            height: size.height as u32,
-            present_mode: wgpu::PresentMode::Mailbox,
-        };
-
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
         let depth_view = Context::create_depth_view(&device, size);
 
@@ -374,9 +255,6 @@ impl Context {
         let context = Context {
             device,
             queue,
-            surface,
-            sc_desc,
-            swap_chain,
             uniform_buf,
             lights_buf,
             local_bind_group_layout,
@@ -482,13 +360,15 @@ impl Context {
         });
     }
 
-    pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.sc_desc.width = size.width;
-        self.sc_desc.height = size.height;
-
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
-
+    pub fn resize(
+        &mut self,
+        size: PhysicalSize<u32>,
+        sc_desc: &SwapChainDescriptor,
+        surface: &Surface,
+    ) -> SwapChain {
         self.depth_view = Context::create_depth_view(&self.device, size);
+
+        return self.device.create_swap_chain(surface, sc_desc);
     }
 
     fn create_depth_view(device: &wgpu::Device, size: PhysicalSize<u32>) -> wgpu::TextureView {

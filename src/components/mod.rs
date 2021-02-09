@@ -29,7 +29,8 @@ pub struct Parent(pub Entity);
 
 pub struct FrameTime(pub f32);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
+#[derive(Copy, Clone)]
 pub struct Position(pub Vector2<f32>);
 
 impl Position {
@@ -102,7 +103,8 @@ impl Destination {
     }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq)]
+#[derive(Copy, Clone)]
 pub enum Faction {
     Enemies,
     Friends,
@@ -120,6 +122,12 @@ pub enum MapTransition {
 }
 
 pub struct MapSwitcher(pub MapTransition);
+
+pub struct GuiWindow {
+    pub size: [f32; 2],
+    pub name: String,
+    pub view: Box<dyn FnOnce(&imgui::Ui)>,
+}
 
 pub struct Camera {
     pub fov: f32,
@@ -177,15 +185,15 @@ impl StaticModel {
         offset: Vector3<f32>,
         scale: f32,
         z_rotation: f32,
-        material: graphics::Material,
+        material: graphics::data::Material,
     ) -> Self {
-        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+        let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
         let mut matrix = Matrix4::from_scale(scale);
         matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
         matrix = Matrix4::from_translation(offset) * matrix;
 
-        let local_uniforms = graphics::LocalUniforms {
+        let local_uniforms = graphics::data::LocalUniforms {
             model_matrix: matrix.into(),
             material,
         };
@@ -201,28 +209,32 @@ pub struct Model3D {
     pub offset: Vector3<f32>,
     pub scale: f32,
     pub z_rotation: f32,
-    pub material: graphics::Material,
+    pub material: graphics::data::Material,
 
     pub bind_group: wgpu::BindGroup,
     pub uniform_buffer: wgpu::Buffer,
+
+    // TODO: Move out of Model3D
+    pub local_uniforms_cache: graphics::data::LocalUniforms,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
-        let uniforms_size = std::mem::size_of::<graphics::LocalUniforms>() as u64;
+        let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
-        let (uniform_buf, bind_group) =
-            context.model_bind_group_from_uniform_data(graphics::LocalUniforms::new());
+        let (uniform_buffer, bind_group) =
+            context.model_bind_group_from_uniform_data(graphics::data::LocalUniforms::new());
 
         Self {
             idx: 0,
             offset: Vector3::new(0.0, 0.0, 0.0),
-            material: graphics::Material::default(),
+            material: graphics::data::Material::default(),
             bind_group,
             scale: 1.0,
             z_rotation: 0.0,
-            uniform_buffer: uniform_buf,
+            uniform_buffer,
+            local_uniforms_cache: graphics::data::LocalUniforms::new(),
         }
     }
 
@@ -247,7 +259,7 @@ impl Model3D {
         self
     }
 
-    pub fn with_material(mut self, material: graphics::Material) -> Self {
+    pub fn with_material(mut self, material: graphics::data::Material) -> Self {
         self.material = material;
         self
     }

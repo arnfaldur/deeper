@@ -132,6 +132,7 @@ pub fn player(
     #[resource] context: &graphics::Context,
     #[resource] player: &Player,
     #[resource] player_cam: &PlayerCamera,
+    #[resource] sc_desc: &wgpu::SwapChainDescriptor,
 ) {
     // We need to do this to get mutable accesses to multiple components at once.
     // It is possible that we can fix this by creating more systems
@@ -152,7 +153,7 @@ pub fn player(
         let camera_3d_pos = player_cam_entry.get_component::<Position3D>().unwrap().0;
         let camera_pos = player_cam_entry.get_component::<Position>().unwrap().0;
 
-        let aspect_ratio = context.sc_desc.width as f32 / context.sc_desc.height as f32;
+        let aspect_ratio = sc_desc.width as f32 / sc_desc.height as f32;
 
         let mx_view = cgmath::Matrix4::look_at(
             to_pos3(camera_3d_pos),
@@ -164,12 +165,7 @@ pub fn player(
         if let Some(mouse_world_pos) = project_screen_to_world(
             Vector3::new(mouse_pos.x, mouse_pos.y, 1.0),
             correction_matrix() * mx_projection * mx_view,
-            Vector4::new(
-                0,
-                0,
-                context.sc_desc.width as i32,
-                context.sc_desc.height as i32,
-            ),
+            Vector4::new(0, 0, sc_desc.width as i32, sc_desc.height as i32),
         ) {
             let ray_delta: Vector3<f32> = mouse_world_pos - camera_3d_pos;
             let t: f32 = mouse_world_pos.z / ray_delta.z;

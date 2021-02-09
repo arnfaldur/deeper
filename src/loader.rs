@@ -10,6 +10,7 @@ use wavefront_obj::obj;
 use zerocopy::AsBytes;
 
 use crate::graphics;
+use crate::graphics::data;
 
 #[derive(Serialize, Deserialize)]
 struct PathSettings {
@@ -76,7 +77,7 @@ pub struct AssetManager {
     paths: PathSettings,
     extensions: Extensions,
 
-    pub models: Vec<graphics::Model>,
+    pub models: Vec<graphics::data::Model>,
 }
 
 use std::path::Path;
@@ -84,6 +85,7 @@ use std::path::PathBuf;
 
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
+use crate::graphics::data::Vertex;
 use crate::loader::AssetKind::Model;
 
 impl AssetManager {
@@ -182,7 +184,7 @@ impl AssetManager {
         path: &Path,
         ext: &String,
         context: &graphics::Context,
-    ) -> graphics::Model {
+    ) -> graphics::data::Model {
         // TODO: Generalize this
         match ext.as_str() {
             "obj" => load_model_from_obj(context, path),
@@ -190,7 +192,7 @@ impl AssetManager {
             _ => {
                 // Should not happen
                 println!("[loader] (error): Extension {} not recognized.", ext);
-                graphics::Model { meshes: vec![] }
+                graphics::data::Model { meshes: vec![] }
             }
         }
     }
@@ -240,20 +242,20 @@ impl AssetManager {
 // Note(Jökull): We really only need the device, so...
 // TODO: Grab only the device from context, not the whole context
 
-fn load_model_from_gltf(context: &graphics::Context, path: &Path) -> graphics::Model {
+fn load_model_from_gltf(context: &graphics::Context, path: &Path) -> graphics::data::Model {
     let vertex_lists = vertex_lists_from_gltf(path).unwrap();
     return load_model_from_vertex_lists(context, &vertex_lists);
 }
 
-fn load_model_from_obj(context: &graphics::Context, path: &Path) -> graphics::Model {
+fn load_model_from_obj(context: &graphics::Context, path: &Path) -> graphics::data::Model {
     let vertex_lists = vertex_lists_from_obj(path).unwrap();
     return load_model_from_vertex_lists(context, &vertex_lists);
 }
 
 fn load_model_from_vertex_lists(
     context: &graphics::Context,
-    vertex_lists: &Vec<Vec<graphics::Vertex>>,
-) -> graphics::Model {
+    vertex_lists: &Vec<Vec<Vertex>>,
+) -> graphics::data::Model {
     let mut meshes = vec![];
 
     for vertices in vertex_lists {
@@ -271,18 +273,18 @@ fn load_model_from_vertex_lists(
                 usage: wgpu::BufferUsage::VERTEX,
             });
 
-        meshes.push(graphics::Mesh {
+        meshes.push(graphics::data::Mesh {
             num_vertices: vertices.len(),
             vertex_buffer: vertex_buf,
             offset: [0.0, 0.0, 0.0],
         });
     }
 
-    graphics::Model { meshes }
+    graphics::data::Model { meshes }
 }
 
 // TODO: Handle transforms
-pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, String> {
+pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
     let (document, buffers, _images) = gltf::import(path).expect(
         format!(
             "[graphics/gltf] : File {} could not be opened",
@@ -314,7 +316,7 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>,
                 let normal = normals.get(idx as usize).unwrap().clone();
                 let tex_coord = tex_coords.get(idx as usize).unwrap().clone();
 
-                vertex_list.push(graphics::Vertex {
+                vertex_list.push(Vertex {
                     pos,
                     normal,
                     tex_coord,
@@ -327,7 +329,7 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>,
     return Ok(vertex_lists);
 }
 
-pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, String> {
+pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
     let mut f;
 
     if let Ok(file) = File::open(path) {
@@ -381,7 +383,7 @@ pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<graphics::Vertex>>, 
                     },
                 };
 
-                let v = graphics::Vertex {
+                let v = Vertex {
                     pos: [pos.x as f32, pos.y as f32, pos.z as f32],
                     normal: [normal.x as f32, normal.y as f32, normal.z as f32],
                     tex_coord: [tc.u as f32, tc.v as f32],
