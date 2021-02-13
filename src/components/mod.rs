@@ -1,4 +1,4 @@
-mod entity_builder;
+pub mod entity_builder;
 
 extern crate cgmath;
 
