@@ -8,27 +8,28 @@ use legion::storage::{
     ArchetypeSource, ArchetypeWriter, Component, ComponentSource, ComponentTypeId, ComponentWriter,
     EntityLayout, IntoComponentSource, PackedStorage, UnknownComponentStorage,
 };
+use legion::world::SubWorld;
 use legion::*;
 
 use crate::components::*;
 
 pub struct EntityBuilder<'a> {
-    buffer: legion::systems::CommandBuffer,
     entity: Entity,
-    world: &'a mut World,
+    buffer: &'a mut legion::systems::CommandBuffer,
 }
 
 impl<'a> EntityBuilder<'a> {
-    pub fn new(world: &'a mut World) -> Self {
-        let mut buffer = legion::systems::CommandBuffer::new(world);
-        let entity = buffer.push(());
-        return Self {
+    pub fn from_buffer(buffer: &'a mut legion::systems::CommandBuffer) -> Self {
+        Self {
+            entity: buffer.push(()),
             buffer,
-            entity,
-            world,
-        };
+        }
     }
-    pub fn build(&mut self) { self.buffer.flush(self.world) }
+    pub fn another(&mut self) -> &mut Self {
+        self.entity = self.buffer.push(());
+        return self;
+    }
+    pub fn build(&self) -> Entity { self.entity }
     fn add_component<T: Component>(&mut self, component: T) {
         self.buffer.add_component(self.entity, component);
     }
@@ -48,8 +49,17 @@ impl<'a> EntityBuilder<'a> {
         self.add_component(DynamicBody { mass });
         return self;
     }
-    pub fn agent(&mut self, accel: Acceleration) -> &mut Self {
-        self.add_component(accel);
+    pub fn circle_collider(&mut self, radius: f32) -> &mut Self {
+        self.add_component(CircleCollider{radius});
+        return self;
+    }
+    pub fn model(&mut self, model_name: String) -> &mut Self {
+        self.add_component()
+        return self;
+    }
+    pub fn agent(&mut self, speed: f32, acceleration: f32) -> &mut Self {
+        self.add_component(Speed(speed));
+        self.add_component(Acceleration(acceleration));
         return self;
     }
 }
