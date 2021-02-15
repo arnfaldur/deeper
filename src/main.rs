@@ -16,11 +16,13 @@ mod input;
 mod loader;
 mod systems;
 
+use std::rc::Rc;
 use std::time::{Instant, SystemTime};
 
-use cgmath::{Deg, Vector2, Vector3};
+use cgmath::{Deg, Vector2, Vector3, Zero};
 use components::*;
 use input::InputState;
+use legion::storage::{ComponentSource, EntityLayout, IntoComponentSource};
 use legion::{Resources, Schedule, World};
 use loader::AssetManager;
 use systems::physics::PhysicsBuilderExtender;
@@ -30,6 +32,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 
+use crate::components::entity_builder::EntityBuilder;
 use crate::graphics::{sc_desc_from_size, GuiContext};
 use crate::systems::rendering::RenderBuilderExtender;
 
@@ -78,37 +81,35 @@ async fn run_async() {
         .add_render_systems()
         .build();
 
-    let player = world.push((
-        Position(Vector2::unit_x()),
-        Speed(5.),
-        Acceleration(30.),
-        Orientation(Deg(0.0)),
-        Velocity::new(),
-        DynamicBody { mass: 1.0 },
-        CircleCollider { radius: 0.3 },
-    ));
+    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
-    if let Some(mut p) = world.entry(player) {
-        p.add_component(
+    let player = EntityBuilder::from_buffer(&mut command_buffer)
+        .position(Vector2::unit_x())
+        .orientation(0.0)
+        .agent(5., 30.)
+        .velocity(Vector2::zero())
+        .dynamic_body(1.)
+        .circle_collider(0.3)
+        .model(
             Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
                 .with_scale(0.5),
         )
-    }
+        .build();
 
-    let player_camera = world.push((
-        Parent(player),
-        Position(Vector2::unit_x()),
-        Speed(5.),
-        Acceleration(30.0),
-        Velocity::new(),
-        components::Camera {
+    let player_camera = EntityBuilder::from_buffer(&mut command_buffer)
+        .any(Parent(player))
+        .position(Vector2::unit_x())
+        .velocity(Vector2::zero())
+        .any(components::Camera {
             up: Vector3::unit_z(),
             fov: 30.0,
             roaming: false,
-        },
-        Position3D(Vector3::new(0.0, 0.0, 0.0)),
-        SphericalOffset::camera_offset(),
-    ));
+        })
+        .any(Position3D(Vector3::new(0.0, 0.0, 0.0)))
+        .any(SphericalOffset::camera_offset())
+        .build();
+
+    command_buffer.flush(&mut world);
 
     resources.insert(Player { entity: player });
     resources.insert(ActiveCamera {

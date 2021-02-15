@@ -50,16 +50,21 @@ impl<'a> EntityBuilder<'a> {
         return self;
     }
     pub fn circle_collider(&mut self, radius: f32) -> &mut Self {
-        self.add_component(CircleCollider{radius});
+        self.add_component(CircleCollider { radius });
         return self;
     }
-    pub fn model(&mut self, model_name: String) -> &mut Self {
-        self.add_component()
+    pub fn model(&mut self, model: Model3D) -> &mut Self {
+        self.add_component(model);
         return self;
     }
     pub fn agent(&mut self, speed: f32, acceleration: f32) -> &mut Self {
         self.add_component(Speed(speed));
         self.add_component(Acceleration(acceleration));
+        return self;
+    }
+    #[deprecated(note = "builder method not implemented for a component class.")]
+    pub fn any<T: Component>(&mut self, component: T) -> &mut Self {
+        self.add_component(component);
         return self;
     }
 }
