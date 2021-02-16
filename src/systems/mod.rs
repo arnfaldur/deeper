@@ -1,8 +1,10 @@
-
-use specs::prelude::*;
-use std::f32::consts::{FRAC_PI_2};
+use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{prelude::*, Vector2};
+use legion::systems::{CommandBuffer, Runnable};
+use legion::world::SubWorld;
+use legion::IntoQuery;
+use legion::*;
 
 use crate::components::*;
 
@@ -12,128 +14,132 @@ pub mod player;
 pub mod rendering;
 pub mod world_gen;
 
-pub struct SphericalOffsetSystem;
-
-impl<'a> System<'a> for SphericalOffsetSystem {
-    type SystemData = (
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, SphericalOffset>,
-        WriteStorage<'a, Position3D>,
-    );
-
-    fn run(&mut self, (pos2d, offset, mut pos3d): Self::SystemData) {
-        for (pos2d, follow, pos3d) in (&pos2d, &offset, &mut pos3d).join() {
-            pos3d.0 = pos2d.to_vec3();
-
-            pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
-            pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
-            pos3d.0.z += follow.radius * follow.phi.sin();
-        }
-    }
+pub fn spherical_offset_system() -> impl Runnable {
+    SystemBuilder::new("spherical_offset")
+        .with_query(<(
+            ::legion::Read<Position>,
+            ::legion::Read<SphericalOffset>,
+            ::legion::Write<Position3D>,
+        )>::query())
+        .build(move |cmd, world, resources, query| {
+            let for_query = world;
+            query.for_each_mut(for_query, |components| {
+                spherical_offset(components.0, components.1, components.2);
+            });
+        })
 }
 
-pub struct HitPointRegenSystem;
-
-impl<'a> System<'a> for HitPointRegenSystem {
-    type SystemData = (
-        Entities<'a>,
-        ReadExpect<'a, FrameTime>,
-        WriteStorage<'a, HitPoints>,
-        Read<'a, LazyUpdate>,
-    );
-
-    fn run(&mut self, (ents, frame_time, mut hp, updater): Self::SystemData) {
-        for (ent, hp) in (&ents, &mut hp).join() {
-            if hp.health <= 0.0 {
-                updater.remove::<AIFollow>(ent);
-                updater.remove::<Destination>(ent);
-            } else {
-                hp.health += 0.7654321 * frame_time.0;
-                hp.health = hp.max.min(hp.health);
-            }
-        }
+#[allow(dead_code)]
+pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {
+    pos3d.0 = pos2d.into();
+    pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
+    pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
+    pos3d.0.z += follow.radius * follow.phi.sin();
+}
+pub fn hit_point_regen_system() -> impl Runnable {
+    SystemBuilder::new("hit_point_regen")
+        .read_resource::<FrameTime>()
+        .with_query(<(::legion::Entity, ::legion::Write<HitPoints>)>::query())
+        .build(move |cmd, world, resources, query| {
+            let (mut for_query, mut world) = world.split_for_query(query);
+            let for_query = &mut for_query;
+            query.for_each_mut(for_query, |components| {
+                hit_point_regen(&mut world, cmd, &*resources, components.0, components.1);
+            });
+        })
+}
+#[allow(dead_code)]
+pub fn hit_point_regen(
+    world: &mut SubWorld,
+    commands: &mut CommandBuffer,
+    frame_time: &FrameTime,
+    ent: &Entity,
+    hp: &mut HitPoints,
+) {
+    if hp.health <= 0.0 {
+        commands.remove_component::<AIFollow>(*ent);
+        commands.remove_component::<Destination>(*ent);
+    } else {
+        hp.health += 0.7654321 * frame_time.0;
+        hp.health = hp.max.min(hp.health);
     }
 }
-
-pub struct AIFollowSystem;
-
-impl<'a> System<'a> for AIFollowSystem {
-    type SystemData = (
-        Entities<'a>,
-        WriteStorage<'a, Destination>,
-        WriteStorage<'a, Orientation>,
-        ReadStorage<'a, AIFollow>,
-        ReadStorage<'a, Position>,
-    );
-
-    fn run(&mut self, (ents, mut dest, mut orient, follow, pos): Self::SystemData) {
-        for (ent, orient, follow, hunter) in (&ents, (&mut orient).maybe(), &follow, &pos).join() {
-            if let Some(hunted) = pos.get(follow.target) {
-                let difference: Vector2<f32> = hunted.0 - hunter.0;
-                let distance = difference.magnitude();
-                if distance > follow.minimum_distance {
-                    dest.insert(ent, Destination::simple(hunted.0));
-                    if let Some(orientation) = orient {
-                        orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
-                    }
+fn ai_follow_system() -> impl Runnable {
+    SystemBuilder::new("ai_follow")
+        .read_component::<AIFollow>()
+        .read_component::<Position>()
+        .write_component::<Destination>()
+        .write_component::<Orientation>()
+        .build(move |cmd, world, resources, query| {
+            ai_follow(world, cmd);
+        })
+}
+#[allow(dead_code)]
+fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
+    let mut query = <(Entity, TryWrite<Orientation>, &AIFollow, &Position)>::query();
+    let (mut hunter_world, mut hunted_world) = world.split_for_query(&query);
+    for (ent, orient, follow, hunter) in query.iter_mut(&mut hunter_world) {
+        if let Some(hunted) = hunted_world
+            .entry_ref(follow.target)
+            .ok()
+            .map(|e| e.into_component::<Position>().ok())
+            .flatten()
+        {
+            let difference: Vector2<f32> = hunted.0 - hunter.0;
+            let distance = difference.magnitude();
+            if distance > follow.minimum_distance {
+                command.add_component(*ent, Destination::simple(hunted.0));
+                if let Some(orientation) = orient {
+                    orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
                 }
             }
         }
     }
 }
-
-pub struct GoToDestinationSystem;
-
-impl<'a> System<'a> for GoToDestinationSystem {
-    type SystemData = (
-        Entities<'a>,
-        Read<'a, LazyUpdate>,
-        ReadExpect<'a, FrameTime>,
-        WriteStorage<'a, Destination>,
-        ReadStorage<'a, Position>,
-        WriteStorage<'a, Velocity>,
-        ReadStorage<'a, Speed>,
-        ReadStorage<'a, Acceleration>,
-    );
-
-    fn run(&mut self, (ents, updater, frame_time, mut dests, pos, mut vel, speed, acc): Self::SystemData) {
-
-        const EPSILON : f32 = 0.05;
-
-        for (ent, dest, hunter, vel, speed, accel) in (&ents, &mut dests, &pos, &mut vel, &speed, &acc).join() {
-            // check if straight path is available, line drawing? or just navmesh
-            // if not do A* and add intermediate destination component for next node in path
-            // or just make Destination an object inheriting from the abstract destinations
-            // class.
-            let to_dest: Vector2<f32> = dest.goal - hunter.0;
-
-            if to_dest.magnitude() < EPSILON {
-                updater.remove::<Destination>(ent);
-                vel.0 = Vector2::new(0.0, 0.0);
-            } else {
-                let direction = to_dest.normalize();
-                let time_to_stop = speed.0 / accel.0;
-                let slowdown = FRAC_PI_2.min(to_dest.magnitude() / time_to_stop * 0.5).sin();
-                let target_velocity = direction * speed.0 * slowdown;
-                let delta: Vector2<f32> = target_velocity - vel.0;
-                let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
-
-                if delta != Vector2::unit_x() * 0.0 {
-                    vel.0 += delta.normalize() * velocity_change;
-                }
+pub fn go_to_destination_system() -> impl Runnable {
+    SystemBuilder::new("go_to_destination")
+        .read_component::<Position>()
+        .read_component::<Speed>()
+        .read_component::<Acceleration>()
+        .write_component::<Destination>()
+        .write_component::<Velocity>()
+        .read_resource::<FrameTime>()
+        .build(move |cmd, world, resources, query| {
+            go_to_destination(world, cmd, &*resources);
+        })
+}
+#[allow(dead_code)]
+pub fn go_to_destination(
+    world: &mut SubWorld,
+    commands: &mut legion::systems::CommandBuffer,
+    frame_time: &FrameTime,
+) {
+    const EPSILON: f32 = 0.05;
+    let mut query = <(
+        Entity,
+        &Destination,
+        &Position,
+        &mut Velocity,
+        &Speed,
+        &Acceleration,
+    )>::query();
+    for (ent, dest, hunter, vel, speed, accel) in query.iter_mut(world) {
+        let to_dest: Vector2<f32> = dest.goal - hunter.0;
+        if to_dest.magnitude() < EPSILON {
+            commands.remove_component::<Destination>(*ent);
+            vel.0 = Vector2::new(0.0, 0.0);
+        } else {
+            let direction = to_dest.normalize();
+            let time_to_stop = speed.0 / accel.0;
+            let slowdown = FRAC_PI_2
+                .min(to_dest.magnitude() / time_to_stop * 0.5)
+                .sin();
+            let target_velocity = direction * speed.0 * slowdown;
+            let delta: Vector2<f32> = target_velocity - vel.0;
+            let velocity_change = (accel.0 * frame_time.0).min(delta.magnitude());
+            if delta != Vector2::unit_x() * 0.0 {
+                vel.0 += delta.normalize() * velocity_change;
             }
         }
-    }
-}
-
-pub struct IntermediateDestinationSystem;
-
-impl<'a> System<'a> for IntermediateDestinationSystem {
-    type SystemData = (
-
-    );
-
-    fn run(&mut self, (): Self::SystemData) {
-
     }
 }

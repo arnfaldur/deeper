@@ -4,32 +4,34 @@ version = "0.0.1"
 authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
 edition = "2018"
 
-
+[profile.release]
+opt-level = 2
+incremental = true
+#lto = false
+#lto = "thin"
 
 [dependencies]
 
 # misc
-itertools = "0.9"
+itertools = "0.10"
 
 # dung_gen
-rand = "0.7"
-ena  = "0.13.1"
-
-# sound baby
-rg3d-sound = "0.11.0"
+rand = "0.8.3"
+ena  = "0.14.0"
 
 # graphics and input
-wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
-cgmath        = "0.17"
-winit         = "0.22"
+# wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
+wgpu          = "0.7"
+cgmath        = "0.18"
+winit         = "0.24"
 futures       = "0.3"
-env_logger    = "0.7"
-glsl-to-spirv = "0.1"
+env_logger    = "0.8.2"
+shaderc       = "0.7.1"
 zerocopy      = "0.3"
 lazy_static   = "1.4.0"
-imgui         = "0.4"
-imgui-wgpu    = "0.6.0"
-imgui-winit-support = { version = "0.4", default-features = false, features = ["winit-22"]}
+imgui         = "0.7"
+imgui-wgpu    = "0.14"
+imgui-winit-support = "0.7"
 
 wavefront_obj = "*"
 gltf = "0.15.2"
@@ -40,5 +42,10 @@ serde = { version = "1.0", features = ["derive"] }
 notify = "4.0.15"
 
 # ECS
-specs = { version = "0.16.1", features = ["specs-derive"] }
 legion = "0.3.1"
+crossbeam-channel = "0.4.4"
+
+# physics
+nalgebra = "0.24.0"
+ncollide2d = "0.27.0"
+nphysics2d = "0.19.0"

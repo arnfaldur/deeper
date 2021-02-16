@@ -5,135 +5,68 @@ pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
-pub struct Vertex {
-    pub pos: [f32; 3],
-    pub normal: [f32; 3],
-    pub tex_coord: [f32; 2],
-}
+pub mod data;
+pub mod gui;
 
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct GlobalUniforms {
-    pub projection_view_matrix: [[f32; 4]; 4],
-    pub eye_position: [f32; 4],
-    pub time: f32,
-}
+use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct Material {
-    pub albedo : [f32; 4],
-    pub metallic : f32,
-    pub roughness : f32,
-}
+use cgmath::{Deg, Vector2, Vector3};
+use wgpu::util::DeviceExt;
+use wgpu::{
+    ColorTargetState, DepthStencilState, Device, PipelineLayout, RenderPipeline, ShaderModule,
+    Surface, SwapChain, SwapChainDescriptor,
+};
+use winit::dpi::PhysicalSize;
+use winit::event::Event;
+use winit::window::Window;
 
-impl Material {
-    pub fn default() -> Self {
-        let mut mat : Self = Default::default();
-        mat.albedo = [1.0, 1.0, 1.0, 1.0];
-        mat.metallic = 0.1;
-        mat.roughness = 0.15;
-        return mat;
-    }
+use crate::components::{Camera, Model3D, Position, StaticModel};
+// How dirty of me
+use crate::graphics::data::*;
+use crate::graphics::gui::GuiContext;
+use crate::loader::AssetManager;
 
-    pub fn glossy(color : Vector3<f32>) -> Self {
-        let mut mat : Self = Self::default();
-        mat.albedo = [color.x, color.y, color.z, 1.0];
-        mat.roughness = 0.2;
-        mat.metallic = 0.2;
-        return mat;
-    }
-
-    pub fn darkest_stone() -> Self {
-        let mut mat : Self = Self::default();
-        mat.albedo = [0.05, 0.05, 0.05, 1.0];
-        mat.metallic = 0.0;
-        mat.roughness = 0.5;
-        return mat;
-    }
-
-    pub fn dark_stone() -> Self {
-        let mut mat : Self = Self::default();
-        mat.albedo = [0.07, 0.07 , 0.07, 1.0];
-        mat.metallic = 0.0;
-        mat.roughness = 0.7;
-        return mat;
-    }
-
-    pub fn bright_stone() -> Self {
-        let mut mat : Self = Default::default();
-        mat.albedo = [0.2, 0.2 , 0.2, 1.0];
-        mat.metallic = 0.01;
-        mat.roughness = 0.6;
-        return mat;
+pub fn sc_desc_from_size(size: &PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
+    wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+        format: COLOR_FORMAT,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Mailbox,
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes)]
-pub struct LocalUniforms {
-    pub model_matrix: [[f32; 4]; 4],
-    pub material: Material,
+struct ModelQueue {
+    local_uniforms: Vec<LocalUniforms>,
+    model_desc: Vec<Model3D>,
+    static_models: Vec<StaticModel>,
 }
 
-impl LocalUniforms {
-    pub fn new() -> Self {
-        use cgmath::SquareMatrix;
+impl ModelQueue {
+    fn new() -> Self {
         Self {
-            model_matrix: cgmath::Matrix4::identity().into(),
-            material: Material::default(),
+            local_uniforms: vec![],
+            model_desc: vec![],
+            static_models: vec![],
         }
     }
+
+    fn clear(&mut self) {
+        self.local_uniforms.clear();
+        self.model_desc.clear();
+        self.static_models.clear();
+    }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct DirectionalLight {
-    pub direction : [f32; 4],
-    pub ambient   : [f32; 4],
-    pub color     : [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct PointLight {
-    pub radius : f32,
-    pub pad : [f32; 3],
-    pub position : [f32; 4],
-    pub color    : [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
-pub struct Lights {
-    pub directional_light : DirectionalLight,
-    pub point_lights      : [PointLight; MAX_NR_OF_POINT_LIGHTS],
-}
-
-pub struct Mesh {
-    pub num_vertices   : usize,
-    pub vertex_buffer  : wgpu::Buffer,
-    pub offset         : [f32; 3],
-}
-
-pub struct Model {
-    pub meshes: Vec<Mesh>,
-}
-
-use wgpu::{ShaderModule, RenderPipeline, PipelineLayout, Device};
-use cgmath::Vector3;
-use winit::window::Window;
-use winit::dpi::PhysicalSize;
-
+/** The graphics context.
+    Currently just a grab-bag of all the state and functionality
+    needed to power all graphics. Needs simplification.
+*/
 pub struct Context {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    
-    //pub imgui: imgui::Context,
-    //pub imgui_platform: imgui_winit_support::WinitPlatform,
-    //pub imgui_renderer: imgui_wgpu::Renderer,
 
     pub uniform_buf: wgpu::Buffer,
     pub lights_buf: wgpu::Buffer,
@@ -149,8 +82,10 @@ pub struct Context {
     pub depth_view: wgpu::TextureView,
 
     pub surface: wgpu::Surface,
-    pub sc_desc: wgpu::SwapChainDescriptor,
     pub swap_chain: wgpu::SwapChain,
+    pub sc_desc: wgpu::SwapChainDescriptor,
+
+    model_queue: ModelQueue,
 }
 
 const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
@@ -158,127 +93,159 @@ const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
 
 impl Context {
     pub async fn new(window: &Window) -> Self {
-        let surface = wgpu::Surface::create(window);
+        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
         let size = window.inner_size();
 
-        let adapter = wgpu::Adapter::request(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::Default,
-            },
-            wgpu::BackendBit::PRIMARY,
-        ).await.unwrap();
+        let surface = unsafe { instance.create_surface(window) };
 
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                extensions: wgpu::Extensions {
-                    anisotropic_filtering: false
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: None,
+            })
+            .await
+            .unwrap();
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    features: wgpu::Features::empty(),
+                    limits: wgpu::Limits::default(),
                 },
-                limits: Default::default(),
-            }
-        ).await;
+                None,
+            )
+            .await
+            .unwrap();
 
-        let sc_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: COLOR_FORMAT,
-            width: size.width as u32,
-            height: size.height as u32,
-            present_mode: wgpu::PresentMode::Mailbox,
-        };
-
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        let mut sc_desc = sc_desc_from_size(&size);
+        let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
         let depth_view = Context::create_depth_view(&device, size);
 
-        let bind_group_layout = device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                bindings: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
-                        ty: wgpu::BindingType::UniformBuffer { dynamic: false } // TODO: ?
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStage::FRAGMENT,
-                        ty: wgpu::BindingType::UniformBuffer { dynamic: false } // TODO: ?
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
-                ],
-            }
-        );
+                    count: None,
+                },
+            ],
+        });
 
-        let local_bind_group_layout = device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
+        let local_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: None,
-                bindings: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
-                        ty: wgpu::BindingType::UniformBuffer { dynamic: false }
-                    }
-                ]
-            }
-        );
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
 
-        let global_uniforms : GlobalUniforms = Default::default();
+        let global_uniforms: GlobalUniforms = Default::default();
 
-        let uniform_buf = device.create_buffer_with_data(
-            global_uniforms.as_bytes(),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
+        let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Global Shader Uniforms"),
+            contents: global_uniforms.as_bytes(),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        });
 
-        let lights : Lights = Default::default();
+        let lights: Lights = Default::default();
 
-        let lights_buf = device.create_buffer_with_data(
-            lights.as_bytes(),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
+        let lights_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Lights"),
+            contents: lights.as_bytes(),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
+            entries: &[
+                wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &uniform_buf,
-                        range: 0..std::mem::size_of::<GlobalUniforms>() as u64,
+                        offset: 0,
+                        size: None,
                     },
                 },
-                wgpu::Binding {
+                wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &lights_buf,
-                        range: 0..std::mem::size_of::<Lights>() as u64,
-                    }
-                }
+                        offset: 0,
+                        size: None,
+                    },
+                },
             ],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(
-            &wgpu::PipelineLayoutDescriptor {
-                bind_group_layouts: &[&bind_group_layout, &local_bind_group_layout]
-            }
-        );
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&bind_group_layout, &local_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
-        use glsl_to_spirv::ShaderType;
-        let vs = glsl_to_spirv::compile(VERT_SRC, ShaderType::Vertex).unwrap();
-        let vs_module = device.create_shader_module(&wgpu::read_spirv(vs).unwrap());
+        let mut shader_compiler = shaderc::Compiler::new().unwrap();
+        let vs_spirv = shader_compiler
+            .compile_into_spirv(
+                VERT_SRC,
+                shaderc::ShaderKind::Vertex,
+                "forward.vert",
+                "main",
+                None,
+            )
+            .unwrap();
+        let fs_spirv = shader_compiler
+            .compile_into_spirv(
+                FRAG_SRC,
+                shaderc::ShaderKind::Fragment,
+                "forward.frag",
+                "main",
+                None,
+            )
+            .unwrap();
 
-        let fs = glsl_to_spirv::compile(FRAG_SRC, ShaderType::Fragment).unwrap();
-        let fs_module = device.create_shader_module(&wgpu::read_spirv(fs).unwrap());
+        let vs_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Vertex Shader"),
+            source: wgpu::util::make_spirv(&vs_spirv.as_binary_u8()),
+            flags: wgpu::ShaderFlags::default(),
+        });
+        let fs_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Fragment Shader"),
+            source: wgpu::util::make_spirv(&fs_spirv.as_binary_u8()),
+            flags: wgpu::ShaderFlags::default(),
+        });
 
         let pipeline = Context::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
 
         let context = Context {
             device,
             queue,
-            //imgui,
-            //imgui_platform,
-            surface,
-            sc_desc,
-            swap_chain,
             uniform_buf,
             lights_buf,
             local_bind_group_layout,
@@ -286,108 +253,285 @@ impl Context {
             bind_group,
             pipeline_layout,
             pipeline,
-            depth_view
+            depth_view,
+            surface,
+            swap_chain,
+            sc_desc,
+            model_queue: ModelQueue::new(),
         };
 
         return context;
     }
 
-    // Note(Jökull): A step in the right direction, but a bit heavy-handed
-    pub fn model_bind_group_from_uniform_data(&self, local_uniforms: LocalUniforms) -> (wgpu::Buffer, wgpu::BindGroup) {
+    pub fn draw_static_model(&mut self, model: StaticModel) {
+        self.model_queue.static_models.push(model);
+    }
 
+    pub fn draw_model(
+        &mut self,
+        model: Model3D,
+        position: Vector3<f32>,
+        rotation: Option<Deg<f32>>,
+    ) {
+        use cgmath::Matrix4;
+
+        let mut matrix = Matrix4::from_scale(model.scale);
+
+        if let Some(rot) = rotation {
+            matrix = Matrix4::from_angle_z(rot) * matrix;
+        }
+
+        matrix = Matrix4::from_translation(position) * matrix;
+
+        self.model_queue.local_uniforms.push(LocalUniforms {
+            model_matrix: matrix.into(),
+            material: model.material,
+        });
+
+        self.model_queue.model_desc.push(model);
+    }
+
+    fn get_encoder(&mut self) -> wgpu::CommandEncoder {
+        self.device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
+    }
+
+    pub fn set_3d_camera(&mut self, camera: &Camera, position: Vector3<f32>, target: Vector3<f32>) {
+        let mut encoder = self.get_encoder();
+
+        let proj_view_matrix = generate_view_matrix(
+            camera,
+            position,
+            target,
+            self.sc_desc.width as f32 / self.sc_desc.height as f32,
+        );
+
+        let global_uniforms = GlobalUniforms {
+            projection_view_matrix: proj_view_matrix.into(),
+            eye_position: [position.x, position.y, position.z, 0.0],
+        };
+
+        let new_uniform_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: global_uniforms.as_bytes(),
+                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+            });
+
+        encoder.copy_buffer_to_buffer(
+            &new_uniform_buf,
+            0,
+            &self.uniform_buf,
+            0,
+            std::mem::size_of::<GlobalUniforms>() as u64,
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    pub fn render(
+        &mut self,
+        ass_man: &AssetManager,
+        gui_context: &mut gui::GuiContext,
+        window: &winit::window::Window,
+    ) {
+        let mut encoder = self.get_encoder();
+        let current_frame = self.swap_chain.get_current_frame().unwrap();
+
+        // Copy local uniforms
+        {
+            let temp_buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: self.model_queue.local_uniforms.as_bytes(),
+                    usage: wgpu::BufferUsage::COPY_SRC,
+                });
+
+            for (i, (model)) in self.model_queue.model_desc.iter().enumerate() {
+                encoder.copy_buffer_to_buffer(
+                    &temp_buf,
+                    (i * std::mem::size_of::<LocalUniforms>()) as u64,
+                    &model.uniform_buffer,
+                    0,
+                    std::mem::size_of::<LocalUniforms>() as u64,
+                );
+            }
+        }
+
+        // Do big boi render pass
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &current_frame.output.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &self.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: true,
+                    }),
+                }),
+            });
+
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
+
+            // render static meshes
+            for model in &self.model_queue.static_models {
+                render_pass.set_bind_group(1, &model.bind_group, &[]);
+                for mesh in &ass_man.models[model.idx].meshes {
+                    render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    render_pass.draw(0..mesh.num_vertices as u32, 0..1)
+                }
+            }
+            // render dynamic meshes
+            for model_desc in &self.model_queue.model_desc {
+                render_pass.set_bind_group(1, &model_desc.bind_group, &[]);
+                for mesh in &ass_man.models[model_desc.idx].meshes {
+                    render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    render_pass.draw(0..mesh.num_vertices as u32, 0..1)
+                }
+            }
+        }
+
+        unsafe {
+            if let Some(ui) = gui::current_ui() {
+                gui_context.imgui_platform.prepare_render(&ui, &window);
+            }
+        }
+
+        {
+            let draw_data = unsafe {
+                crate::graphics::gui::CURRENT_UI = None;
+                imgui::sys::igRender();
+                &*(imgui::sys::igGetDrawData() as *mut imgui::DrawData)
+            };
+
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &current_frame.output.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+
+            gui_context
+                .imgui_renderer
+                .render(
+                    draw_data,
+                    &self.queue,
+                    &self.device,
+                    &mut rpass,
+                )
+                .expect("Rendering failed");
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+        self.model_queue.clear();
+    }
+
+    // Note(Jökull): A step in the right direction, but a bit heavy-handed
+    pub fn model_bind_group_from_uniform_data(
+        &self,
+        local_uniforms: LocalUniforms,
+    ) -> (wgpu::Buffer, wgpu::BindGroup) {
         let uniforms_size = std::mem::size_of::<LocalUniforms>() as u64;
 
-        let uniform_buf = self.device.create_buffer_with_data(
-            local_uniforms.as_bytes(),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
-
-        let bind_group = self.device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
+        let uniform_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: None,
-                layout: &self.local_bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..uniforms_size,
-                        }
-                    },
-                ],
-            }
-        );
+                contents: local_uniforms.as_bytes(),
+                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            });
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.local_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: &uniform_buf,
+                    offset: 0,
+                    size: None,
+                },
+            }],
+        });
 
         (uniform_buf, bind_group)
     }
 
     pub fn recompile_pipeline(&mut self, vs_module: ShaderModule, fs_module: ShaderModule) {
-        self.pipeline = Context::compile_pipeline(&self.device, &self.pipeline_layout, vs_module, fs_module);
+        self.pipeline =
+            Context::compile_pipeline(&self.device, &self.pipeline_layout, vs_module, fs_module);
     }
 
-    fn compile_pipeline(device: &Device, pipeline_layout: &PipelineLayout, vs_module : ShaderModule, fs_module : ShaderModule) -> RenderPipeline{
+    fn compile_pipeline(
+        device: &Device,
+        pipeline_layout: &PipelineLayout,
+        vs_module: ShaderModule,
+        fs_module: ShaderModule,
+    ) -> RenderPipeline {
         return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: pipeline_layout,
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
+            label: None,
+            layout: Option::from(pipeline_layout),
+            vertex: wgpu::VertexState {
                 module: &vs_module,
                 entry_point: "main",
-            },
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: &fs_module,
-                entry_point: "main",
-            }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::None,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0
-            }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: COLOR_FORMAT,
-                alpha_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcColor,
-                    dst_factor: wgpu::BlendFactor::DstColor,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                color_blend: wgpu::BlendDescriptor::REPLACE,
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
-            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
-                stencil_back : wgpu::StencilStateFaceDescriptor::IGNORE,
-                stencil_read_mask: !0,
-                stencil_write_mask: !0,
-            }),
-            vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: &[wgpu::VertexBufferDescriptor{
-                    stride: std::mem::size_of::<Vertex>() as u64,
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
                     attributes: &wgpu::vertex_attr_array![
                         0 => Float3,
                         1 => Float3,
                         2 => Float2
-                    ]
-                }]
+                    ],
+                }],
             },
-            sample_count: 1,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: Default::default(),
+                bias: Default::default(),
+                clamp_depth: false,
+            }),
+            fragment: Some(wgpu::FragmentState {
+                module: &fs_module,
+                entry_point: "main",
+                targets: &[wgpu::ColorTargetState {
+                    format: COLOR_FORMAT,
+                    alpha_blend: wgpu::BlendState::REPLACE, // For now
+                    color_blend: wgpu::BlendState::REPLACE,
+                    write_mask: wgpu::ColorWrite::ALL,
+                }],
+            }),
+            multisample: wgpu::MultisampleState::default(),
         });
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.sc_desc.width  = size.width;
-        self.sc_desc.height = size.height;
-
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
-
+        self.sc_desc = sc_desc_from_size(&size);
         self.depth_view = Context::create_depth_view(&self.device, size);
+        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
     }
 
     fn create_depth_view(device: &wgpu::Device, size: PhysicalSize<u32>) -> wgpu::TextureView {
@@ -398,23 +542,21 @@ impl Context {
                 height: size.height as u32,
                 depth: 1,
             },
-            array_layer_count: 1,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: DEPTH_FORMAT,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
         });
 
-        return depth_texture.create_default_view();
+        return depth_texture.create_view(&Default::default());
     }
-
 }
 
 pub fn create_texels(size: usize) -> Vec<u8> {
     use std::iter;
 
-    (0 .. size * size)
+    (0..size * size)
         .flat_map(|id| {
             // get high five for recognizing this ;)
             let cx = 3.0 * (id % size) as f32 / (size - 1) as f32 - 2.0;
@@ -438,18 +580,16 @@ pub fn to_pos3<T>(vec: cgmath::Vector3<T>) -> cgmath::Point3<T> {
     cgmath::Point3::new(vec.x, vec.y, vec.z)
 }
 
-fn pos3(x: f32, y: f32, z: f32) -> cgmath::Point3<f32> {
-    cgmath::Point3::new(x, y, z)
-}
+fn pos3(x: f32, y: f32, z: f32) -> cgmath::Point3<f32> { cgmath::Point3::new(x, y, z) }
 
 pub fn to_vec2<T>(vec3: cgmath::Vector3<T>) -> cgmath::Vector2<T> {
     cgmath::Vector2::new(vec3.x, vec3.y)
 }
 
-pub fn generate_matrix(aspect_ratio: f32, t : f32) -> cgmath::Matrix4<f32> {
+pub fn generate_matrix(aspect_ratio: f32, t: f32) -> cgmath::Matrix4<f32> {
     let mx_projection = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 10.0);
-    let mx_view = cgmath::Matrix4::look_at(
-        pos3(5.  * t.cos(), 5.0 * t.sin(), 3.),
+    let mx_view = cgmath::Matrix4::look_at_rh(
+        pos3(5. * t.cos(), 5.0 * t.sin(), 3.),
         pos3(0., 0., 0.),
         cgmath::Vector3::unit_z(),
     );
@@ -472,8 +612,10 @@ pub fn project_screen_to_world(
             // Screen Origin is Top Left    (Mouse Origin is Top Left)
             // (screen.y - (viewport.y as f32)) / (viewport.w as f32) * 2.0 - 1.0,
             // Screen Origin is Bottom Left (Mouse Origin is Top Left)
-            (1.0 - (screen.y - (viewport.y as f32)) / (viewport.w as f32)) * 2.0 - 1.0, screen.z * 2.0 - 1.0,
-            1.0);
+            (1.0 - (screen.y - (viewport.y as f32)) / (viewport.w as f32)) * 2.0 - 1.0,
+            screen.z * 2.0 - 1.0,
+            1.0,
+        );
         let world = inv_view_projection * world;
 
         if world.w != 0.0 {
@@ -514,11 +656,31 @@ pub fn project_world_to_screen(
     }
 }
 
+fn generate_view_matrix(
+    cam: &Camera,
+    cam_pos: cgmath::Vector3<f32>,
+    cam_target: cgmath::Vector3<f32>,
+    aspect_ratio: f32,
+) -> cgmath::Matrix4<f32> {
+    let mx_correction = correction_matrix();
+
+    let mx_view = cgmath::Matrix4::look_at_rh(
+        to_pos3(cam_pos),
+        to_pos3(cam_target),
+        cgmath::Vector3::unit_z(),
+    );
+
+    let mx_perspective = cgmath::perspective(cgmath::Deg(cam.fov), aspect_ratio, 1.0, 1000.0);
+
+    mx_correction * mx_perspective * mx_view
+}
+
+#[rustfmt::skip]
 pub fn correction_matrix() -> cgmath::Matrix4<f32> {
     cgmath::Matrix4::new(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 0.5, 0.0,
+        1.0, 0.0, 0.0, 0.0, 
+        0.0, 1.0, 0.0, 0.0, 
+        0.0, 0.0, 0.5, 0.0, 
         0.0, 0.0, 0.5, 1.0,
     )
 }
