@@ -33,12 +33,9 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 
 use crate::components::entity_builder::EntityBuilder;
-use crate::graphics::{sc_desc_from_size, GuiContext};
 use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
-    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
-
     let mut ass_man = AssetManager::new();
     let ds = ass_man.load_display_settings();
 
@@ -54,13 +51,9 @@ async fn run_async() {
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
 
-    let context = graphics::Context::new(&window, &instance).await;
+    let context = graphics::Context::new(&window).await;
 
-    let gui_context = graphics::GuiContext::new(&window, &context);
-
-    let surface = unsafe { instance.create_surface(&window) };
-    let mut sc_desc = sc_desc_from_size(&size);
-    let mut swap_chain = context.device.create_swap_chain(&surface, &sc_desc);
+    let gui_context = graphics::gui::GuiContext::new(&window, &context);
 
     ass_man.load_models(&context);
 
@@ -78,6 +71,10 @@ async fn run_async() {
         .add_physics_systems(&mut world, &mut resources)
         .add_system(systems::spherical_offset_system())
         .add_system(systems::world_gen::dung_gen_system())
+        .add_system(systems::assets::hot_loading_system(
+            SystemTime::now(),
+            false,
+        ))
         .add_render_systems()
         .build();
 
@@ -123,38 +120,41 @@ async fn run_async() {
     resources.insert(window);
     resources.insert(ass_man);
     resources.insert(Instant::now());
-    resources.insert(SystemTime::now());
-    resources.insert(FrameTime(std::f32::EPSILON));
+    resources.insert(FrameTime(f32::EPSILON));
     resources.insert(MapTransition::Deeper);
     resources.insert(FloorNumber(7));
     resources.insert(InputState::new());
-    resources.insert(systems::rendering::RenderState::new());
 
     event_loop.run(move |event, _, control_flow| {
+        let imgui_wants_input = {
+            let mut gui_context = resources.get_mut::<graphics::gui::GuiContext>().unwrap();
+
+            gui_context.handle_event(
+                &mut *resources.get_mut::<winit::window::Window>().unwrap(),
+                &event,
+            );
+
+            gui_context.wants_input()
+        };
+
         match event {
             Event::MainEventsCleared => {
-                // update frametime information
                 let frame_time = resources.get::<Instant>().unwrap().elapsed();
                 resources.insert(FrameTime(frame_time.as_secs_f32()));
                 resources.insert(Instant::now());
-                resources.insert(sc_desc.clone());
-                // Explicitly drop the current swap frame in preparation
-                // for the next.
-                drop(resources.remove::<wgpu::SwapChainFrame>());
-                resources.insert(swap_chain.get_current_frame().unwrap());
+
                 schedule.execute(&mut world, &mut resources);
+
                 resources.get_mut::<InputState>().unwrap().new_frame();
-                schedule.execute(&mut world, &mut resources);
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                sc_desc = sc_desc_from_size(&size);
-                swap_chain = resources
+                resources
                     .get_mut::<graphics::Context>()
                     .unwrap()
-                    .resize(size, &sc_desc, &surface);
+                    .resize(size);
             }
             // note(Jökull): Can we make this more readable somehow?
             // It is not clear that these two events result in Exit
@@ -175,20 +175,17 @@ async fn run_async() {
                 ..
             } => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { ref event, .. } => {
-                resources
-                    .get_mut::<InputState>()
-                    .unwrap()
-                    .update_from_event(&event);
+                if !imgui_wants_input {
+                    resources
+                        .get_mut::<InputState>()
+                        .unwrap()
+                        .update_from_event(&event);
+                }
             }
             _ => {
                 *control_flow = ControlFlow::Poll;
             }
         }
-
-        resources.get_mut::<GuiContext>().unwrap().handle_event(
-            &mut *resources.get_mut::<winit::window::Window>().unwrap(),
-            &event,
-        )
     });
 }
 

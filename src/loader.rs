@@ -80,12 +80,11 @@ pub struct AssetManager {
     pub models: Vec<graphics::data::Model>,
 }
 
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
-use crate::graphics::data::Vertex;
+use crate::graphics::data::{LocalUniforms, Vertex};
 use crate::loader::AssetKind::Model;
 
 impl AssetManager {

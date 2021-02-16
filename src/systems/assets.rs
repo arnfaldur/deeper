@@ -52,7 +52,11 @@ pub fn hot_loading(
                     Some(
                         context
                             .device
-                            .create_shader_module(wgpu::util::make_spirv(&vs_spirv.as_binary_u8())),
+                            .create_shader_module(&wgpu::ShaderModuleDescriptor {
+                                label: Some("Vertex Shader"),
+                                source: wgpu::util::make_spirv(&vs_spirv.as_binary_u8()),
+                                flags: wgpu::ShaderFlags::VALIDATION,
+                            }),
                     )
                 } else {
                     eprintln!("Failed to recompile vertex shader");
@@ -74,7 +78,11 @@ pub fn hot_loading(
                     Some(
                         context
                             .device
-                            .create_shader_module(wgpu::util::make_spirv(&fs_spirv.as_binary_u8())),
+                            .create_shader_module(&wgpu::ShaderModuleDescriptor {
+                                label: Some("Fragment Shader"),
+                                source: wgpu::util::make_spirv(&fs_spirv.as_binary_u8()),
+                                flags: wgpu::ShaderFlags::VALIDATION,
+                            }),
                     )
                 } else {
                     eprintln!("Failed to recompile fragment shader");

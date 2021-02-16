@@ -3,6 +3,7 @@ pub mod entity_builder;
 extern crate cgmath;
 
 use std::f32::consts::PI;
+use std::sync::Arc;
 
 use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 use legion::Entity;
@@ -123,12 +124,6 @@ pub enum MapTransition {
 
 pub struct MapSwitcher(pub MapTransition);
 
-pub struct GuiWindow {
-    pub size: [f32; 2],
-    pub name: String,
-    pub view: Box<dyn FnOnce(&imgui::Ui)>,
-}
-
 pub struct Camera {
     pub fov: f32,
     pub up: Vector3<f32>,
@@ -173,9 +168,10 @@ impl SphericalOffset {
     }
 }
 
+#[derive(Clone)]
 pub struct StaticModel {
     pub idx: usize,
-    pub bind_group: wgpu::BindGroup,
+    pub bind_group: Arc<wgpu::BindGroup>,
 }
 
 impl StaticModel {
@@ -200,22 +196,21 @@ impl StaticModel {
 
         let (_uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(local_uniforms);
 
-        Self { idx, bind_group }
+        Self {
+            idx,
+            bind_group: Arc::new(bind_group),
+        }
     }
 }
 
+#[derive(Clone)]
 pub struct Model3D {
     pub idx: usize,
-    pub offset: Vector3<f32>,
     pub scale: f32,
-    pub z_rotation: f32,
     pub material: graphics::data::Material,
 
-    pub bind_group: wgpu::BindGroup,
-    pub uniform_buffer: wgpu::Buffer,
-
-    // TODO: Move out of Model3D
-    pub local_uniforms_cache: graphics::data::LocalUniforms,
+    pub bind_group: Arc<wgpu::BindGroup>,
+    pub uniform_buffer: Arc<wgpu::Buffer>,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
@@ -228,13 +223,10 @@ impl Model3D {
 
         Self {
             idx: 0,
-            offset: Vector3::new(0.0, 0.0, 0.0),
             material: graphics::data::Material::default(),
-            bind_group,
+            bind_group: Arc::new(bind_group),
+            uniform_buffer: Arc::new(uniform_buffer),
             scale: 1.0,
-            z_rotation: 0.0,
-            uniform_buffer,
-            local_uniforms_cache: graphics::data::LocalUniforms::new(),
         }
     }
 
@@ -244,18 +236,8 @@ impl Model3D {
         return m;
     }
 
-    pub fn with_offset(mut self, offset: Vector3<f32>) -> Self {
-        self.offset = offset;
-        self
-    }
-
     pub fn with_scale(mut self, scale: f32) -> Self {
         self.scale = scale;
-        self
-    }
-
-    pub fn with_z_rotation(mut self, z_rotation: f32) -> Self {
-        self.z_rotation = z_rotation;
         self
     }
 
