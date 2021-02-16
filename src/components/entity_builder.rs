@@ -30,41 +30,26 @@ impl<'a> EntityBuilder<'a> {
         return self;
     }
     pub fn build(&self) -> Entity { self.entity }
-    fn add_component<T: Component>(&mut self, component: T) {
+    fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
         self.buffer.add_component(self.entity, component);
-    }
-    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self {
-        self.add_component(Position(pos));
         return self;
     }
-    pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self {
-        self.add_component(Velocity(vel));
-        return self;
-    }
+    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self { self.add_component(Position(pos)) }
+    pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
     pub fn orientation(&mut self, ori: f32) -> &mut Self {
-        self.add_component(Orientation(Deg(ori)));
-        return self;
+        self.add_component(Orientation(Deg(ori)))
     }
     pub fn dynamic_body(&mut self, mass: f32) -> &mut Self {
-        self.add_component(DynamicBody { mass });
-        return self;
+        self.add_component(DynamicBody { mass })
     }
     pub fn circle_collider(&mut self, radius: f32) -> &mut Self {
-        self.add_component(CircleCollider { radius });
-        return self;
+        self.add_component(CircleCollider { radius })
     }
-    pub fn model(&mut self, model: Model3D) -> &mut Self {
-        self.add_component(model);
-        return self;
-    }
+    pub fn model(&mut self, model: Model3D) -> &mut Self { self.add_component(model) }
     pub fn agent(&mut self, speed: f32, acceleration: f32) -> &mut Self {
         self.add_component(Speed(speed));
-        self.add_component(Acceleration(acceleration));
-        return self;
+        self.add_component(Acceleration(acceleration))
     }
     #[deprecated(note = "builder method not implemented for a component class.")]
-    pub fn any<T: Component>(&mut self, component: T) -> &mut Self {
-        self.add_component(component);
-        return self;
-    }
+    pub fn any<T: Component>(&mut self, component: T) -> &mut Self { self.add_component(component) }
 }
