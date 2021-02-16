@@ -32,7 +32,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 
-use crate::components::entity_builder::EntityBuilder;
+use crate::components::entity_builder::EntitySmith;
 use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
@@ -53,7 +53,7 @@ async fn run_async() {
 
     let context = graphics::Context::new(&window).await;
 
-    let gui_context = graphics::gui::GuiContext::new(&window, &context);
+    let mut gui_context = graphics::gui::GuiContext::new(&window, &context);
 
     ass_man.load_models(&context);
 
@@ -80,7 +80,7 @@ async fn run_async() {
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
-    let player = EntityBuilder::from_buffer(&mut command_buffer)
+    let player = EntitySmith::from(&mut command_buffer)
         .position(Vector2::unit_x())
         .orientation(0.0)
         .agent(5., 30.)
@@ -93,7 +93,7 @@ async fn run_async() {
         )
         .build();
 
-    let player_camera = EntityBuilder::from_buffer(&mut command_buffer)
+    let player_camera = EntitySmith::from(&mut command_buffer)
         .any(Parent(player))
         .position(Vector2::unit_x())
         .velocity(Vector2::zero())

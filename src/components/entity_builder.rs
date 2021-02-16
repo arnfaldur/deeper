@@ -8,22 +8,29 @@ use legion::storage::{
     ArchetypeSource, ArchetypeWriter, Component, ComponentSource, ComponentTypeId, ComponentWriter,
     EntityLayout, IntoComponentSource, PackedStorage, UnknownComponentStorage,
 };
+use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
 
 use crate::components::*;
 
-pub struct EntityBuilder<'a> {
-    entity: Entity,
+pub struct EntitySmith<'a> {
+    entity: legion::Entity,
     buffer: &'a mut legion::systems::CommandBuffer,
 }
 
-impl<'a> EntityBuilder<'a> {
-    pub fn from_buffer(buffer: &'a mut legion::systems::CommandBuffer) -> Self {
+impl<'a> From<&'a mut legion::systems::CommandBuffer> for EntitySmith<'a> {
+    fn from(buffer: &'a mut CommandBuffer) -> Self {
         Self {
             entity: buffer.push(()),
             buffer,
         }
+    }
+}
+
+impl<'a> EntitySmith<'a> {
+    pub fn from_entity(buffer: &'a mut legion::systems::CommandBuffer, entity: Entity) -> Self {
+        Self { entity, buffer }
     }
     pub fn another(&mut self) -> &mut Self {
         self.entity = self.buffer.push(());
