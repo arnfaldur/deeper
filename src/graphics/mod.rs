@@ -1,4 +1,17 @@
-use zerocopy::{AsBytes, FromBytes};
+use cgmath::{Deg, Vector3};
+use wgpu::{
+    ColorTargetState, DepthStencilState, Device, PipelineLayout, RenderPipeline, ShaderModule,
+    Surface, SwapChain, SwapChainDescriptor,
+};
+use wgpu::util::DeviceExt;
+use winit::dpi::PhysicalSize;
+use winit::window::Window;
+use zerocopy::AsBytes;
+
+use crate::components::{Camera, Model3D, StaticModel};
+// How dirty of me
+use crate::graphics::data::*;
+use crate::loader::AssetManager;
 
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -8,25 +21,6 @@ pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 pub mod data;
 pub mod gui;
 
-use std::sync::Arc;
-use std::thread::sleep;
-use std::time::Duration;
-
-use cgmath::{Deg, Vector2, Vector3};
-use wgpu::util::DeviceExt;
-use wgpu::{
-    ColorTargetState, DepthStencilState, Device, PipelineLayout, RenderPipeline, ShaderModule,
-    Surface, SwapChain, SwapChainDescriptor,
-};
-use winit::dpi::PhysicalSize;
-use winit::event::Event;
-use winit::window::Window;
-
-use crate::components::{Camera, Model3D, Position, StaticModel};
-// How dirty of me
-use crate::graphics::data::*;
-use crate::graphics::gui::GuiContext;
-use crate::loader::AssetManager;
 
 pub fn sc_desc_from_size(size: &PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
     wgpu::SwapChainDescriptor {
@@ -119,8 +113,8 @@ impl Context {
             .await
             .unwrap();
 
-        let mut sc_desc = sc_desc_from_size(&size);
-        let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        let sc_desc = sc_desc_from_size(&size);
+        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
         let depth_view = Context::create_depth_view(&device, size);
 
@@ -349,7 +343,7 @@ impl Context {
                     usage: wgpu::BufferUsage::COPY_SRC,
                 });
 
-            for (i, (model)) in self.model_queue.model_desc.iter().enumerate() {
+            for (i, model) in self.model_queue.model_desc.iter().enumerate() {
                 encoder.copy_buffer_to_buffer(
                     &temp_buf,
                     (i * std::mem::size_of::<LocalUniforms>()) as u64,
@@ -452,7 +446,7 @@ impl Context {
         &self,
         local_uniforms: LocalUniforms,
     ) -> (wgpu::Buffer, wgpu::BindGroup) {
-        let uniforms_size = std::mem::size_of::<LocalUniforms>() as u64;
+        let _uniforms_size = std::mem::size_of::<LocalUniforms>() as u64;
 
         let uniform_buf = self
             .device

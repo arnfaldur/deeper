@@ -21,7 +21,7 @@ pub fn spherical_offset_system() -> impl Runnable {
             ::legion::Read<SphericalOffset>,
             ::legion::Write<Position3D>,
         )>::query())
-        .build(move |cmd, world, resources, query| {
+        .build(move |_cmd, world, _resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
                 spherical_offset(components.0, components.1, components.2);
@@ -50,7 +50,7 @@ pub fn hit_point_regen_system() -> impl Runnable {
 }
 #[allow(dead_code)]
 pub fn hit_point_regen(
-    world: &mut SubWorld,
+    _world: &mut SubWorld,
     commands: &mut CommandBuffer,
     frame_time: &FrameTime,
     ent: &Entity,
@@ -70,14 +70,14 @@ fn ai_follow_system() -> impl Runnable {
         .read_component::<Position>()
         .write_component::<Destination>()
         .write_component::<Orientation>()
-        .build(move |cmd, world, resources, query| {
+        .build(move |cmd, world, _resources, _query| {
             ai_follow(world, cmd);
         })
 }
 #[allow(dead_code)]
 fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
     let mut query = <(Entity, TryWrite<Orientation>, &AIFollow, &Position)>::query();
-    let (mut hunter_world, mut hunted_world) = world.split_for_query(&query);
+    let (mut hunter_world, hunted_world) = world.split_for_query(&query);
     for (ent, orient, follow, hunter) in query.iter_mut(&mut hunter_world) {
         if let Some(hunted) = hunted_world
             .entry_ref(follow.target)
@@ -104,7 +104,7 @@ pub fn go_to_destination_system() -> impl Runnable {
         .write_component::<Destination>()
         .write_component::<Velocity>()
         .read_resource::<FrameTime>()
-        .build(move |cmd, world, resources, query| {
+        .build(move |cmd, world, resources, _query| {
             go_to_destination(world, cmd, &*resources);
         })
 }

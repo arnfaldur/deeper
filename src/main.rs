@@ -9,31 +9,27 @@
 
 extern crate shaderc;
 
+use std::time::{Instant, SystemTime};
+
+use cgmath::{Vector2, Vector3, Zero};
+use components::*;
+use input::InputState;
+use legion::{Resources, Schedule, World};
+use loader::AssetManager;
+use systems::physics::PhysicsBuilderExtender;
+use winit::dpi::PhysicalSize;
+use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+
+use crate::components::entity_builder::EntitySmith;
+use crate::systems::rendering::RenderBuilderExtender;
+
 mod components;
 mod dung_gen;
 mod graphics;
 mod input;
 mod loader;
 mod systems;
-
-use std::rc::Rc;
-use std::time::{Instant, SystemTime};
-
-use cgmath::{Deg, Vector2, Vector3, Zero};
-use components::*;
-use input::InputState;
-use legion::storage::{ComponentSource, EntityLayout, IntoComponentSource};
-use legion::{Resources, Schedule, World};
-use loader::AssetManager;
-use systems::physics::PhysicsBuilderExtender;
-use wgpu::SwapChainFrame;
-use winit::dpi::PhysicalSize;
-use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::Window;
-
-use crate::components::entity_builder::EntitySmith;
-use crate::systems::rendering::RenderBuilderExtender;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -53,7 +49,7 @@ async fn run_async() {
 
     let context = graphics::Context::new(&window).await;
 
-    let mut gui_context = graphics::gui::GuiContext::new(&window, &context);
+    let gui_context = graphics::gui::GuiContext::new(&window, &context);
 
     ass_man.load_models(&context);
 

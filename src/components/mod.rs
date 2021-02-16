@@ -1,5 +1,3 @@
-pub mod entity_builder;
-
 extern crate cgmath;
 
 use std::f32::consts::PI;
@@ -10,6 +8,8 @@ use legion::Entity;
 use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
 use crate::graphics;
+
+pub mod entity_builder;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -183,7 +183,7 @@ impl StaticModel {
         z_rotation: f32,
         material: graphics::data::Material,
     ) -> Self {
-        let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
+        let _uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
         let mut matrix = Matrix4::from_scale(scale);
         matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
@@ -216,7 +216,7 @@ pub struct Model3D {
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
     pub fn new(context: &graphics::Context) -> Self {
-        let uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
+        let _uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
 
         let (uniform_buffer, bind_group) =
             context.model_bind_group_from_uniform_data(graphics::data::LocalUniforms::new());

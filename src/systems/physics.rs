@@ -1,9 +1,7 @@
 use cgmath::{prelude::*, Vector2};
-use crossbeam_channel::{Receiver, TryRecvError};
-use legion::query::ComponentFilter;
-use legion::storage::ArchetypeIndex;
+use crossbeam_channel::Receiver;
 use legion::systems::{Builder, CommandBuffer};
-use legion::world::{ComponentError, EntityAccessError, EntryRef, Event, EventSender, SubWorld};
+use legion::world::{Event, SubWorld};
 use legion::*;
 use nalgebra::Isometry2;
 use ncollide2d::shape::ShapeHandle;
@@ -11,8 +9,7 @@ use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
 use nphysics2d::ncollide2d::shape::{Ball, Cuboid};
 use nphysics2d::object::{
-    Body, BodyPartHandle, BodyStatus, ColliderDesc, DefaultBodySet, DefaultColliderSet,
-    RigidBodyDesc,
+    BodyPartHandle, BodyStatus, ColliderDesc, DefaultBodySet, DefaultColliderSet, RigidBodyDesc,
 };
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
@@ -25,7 +22,7 @@ pub(crate) trait PhysicsBuilderExtender {
 impl PhysicsBuilderExtender for Builder {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self {
         resources.insert(PhysicsResource::default());
-        let (sender, receiver) = crossbeam_channel::unbounded::<Event>();
+        let (sender, _receiver) = crossbeam_channel::unbounded::<Event>();
         world.subscribe(
             sender,
             component::<BodyHandle>() | component::<ColliderHandle>(),
@@ -91,7 +88,7 @@ impl Default for PhysicsResource {
 #[read_component(Orientation)]
 #[read_component(DynamicBody)]
 #[read_component(StaticBody)]
-fn validate_physics_entities(world: &mut SubWorld, commands: &mut CommandBuffer) {
+fn validate_physics_entities(world: &mut SubWorld, _commands: &mut CommandBuffer) {
     let mut query = <(
         Entity,
         TryRead<Position>,
@@ -101,7 +98,7 @@ fn validate_physics_entities(world: &mut SubWorld, commands: &mut CommandBuffer)
         TryRead<StaticBody>,
     )>::query()
     .filter(component::<DynamicBody>());
-    for (ent, pos, vel, frc, ori, sta) in query.iter(world) {
+    for (_ent, pos, vel, _frc, ori, sta) in query.iter(world) {
         if pos.is_none() {
             panic!("missing Position in DynamicBody");
         } else if vel.is_none() {
@@ -126,7 +123,7 @@ fn validate_physics_entities(world: &mut SubWorld, commands: &mut CommandBuffer)
         TryRead<Orientation>,
     )>::query()
     .filter(component::<StaticBody>());
-    for (ent, pos, vel, spd, acc, frc, ori) in query.iter(world) {
+    for (_ent, pos, vel, spd, acc, frc, _ori) in query.iter(world) {
         if pos.is_none() {
             panic!("missing Position in StaticBody");
         } else if vel.is_some() {
@@ -146,7 +143,7 @@ fn validate_physics_entities(world: &mut SubWorld, commands: &mut CommandBuffer)
 #[system(for_each)]
 #[filter((component::<DynamicBody>() | component::<StaticBody>() | component::<DisabledBody>()) & !component::<BodyHandle>())]
 fn make_body_handles(
-    world: &mut SubWorld,
+    _world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
     #[resource] physics: &mut PhysicsResource,
     entity: &Entity,
@@ -196,7 +193,7 @@ fn flush_command_buffer(world: &mut World, commands: &mut legion::systems::Comma
 #[system(for_each)]
 #[filter((component::<CircleCollider>() | component::<SquareCollider>()) & !component::<ColliderHandle>())]
 fn make_collider_handles(
-    world: &SubWorld,
+    _world: &SubWorld,
     commands: &mut legion::systems::CommandBuffer,
     #[resource] physics: &mut PhysicsResource,
     entity: &Entity,
@@ -213,7 +210,7 @@ fn make_collider_handles(
     } else {
         unreachable!() // the filter should prevent this
     };
-    let mut collider = ColliderDesc::<f32>::new(shape_handle);
+    let collider = ColliderDesc::<f32>::new(shape_handle);
     let handle = ColliderHandle(
         physics
             .colliders
@@ -245,7 +242,7 @@ fn handle_entity_removal(
 ) {
     for event in receiver.try_iter() {
         match event {
-            Event::EntityRemoved(entity, arch) => {
+            Event::EntityRemoved(entity, _arch) => {
                 // FIXME: find a better solution or figure out how to know when an entity is being completely removed
                 if let Some(body_handle) = world
                     .entry_ref(entity)
@@ -266,7 +263,7 @@ fn handle_entity_removal(
                     commands.remove_component::<ColliderHandle>(entity);
                 }
             }
-            Event::ArchetypeCreated(arch) => {}
+            Event::ArchetypeCreated(_arch) => {}
             _ => {}
         }
     }
@@ -287,7 +284,7 @@ fn entity_world_to_physics_world(world: &SubWorld, #[resource] physics: &mut Phy
         Read<Orientation>,
     )>::query()
     .filter(component::<DynamicBody>());
-    for (ent, han, pos, vel, ori) in query.iter(world) {
+    for (_ent, han, pos, vel, ori) in query.iter(world) {
         if let Some(body) = physics.bodies.rigid_body_mut(han.0) {
             body.set_position(Isometry2::new(c2n(pos.0), cgmath::Rad::from(ori.0).0));
             body.set_linear_velocity(c2n(vel.0));
@@ -306,7 +303,7 @@ fn step_physics_world(#[resource] physics: &mut PhysicsResource) { physics.step(
 #[write_component(Orientation)]
 fn physics_world_to_entity_world(
     world: &mut SubWorld,
-    commands: &mut CommandBuffer,
+    _commands: &mut CommandBuffer,
     #[resource] physics: &PhysicsResource,
 ) {
     let mut query = <(

@@ -1,16 +1,5 @@
-use std::any::Any;
-use std::borrow::Borrow;
-use std::ops::DerefMut;
-
-use futures::SinkExt;
-use legion::query::{FilterResult, LayoutFilter};
-use legion::storage::{
-    ArchetypeSource, ArchetypeWriter, Component, ComponentSource, ComponentTypeId, ComponentWriter,
-    EntityLayout, IntoComponentSource, PackedStorage, UnknownComponentStorage,
-};
+use legion::storage::Component;
 use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
-use legion::*;
 
 use crate::components::*;
 

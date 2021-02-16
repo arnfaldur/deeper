@@ -128,7 +128,7 @@ impl InputState {
 
         self.mouse.scroll = 0.0;
 
-        for (x, y) in &mut self.keyboard {
+        for (_x, y) in &mut self.keyboard {
             y.pressed = false;
         }
     }
@@ -161,7 +161,7 @@ impl InputState {
                 }
             }
             MouseWheel { delta, .. } => match delta {
-                MouseScrollDelta::LineDelta(lines, rows) => {
+                MouseScrollDelta::LineDelta(_lines, rows) => {
                     self.mouse.scroll = *rows;
                 }
                 MouseScrollDelta::PixelDelta(pixels) => {

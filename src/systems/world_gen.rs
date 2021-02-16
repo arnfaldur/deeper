@@ -9,8 +9,8 @@ use zerocopy::AsBytes;
 
 use crate::components::*;
 use crate::dung_gen::DungGen;
-use crate::graphics::data;
 use crate::{graphics, loader};
+
 //pub struct MapSwitchingSystem;
 //
 //impl<'a> System<'a> for MapSwitchingSystem {
@@ -152,7 +152,7 @@ pub fn dung_gen(
                     ass_man.get_model_index("floortile.obj").unwrap(),
                 )
             };
-            let pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
+            let _pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
 
             for (&(x, y), &tile_type) in dungeon.world.iter() {
                 let pos = Vector2::new(x as f32, y as f32);

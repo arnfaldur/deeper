@@ -2,15 +2,18 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use wavefront_obj::obj;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use zerocopy::AsBytes;
 
 use crate::graphics;
-use crate::graphics::data;
+use crate::graphics::data::Vertex;
+use crate::loader::AssetKind::Model;
 
 #[derive(Serialize, Deserialize)]
 struct PathSettings {
@@ -79,13 +82,6 @@ pub struct AssetManager {
 
     pub models: Vec<graphics::data::Model>,
 }
-
-use std::path::{Path, PathBuf};
-
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
-
-use crate::graphics::data::{LocalUniforms, Vertex};
-use crate::loader::AssetKind::Model;
 
 impl AssetManager {
     pub fn new() -> Self {
@@ -258,7 +254,7 @@ fn load_model_from_vertex_lists(
     let mut meshes = vec![];
 
     for vertices in vertex_lists {
-        let vertex_buf = context.device.create_buffer_init(&BufferInitDescriptor {
+        let _vertex_buf = context.device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: vertices.as_bytes(),
             usage: wgpu::BufferUsage::VERTEX,

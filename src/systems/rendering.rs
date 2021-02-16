@@ -1,18 +1,11 @@
-use std::time::SystemTime;
-
 use cgmath::prelude::*;
-use cgmath::{Matrix4, Vector4};
 use legion::world::SubWorld;
 use legion::*;
-use nphysics2d::utils::UserData;
-use wgpu::util::DeviceExt;
-use wgpu::{CommandBuffer, SwapChainDescriptor, SwapChainTexture};
 use zerocopy::AsBytes;
 
 use crate::components::*;
-use crate::graphics::data::LocalUniforms;
+use crate::graphics;
 use crate::loader::AssetManager;
-use crate::{graphics, loader};
 
 pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
@@ -76,7 +69,7 @@ fn render_gui_init(
 }
 
 #[system]
-fn render_gui_test(#[resource] gui_context: &mut graphics::gui::GuiContext) {
+fn render_gui_test(#[resource] _gui_context: &mut graphics::gui::GuiContext) {
     graphics::gui::GuiContext::with_ui(|ui| {
         use imgui::{im_str, Condition};
         let test_window = imgui::Window::new(im_str!("Test Window"));
