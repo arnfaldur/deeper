@@ -29,12 +29,11 @@ impl PhysicsBuilderExtender for Builder {
         );
         return self
             // TODO: reimplement .add_system(validate_physics_entities_system())
-            .add_system(make_body_handles_system())
+            .add_system(make_body_handles())
             .add_system(remove_body_handles())
             // .add_system(flush_command_buffer_system())
-            .add_system(make_collider_handles_system())
+            .add_system(make_collider_handles())
             .add_system(remove_collider_handles())
-            //.add_system(handle_entity_removal_system(receiver))
             // .add_system(flush_command_buffer_system())
             .add_system(entity_world_to_physics_world())
             .add_system(step_physics_world())
@@ -76,49 +75,42 @@ impl Default for PhysicsResource {
     }
 }
 
-fn make_body_handles_system() -> impl Runnable {
+fn make_body_handles() -> impl Runnable {
     SystemBuilder::new("make_body_handles")
         .write_resource::<PhysicsResource>()
         .with_query(
-            <(Entity, Read<PhysicsBody>, TryRead<WorldPosition>)>::query()
+            <(Entity, &PhysicsBody, Option<&WorldPosition>)>::query()
                 .filter(!component::<BodyHandle>()),
         )
         .build(move |commands, world, resources, query| {
-            let (mut for_query, mut world) = world.split_for_query(query);
+            let (mut for_query, _) = world.split_for_query(query);
             let physics: &mut PhysicsResource = &mut *resources;
-            query.for_each_mut(
-                &mut for_query,
-                |(entity, physics_body, position): (
-                    &Entity,
-                    &PhysicsBody,
-                    Option<&WorldPosition>,
-                )| {
-                    let body = match physics_body {
-                        PhysicsBody::Disabled => {
-                            RigidBodyDesc::<f32>::new().status(BodyStatus::Disabled)
-                        }
-                        PhysicsBody::Static => RigidBodyDesc::<f32>::new()
-                            .status(BodyStatus::Static)
-                            .position(Isometry2::new(
-                                c2n(position.unwrap_or(&WorldPosition(cgmath::vec2(0., 0.))).0),
-                                0.,
-                            )),
-                        PhysicsBody::Dynamic { mass } => RigidBodyDesc::<f32>::new()
-                            .status(BodyStatus::Dynamic)
-                            .gravity_enabled(false)
-                            .mass(*mass),
-                    };
-                    let handle = BodyHandle(physics.bodies.insert(body.build()));
-                    commands.add_component(*entity, handle);
-                },
-            );
+            for (entity, physics_body, position) in query.iter_mut(world) {
+                let body = match physics_body {
+                    PhysicsBody::Disabled => {
+                        RigidBodyDesc::<f32>::new().status(BodyStatus::Disabled)
+                    }
+                    PhysicsBody::Static => RigidBodyDesc::<f32>::new()
+                        .status(BodyStatus::Static)
+                        .position(Isometry2::new(
+                            c2n(position.unwrap_or(&WorldPosition(cgmath::vec2(0., 0.))).0),
+                            0.,
+                        )),
+                    PhysicsBody::Dynamic { mass } => RigidBodyDesc::<f32>::new()
+                        .status(BodyStatus::Dynamic)
+                        .gravity_enabled(false)
+                        .mass(*mass),
+                };
+                let handle = BodyHandle(physics.bodies.insert(body.build()));
+                commands.add_component(*entity, handle);
+            }
         })
 }
 
 fn remove_body_handles() -> impl Runnable {
     SystemBuilder::new("remove_body_handles")
         .write_resource::<PhysicsResource>()
-        .with_query(<(Entity, Read<BodyHandle>)>::query().filter(!component::<PhysicsBody>()))
+        .with_query(<(Entity, &BodyHandle)>::query().filter(!component::<PhysicsBody>()))
         .build(move |commands, world, physics, query| {
             query.for_each_mut(world, |(entity, handle): (&Entity, &BodyHandle)| {
                 physics.bodies.remove(handle.0);
@@ -127,7 +119,7 @@ fn remove_body_handles() -> impl Runnable {
         })
 }
 
-fn flush_command_buffer_system() -> impl Runnable {
+fn flush_command_buffer() -> impl Runnable {
     SystemBuilder::new("flush_command_buffer")
         .with_query(<(Write<World>)>::query())
         .build(move |commands, world, _, query| {
@@ -138,57 +130,40 @@ fn flush_command_buffer_system() -> impl Runnable {
         })
 }
 
-fn make_collider_handles_system() -> impl Runnable {
+fn make_collider_handles() -> impl Runnable {
     SystemBuilder::new("make_collider_handles")
         .write_resource::<PhysicsResource>()
         .with_query(
-            <(Entity, Read<BodyHandle>, Read<Collider>)>::query()
-                .filter(!component::<ColliderHandle>()),
+            <(Entity, &BodyHandle, &Collider)>::query().filter(!component::<ColliderHandle>()),
         )
-        .build(move |cmd, world, resources, query| {
-            let (mut for_query, world) = world.split_for_query(query);
-            let for_query = &mut for_query;
-            query.for_each_mut(for_query, |components| {
-                make_collider_handles(
-                    cmd,
-                    &mut *resources,
-                    components.0,
-                    components.1,
-                    components.2,
+        .build(move |commands, world, resources, query| {
+            let (mut for_query, _) = world.split_for_query(query);
+            let physics: &mut PhysicsResource = &mut *resources;
+            for components in query.iter_mut(&mut for_query) {
+                let (entity, body_handle, collider): (&Entity, &BodyHandle, &Collider) = components;
+                let shape_handle = match collider {
+                    Collider::Circle { radius } => ShapeHandle::new(Ball::new(*radius)),
+                    Collider::Square { side_length } => {
+                        let half_side = side_length / 2.0;
+                        let sides_vec = nalgebra::Vector2::new(half_side, half_side);
+                        ShapeHandle::new(Cuboid::new(sides_vec))
+                    }
+                };
+                let collider = ColliderDesc::<f32>::new(shape_handle);
+                let handle = ColliderHandle(
+                    physics
+                        .colliders
+                        .insert(collider.build(BodyPartHandle(body_handle.0, 0))),
                 );
-            });
+                commands.add_component(*entity, handle);
+            }
         })
-}
-
-#[allow(dead_code)]
-fn make_collider_handles(
-    commands: &mut CommandBuffer,
-    physics: &mut PhysicsResource,
-    entity: &Entity,
-    body_handle: &BodyHandle,
-    collider: &Collider,
-) {
-    let shape_handle = match collider {
-        Collider::Circle { radius } => ShapeHandle::new(Ball::new(*radius)),
-        Collider::Square { side_length } => {
-            let half_side = side_length / 2.0;
-            let sides_vec = nalgebra::Vector2::new(half_side, half_side);
-            ShapeHandle::new(Cuboid::new(sides_vec))
-        }
-    };
-    let collider = ColliderDesc::<f32>::new(shape_handle);
-    let handle = ColliderHandle(
-        physics
-            .colliders
-            .insert(collider.build(BodyPartHandle(body_handle.0, 0))),
-    );
-    commands.add_component(*entity, handle);
 }
 
 fn remove_collider_handles() -> impl Runnable {
     SystemBuilder::new("remove_collider_handles")
         .write_resource::<PhysicsResource>()
-        .with_query(<(Entity, Read<ColliderHandle>)>::query().filter(!component::<Collider>()))
+        .with_query(<(Entity, &ColliderHandle)>::query().filter(!component::<Collider>()))
         .build(move |commands, world, physics, query| {
             let for_query = world;
             query.for_each_mut(for_query, |(entity, collider_handle)| {
@@ -196,52 +171,6 @@ fn remove_collider_handles() -> impl Runnable {
                 commands.remove_component::<ColliderHandle>(*entity);
             });
         })
-}
-
-fn handle_entity_removal_system(state_0: Receiver<Event>) -> impl Runnable {
-    SystemBuilder::new("handle_entity_removal")
-        .read_component::<BodyHandle>()
-        .read_component::<ColliderHandle>()
-        .write_resource::<PhysicsResource>()
-        .build(move |cmd, world, resources, query| {
-            handle_entity_removal(world, cmd, &mut *resources, &state_0);
-        })
-}
-
-#[allow(dead_code)]
-fn handle_entity_removal(
-    world: &SubWorld,
-    commands: &mut CommandBuffer,
-    physics: &mut PhysicsResource,
-    receiver: &Receiver<Event>,
-) {
-    for event in receiver.try_iter() {
-        match event {
-            Event::EntityRemoved(entity, _arch) => {
-                // FIXME: find a better solution or figure out how to know when an entity is being completely removed
-                if let Some(body_handle) = world
-                    .entry_ref(entity)
-                    .ok()
-                    .map(|e| e.into_component::<BodyHandle>().ok())
-                    .flatten()
-                {
-                    physics.bodies.remove(body_handle.0);
-                    commands.remove_component::<BodyHandle>(entity);
-                }
-                if let Some(collider_handle) = world
-                    .entry_ref(entity)
-                    .ok()
-                    .map(|e| e.into_component::<ColliderHandle>().ok())
-                    .flatten()
-                {
-                    physics.colliders.remove(collider_handle.0);
-                    commands.remove_component::<ColliderHandle>(entity);
-                }
-            }
-            Event::ArchetypeCreated(_arch) => {}
-            _ => {}
-        }
-    }
 }
 
 fn entity_world_to_physics_world() -> impl Runnable {
@@ -253,11 +182,11 @@ fn entity_world_to_physics_world() -> impl Runnable {
         .read_component::<PhysicsBody>()
         .write_resource::<PhysicsResource>()
         .with_query(<(
-            Read<BodyHandle>,
-            Read<PhysicsBody>,
-            Read<WorldPosition>,
-            Read<Velocity>,
-            Read<Orientation>,
+            &BodyHandle,
+            &PhysicsBody,
+            &WorldPosition,
+            &Velocity,
+            &Orientation,
         )>::query())
         .build(move |_, world, physics, query| {
             let physics: &mut PhysicsResource = &mut *physics;
@@ -290,17 +219,23 @@ fn physics_world_to_entity_world() -> impl Runnable {
         .write_component::<Velocity>()
         .write_component::<Orientation>()
         .read_resource::<PhysicsResource>()
+        .with_query(<(
+            &BodyHandle,
+            &PhysicsBody,
+            Option<&mut WorldPosition>,
+            Option<&mut Velocity>,
+            Option<&mut Orientation>,
+        )>::query())
         .build(move |_, world, resources, query| {
             let physics: &PhysicsResource = &*resources;
-            let mut query = <(
-                Read<BodyHandle>,
-                Read<PhysicsBody>,
-                TryWrite<WorldPosition>,
-                TryWrite<Velocity>,
-                TryWrite<Orientation>,
-            )>::query()
-            .filter(maybe_changed::<BodyHandle>());
-            for (handle, body, pos, vel, ori) in query.iter_mut(world) {
+            for components in query.iter_mut(world) {
+                let (handle, body, pos, vel, ori): (
+                    &BodyHandle,
+                    &PhysicsBody,
+                    Option<&mut WorldPosition>,
+                    Option<&mut Velocity>,
+                    Option<&mut Orientation>,
+                ) = components;
                 if let PhysicsBody::Dynamic { .. } = body {
                     if let Some(bod) = physics.bodies.rigid_body(handle.0) {
                         if let Some(p) = pos {
@@ -321,7 +256,7 @@ fn physics_world_to_entity_world() -> impl Runnable {
 fn movement_system() -> impl Runnable {
     SystemBuilder::new("movement")
         .read_resource::<FrameTime>()
-        .with_query(<(Write<WorldPosition>, Write<Velocity>)>::query())
+        .with_query(<(&mut WorldPosition, &mut Velocity)>::query())
         .build(move |cmd, world, resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
