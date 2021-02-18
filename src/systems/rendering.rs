@@ -25,14 +25,14 @@ impl RenderBuilderExtender for legion::systems::Builder {
 #[system]
 #[read_component(Camera)]
 #[read_component(Position3D)]
-#[read_component(Position)]
+#[read_component(WorldPosition)]
 fn update_camera(
     world: &SubWorld,
     #[resource] context: &mut graphics::Context,
     #[resource] active_cam: &ActiveCamera,
 ) {
     let (cam, cam_pos, cam_target) = {
-        <(&Camera, &Position3D, &Position)>::query()
+        <(&Camera, &Position3D, &WorldPosition)>::query()
             .get(world, active_cam.entity)
             .unwrap()
     };
@@ -43,7 +43,7 @@ fn update_camera(
 #[system(for_each)]
 fn render_draw_models(
     model: &Model3D,
-    position: &Position,
+    position: &WorldPosition,
     orientation: Option<&Orientation>,
     #[resource] context: &mut graphics::Context,
 ) {

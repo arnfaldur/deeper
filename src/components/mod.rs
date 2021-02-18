@@ -7,6 +7,7 @@ use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
 use legion::Entity;
 use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
+use self::cgmath::Quaternion;
 use crate::graphics;
 
 pub mod entity_builder;
@@ -32,18 +33,18 @@ pub struct FrameTime(pub f32);
 
 #[derive(Debug)]
 #[derive(Copy, Clone)]
-pub struct Position(pub Vector2<f32>);
+pub struct WorldPosition(pub Vector2<f32>);
 
-impl Position {
-    pub fn to_vec3(self) -> Vector3<f32> { Vector3::new(self.0.x, self.0.y, 0.0) }
+impl From<WorldPosition> for Vector2<f32> {
+    fn from(pos: WorldPosition) -> Self { pos.0 }
 }
 
-impl Into<Vector3<f32>> for Position {
-    fn into(self) -> Vector3<f32> { return self.0.extend(0.0); }
+impl From<WorldPosition> for Vector3<f32> {
+    fn from(pos: WorldPosition) -> Self { pos.0.extend(0.) }
 }
 
-impl Into<Vector3<f32>> for &Position {
-    fn into(self) -> Vector3<f32> { return self.0.extend(0.0); }
+impl From<&WorldPosition> for Vector3<f32> {
+    fn from(pos: &WorldPosition) -> Self { pos.0.extend(0.) }
 }
 
 #[derive(Debug)]
@@ -54,23 +55,24 @@ impl Velocity {
 }
 
 pub struct Force(pub nphysics2d::algebra::Force2<f32>);
+
 impl Default for Force {
     fn default() -> Self { Force(nphysics2d::algebra::Force2::zero()) }
 }
 
 pub struct Orientation(pub Deg<f32>);
 
+pub struct Rotation(pub Quaternion<f32>);
+
+impl Rotation {
+    pub fn orientation(deg: f32) -> Self { Rotation(Quaternion::new(deg, 0., 0., 0.)) }
+}
+
+pub struct Scale(pub f32);
+
 pub struct Speed(pub f32);
 
 pub struct Acceleration(pub f32);
-
-pub struct DisabledBody;
-
-pub struct StaticBody;
-
-pub struct DynamicBody {
-    pub mass: f32,
-}
 
 pub struct CircleCollider {
     pub radius: f32,
@@ -80,7 +82,32 @@ pub struct SquareCollider {
     pub side_length: f32,
 }
 
+pub enum PhysicsCollider {
+    Circle { radius: f32 },
+    Square { side_length: f32 },
+}
+
+pub struct DisabledBody;
+
+pub struct StaticBody;
+
+pub struct DynamicBody {
+    pub mass: f32,
+}
+
+pub enum PhysicsBody {
+    Disabled,
+    Static {
+        collider: PhysicsCollider,
+    },
+    Dynamic {
+        mass: f32,
+        collider: PhysicsCollider,
+    },
+}
+
 pub struct BodyHandle(pub DefaultBodyHandle);
+
 pub struct ColliderHandle(pub DefaultColliderHandle);
 
 pub struct Agent;

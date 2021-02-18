@@ -17,7 +17,7 @@ use crate::input::{InputState, Key};
 #[write_component(Destination)]
 #[write_component(Velocity)]
 #[read_component(Position3D)]
-#[read_component(Position)]
+#[read_component(WorldPosition)]
 pub fn camera_control(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
@@ -63,7 +63,7 @@ pub fn camera_control(
     let cam_pos = world
         .entry_ref(player_cam.entity)
         .unwrap()
-        .get_component::<Position>()
+        .get_component::<WorldPosition>()
         .unwrap()
         .0;
 
@@ -110,7 +110,7 @@ pub fn camera_control(
         let player_pos = world
             .entry_ref(player.entity)
             .unwrap()
-            .get_component::<Position>()
+            .get_component::<WorldPosition>()
             .unwrap()
             .0;
 
@@ -122,7 +122,7 @@ pub fn camera_control(
 #[write_component(Orientation)]
 #[write_component(Destination)]
 #[write_component(Camera)]
-#[read_component(Position)]
+#[read_component(WorldPosition)]
 #[read_component(Position3D)]
 #[read_component(Faction)]
 #[read_component(HitPoints)]
@@ -152,7 +152,7 @@ pub fn player(
 
         let player_cam_entry = world.entry_ref(player_cam.entity).unwrap();
         let camera_3d_pos = player_cam_entry.get_component::<Position3D>().unwrap().0;
-        let camera_pos = player_cam_entry.get_component::<Position>().unwrap().0;
+        let camera_pos = player_cam_entry.get_component::<WorldPosition>().unwrap().0;
 
         let aspect_ratio = context.sc_desc.width as f32 / context.sc_desc.height as f32;
 
@@ -183,7 +183,7 @@ pub fn player(
             let difference: Vector2<f32> = {
                 let player_entry = world.entry_ref(player.entity).unwrap();
                 let player_pos = player_entry
-                    .get_component::<Position>()
+                    .get_component::<WorldPosition>()
                     .expect("I have no place in this world.")
                     .0;
                 ray_hit - player_pos

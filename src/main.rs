@@ -87,7 +87,7 @@ async fn run_async() {
             Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
                 .with_scale(0.5),
         )
-        .build();
+        .get_entity();
 
     let player_camera = EntitySmith::from(&mut command_buffer)
         .any(Parent(player))
@@ -100,7 +100,7 @@ async fn run_async() {
         })
         .any(Position3D(Vector3::new(0.0, 0.0, 0.0)))
         .any(SphericalOffset::camera_offset())
-        .build();
+        .get_entity();
 
     command_buffer.flush(&mut world);
 

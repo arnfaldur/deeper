@@ -17,7 +17,7 @@ pub mod world_gen;
 pub fn spherical_offset_system() -> impl Runnable {
     SystemBuilder::new("spherical_offset")
         .with_query(<(
-            ::legion::Read<Position>,
+            ::legion::Read<WorldPosition>,
             ::legion::Read<SphericalOffset>,
             ::legion::Write<Position3D>,
         )>::query())
@@ -30,12 +30,13 @@ pub fn spherical_offset_system() -> impl Runnable {
 }
 
 #[allow(dead_code)]
-pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {
+pub fn spherical_offset(pos2d: &WorldPosition, follow: &SphericalOffset, pos3d: &mut Position3D) {
     pos3d.0 = pos2d.into();
     pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
     pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
     pos3d.0.z += follow.radius * follow.phi.sin();
 }
+
 pub fn hit_point_regen_system() -> impl Runnable {
     SystemBuilder::new("hit_point_regen")
         .read_resource::<FrameTime>()
@@ -67,7 +68,7 @@ pub fn hit_point_regen(
 fn ai_follow_system() -> impl Runnable {
     SystemBuilder::new("ai_follow")
         .read_component::<AIFollow>()
-        .read_component::<Position>()
+        .read_component::<WorldPosition>()
         .write_component::<Destination>()
         .write_component::<Orientation>()
         .build(move |cmd, world, _resources, _query| {
@@ -76,13 +77,13 @@ fn ai_follow_system() -> impl Runnable {
 }
 #[allow(dead_code)]
 fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
-    let mut query = <(Entity, TryWrite<Orientation>, &AIFollow, &Position)>::query();
+    let mut query = <(Entity, TryWrite<Orientation>, &AIFollow, &WorldPosition)>::query();
     let (mut hunter_world, hunted_world) = world.split_for_query(&query);
     for (ent, orient, follow, hunter) in query.iter_mut(&mut hunter_world) {
         if let Some(hunted) = hunted_world
             .entry_ref(follow.target)
             .ok()
-            .map(|e| e.into_component::<Position>().ok())
+            .map(|e| e.into_component::<WorldPosition>().ok())
             .flatten()
         {
             let difference: Vector2<f32> = hunted.0 - hunter.0;
@@ -98,7 +99,7 @@ fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
 }
 pub fn go_to_destination_system() -> impl Runnable {
     SystemBuilder::new("go_to_destination")
-        .read_component::<Position>()
+        .read_component::<WorldPosition>()
         .read_component::<Speed>()
         .read_component::<Acceleration>()
         .write_component::<Destination>()
@@ -118,7 +119,7 @@ pub fn go_to_destination(
     let mut query = <(
         Entity,
         &Destination,
-        &Position,
+        &WorldPosition,
         &mut Velocity,
         &Speed,
         &Acceleration,

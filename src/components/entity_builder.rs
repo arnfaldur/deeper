@@ -1,5 +1,6 @@
 use legion::storage::Component;
 use legion::systems::CommandBuffer;
+use legion::World;
 
 use crate::components::*;
 
@@ -18,6 +19,12 @@ impl<'a> From<&'a mut legion::systems::CommandBuffer> for EntitySmith<'a> {
 }
 
 impl<'a> EntitySmith<'a> {
+    pub fn from_buffer(buffer: &'a mut legion::systems::CommandBuffer) -> Self {
+        Self {
+            entity: buffer.push(()),
+            buffer,
+        }
+    }
     pub fn from_entity(buffer: &'a mut legion::systems::CommandBuffer, entity: Entity) -> Self {
         Self { entity, buffer }
     }
@@ -25,13 +32,18 @@ impl<'a> EntitySmith<'a> {
         self.entity = self.buffer.push(());
         return self;
     }
-    pub fn build(&self) -> Entity { self.entity }
+    pub fn done(&self) {}
+    pub fn get_entity(&self) -> Entity { self.entity }
+    pub fn craft(mut self) -> EntitySmith<'a> { self }
     fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
         self.buffer.add_component(self.entity, component);
         return self;
     }
-    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self { self.add_component(Position(pos)) }
+    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self {
+        self.add_component(WorldPosition(pos))
+    }
     pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
+    pub fn velocity_zero(&mut self) -> &mut Self { self.add_component(Velocity::new()) }
     pub fn orientation(&mut self, ori: f32) -> &mut Self {
         self.add_component(Orientation(Deg(ori)))
     }

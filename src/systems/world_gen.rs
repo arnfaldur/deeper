@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use cgmath::{Deg, Vector2, Vector3};
+use cgmath::{Deg, Vector2, Vector3, Zero};
 use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
 use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
+use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::dung_gen::DungGen;
 use crate::{graphics, loader};
@@ -84,14 +85,14 @@ pub fn dung_gen(
             // Reset player position and stuff
             commands.add_component(
                 player.entity,
-                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
+                WorldPosition(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
             );
             //updater.insert(player.entity, Orientation(Deg(0.0)));
             commands.add_component(player.entity, Velocity::new());
 
             commands.add_component(
                 player_camera.entity,
-                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
+                WorldPosition(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
             );
 
             // TODO: Turn lights into entities
@@ -191,7 +192,7 @@ pub fn dung_gen(
                 match tile_type {
                     TileType::Nothing => {}
                     _ => {
-                        commands.add_component(entity, Position(pos));
+                        commands.add_component(entity, WorldPosition(pos));
                     }
                 }
                 // tile specific behaviors
@@ -217,45 +218,40 @@ pub fn dung_gen(
                     && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
                 {
                     let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
-                    let enemy = commands.push((
-                        Position(
+                    EntitySmith::from_buffer(commands)
+                        .position(
                             pos + Vector2::new(rng.gen_range(-0.3..0.3), rng.gen_range(-0.3..0.3)),
-                        ),
-                        Speed(rng.gen_range(1.0..4.0) - 1.6 * rad),
-                        Acceleration(rng.gen_range(3.0..9.0) + 2.0 * rad),
-                        Orientation(Deg(0.0)),
-                        Velocity::new(),
-                        DynamicBody { mass: rad },
-                        CircleCollider { radius: rad },
-                    ));
-                    commands.add_component(enemy, Faction::Enemies);
-                    commands.add_component(
-                        enemy,
-                        AIFollow {
+                        )
+                        .agent(
+                            rng.gen_range(1.0..4.0) - 1.6 * rad,
+                            rng.gen_range(3.0..9.0) + 2.0 * rad,
+                        )
+                        .orientation(0.0)
+                        .velocity_zero()
+                        .dynamic_body(rad)
+                        .circle_collider(rad)
+                        .any(Faction::Enemies)
+                        .any(AIFollow {
                             target: player.entity,
                             minimum_distance: 2.0 + rad,
-                        },
-                    );
-                    commands.add_component(
-                        enemy,
-                        HitPoints {
+                        })
+                        .any(HitPoints {
                             max: rng.gen_range(0.0..2.0) + 8. * rad,
                             health: rng.gen_range(0.0..2.0) + 8. * rad,
-                        },
-                    );
-                    commands.add_component(
-                        enemy,
-                        Model3D::from_index(
-                            &context,
-                            ass_man.get_model_index("monstroman.obj").unwrap(),
+                        })
+                        .any(
+                            Model3D::from_index(
+                                &context,
+                                ass_man.get_model_index("monstroman.obj").unwrap(),
+                            )
+                            .with_material(graphics::data::Material::glossy(Vector3::<f32>::new(
+                                rng.gen(),
+                                rng.gen(),
+                                rng.gen(),
+                            )))
+                            .with_scale(rad * 1.7),
                         )
-                        .with_material(graphics::data::Material::glossy(Vector3::<f32>::new(
-                            rng.gen(),
-                            rng.gen(),
-                            rng.gen(),
-                        )))
-                        .with_scale(rad * 1.7),
-                    );
+                        .done();
                 }
             }
             // TODO: use this or delete for a pathfinding system
