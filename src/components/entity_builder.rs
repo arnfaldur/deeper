@@ -47,11 +47,12 @@ impl<'a> EntitySmith<'a> {
     pub fn orientation(&mut self, ori: f32) -> &mut Self {
         self.add_component(Orientation(Deg(ori)))
     }
+    pub fn physics_body(&mut self, body: PhysicsBody) -> &mut Self { self.add_component(body) }
     pub fn dynamic_body(&mut self, mass: f32) -> &mut Self {
-        self.add_component(DynamicBody { mass })
+        self.add_component(PhysicsBody::Dynamic { mass })
     }
     pub fn circle_collider(&mut self, radius: f32) -> &mut Self {
-        self.add_component(CircleCollider { radius })
+        self.add_component(Collider::Circle { radius })
     }
     pub fn model(&mut self, model: Model3D) -> &mut Self { self.add_component(model) }
     pub fn agent(&mut self, speed: f32, acceleration: f32) -> &mut Self {

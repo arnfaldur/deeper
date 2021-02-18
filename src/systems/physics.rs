@@ -28,7 +28,7 @@ impl PhysicsBuilderExtender for Builder {
             component::<BodyHandle>() | component::<ColliderHandle>(),
         );
         return self
-            .add_system(validate_physics_entities_system())
+            // TODO: reimplement .add_system(validate_physics_entities_system())
             .add_system(make_body_handles_system())
             .add_system(remove_body_handles())
             // .add_system(flush_command_buffer_system())
@@ -76,152 +76,49 @@ impl Default for PhysicsResource {
     }
 }
 
-fn validate_physics_entities_system() -> impl Runnable {
-    SystemBuilder::new("validate_physics_entities")
-        .read_component::<WorldPosition>()
-        .read_component::<Velocity>()
-        .read_component::<Speed>()
-        .read_component::<Acceleration>()
-        .read_component::<Orientation>()
-        .read_component::<DynamicBody>()
-        .read_component::<StaticBody>()
-        .write_component::<Force>()
-        .build(move |cmd, world, resources, query| {
-            validate_physics_entities(world, cmd);
-        })
-}
-
-#[allow(dead_code)]
-fn validate_physics_entities(world: &mut SubWorld, _commands: &mut CommandBuffer) {
-    let mut query = <(
-        Entity,
-        TryRead<WorldPosition>,
-        TryRead<Velocity>,
-        TryRead<Force>,
-        TryRead<Orientation>,
-        TryRead<StaticBody>,
-    )>::query()
-    .filter(component::<DynamicBody>());
-    for (_ent, pos, vel, _frc, ori, sta) in query.iter(world) {
-        if pos.is_none() {
-            panic!("missing Position in DynamicBody");
-        } else if vel.is_none() {
-            panic!("missing Velocity in DynamicBody");
-            // TODO: decide if Force should be in our repertoire
-            // } else if frc.is_none() {
-            //     commands.add_component(*ent, Force::default());
-        } else if ori.is_none() {
-            panic!("missing Orientation in DynamicBody");
-        } else if sta.is_some() {
-            // this is an awfully DynamicBody normative perspective
-            panic!("There's a naughty StaticBody that really feels DynamicBody inside.");
-        }
-    }
-    let mut query = <(
-        Entity,
-        TryRead<WorldPosition>,
-        TryRead<Velocity>,
-        TryRead<Speed>,
-        TryRead<Acceleration>,
-        TryRead<Force>,
-        TryRead<Orientation>,
-    )>::query()
-    .filter(component::<StaticBody>());
-    for (_ent, pos, vel, spd, acc, frc, _ori) in query.iter(world) {
-        if pos.is_none() {
-            panic!("missing Position in StaticBody");
-        } else if vel.is_some() {
-            panic!("StaticBody can't have a Velocity component");
-        } else if spd.is_some() {
-            panic!("StaticBody can't have a Speed component");
-        } else if acc.is_some() {
-            panic!("StaticBody can't have a Acceleration component");
-        } else if frc.is_some() {
-            panic!("StaticBody can't have a Force component");
-            // } else if ori.is_none() {
-            //     panic!("missing Orientation in StaticBody");
-        }
-    }
-}
-
 fn make_body_handles_system() -> impl Runnable {
     SystemBuilder::new("make_body_handles")
         .write_resource::<PhysicsResource>()
         .with_query(
-            <(
-                Entity,
-                TryRead<DynamicBody>,
-                TryRead<StaticBody>,
-                TryRead<DisabledBody>,
-                TryRead<WorldPosition>,
-            )>::query()
-            .filter(
-                (component::<DynamicBody>()
-                    | component::<StaticBody>()
-                    | component::<DisabledBody>())
-                    & !component::<BodyHandle>(),
-            ),
+            <(Entity, Read<PhysicsBody>, TryRead<WorldPosition>)>::query()
+                .filter(!component::<BodyHandle>()),
         )
-        .build(move |cmd, world, resources, query| {
+        .build(move |commands, world, resources, query| {
             let (mut for_query, mut world) = world.split_for_query(query);
-            let for_query = &mut for_query;
-            query.for_each_mut(for_query, |components| {
-                make_body_handles(
-                    &mut world,
-                    cmd,
-                    &mut *resources,
-                    components.0,
-                    components.1,
-                    components.2,
-                    components.3,
-                    components.4,
-                );
-            });
+            let physics: &mut PhysicsResource = &mut *resources;
+            query.for_each_mut(
+                &mut for_query,
+                |(entity, physics_body, position): (
+                    &Entity,
+                    &PhysicsBody,
+                    Option<&WorldPosition>,
+                )| {
+                    let body = match physics_body {
+                        PhysicsBody::Disabled => {
+                            RigidBodyDesc::<f32>::new().status(BodyStatus::Disabled)
+                        }
+                        PhysicsBody::Static => RigidBodyDesc::<f32>::new()
+                            .status(BodyStatus::Static)
+                            .position(Isometry2::new(
+                                c2n(position.unwrap_or(&WorldPosition(cgmath::vec2(0., 0.))).0),
+                                0.,
+                            )),
+                        PhysicsBody::Dynamic { mass } => RigidBodyDesc::<f32>::new()
+                            .status(BodyStatus::Dynamic)
+                            .gravity_enabled(false)
+                            .mass(*mass),
+                    };
+                    let handle = BodyHandle(physics.bodies.insert(body.build()));
+                    commands.add_component(*entity, handle);
+                },
+            );
         })
-}
-
-#[allow(dead_code)]
-fn make_body_handles(
-    _world: &mut SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
-    physics: &mut PhysicsResource,
-    entity: &Entity,
-    dynamic: Option<&DynamicBody>,
-    stat: Option<&StaticBody>,
-    disabled: Option<&DisabledBody>,
-    position: Option<&WorldPosition>,
-) {
-    let body = if let Some(dyna) = dynamic {
-        RigidBodyDesc::<f32>::new()
-            .status(BodyStatus::Dynamic)
-            .gravity_enabled(false)
-            .mass(dyna.mass)
-    } else if stat.is_some() {
-        RigidBodyDesc::<f32>::new()
-            .status(BodyStatus::Static)
-            .position(Isometry2::new(
-                c2n(position.unwrap_or(&WorldPosition(cgmath::vec2(0., 0.))).0),
-                0.,
-            ))
-    } else if disabled.is_some() {
-        RigidBodyDesc::<f32>::new().status(BodyStatus::Disabled)
-    } else {
-        unreachable!() // the filter should take care of this
-    };
-    let handle = BodyHandle(physics.bodies.insert(body.build()));
-    commands.add_component(*entity, handle);
 }
 
 fn remove_body_handles() -> impl Runnable {
     SystemBuilder::new("remove_body_handles")
         .write_resource::<PhysicsResource>()
-        .with_query(
-            <(::legion::Entity, ::legion::Read<BodyHandle>)>::query().filter(
-                !component::<DynamicBody>()
-                    & !component::<StaticBody>()
-                    & !component::<DisabledBody>(),
-            ),
-        )
+        .with_query(<(Entity, Read<BodyHandle>)>::query().filter(!component::<PhysicsBody>()))
         .build(move |commands, world, physics, query| {
             query.for_each_mut(world, |(entity, handle): (&Entity, &BodyHandle)| {
                 physics.bodies.remove(handle.0);
@@ -233,8 +130,8 @@ fn remove_body_handles() -> impl Runnable {
 fn flush_command_buffer_system() -> impl Runnable {
     SystemBuilder::new("flush_command_buffer")
         .with_query(<(Write<World>)>::query())
-        .build(move |commands, world, resources, query| {
-            let for_query = world;
+        .build(move |commands, world, _, query| {
+            let for_query = world; // TODO: simplify this
             query.for_each_mut(for_query, |components| {
                 commands.flush(components);
             });
@@ -245,29 +142,19 @@ fn make_collider_handles_system() -> impl Runnable {
     SystemBuilder::new("make_collider_handles")
         .write_resource::<PhysicsResource>()
         .with_query(
-            <(
-                Entity,
-                Read<BodyHandle>,
-                TryRead<CircleCollider>,
-                TryRead<SquareCollider>,
-            )>::query()
-            .filter(
-                (component::<CircleCollider>() | component::<SquareCollider>())
-                    & !component::<ColliderHandle>(),
-            ),
+            <(Entity, Read<BodyHandle>, Read<Collider>)>::query()
+                .filter(!component::<ColliderHandle>()),
         )
         .build(move |cmd, world, resources, query| {
             let (mut for_query, world) = world.split_for_query(query);
             let for_query = &mut for_query;
             query.for_each_mut(for_query, |components| {
                 make_collider_handles(
-                    &world,
                     cmd,
                     &mut *resources,
                     components.0,
                     components.1,
                     components.2,
-                    components.3,
                 );
             });
         })
@@ -275,22 +162,19 @@ fn make_collider_handles_system() -> impl Runnable {
 
 #[allow(dead_code)]
 fn make_collider_handles(
-    _world: &SubWorld,
     commands: &mut CommandBuffer,
     physics: &mut PhysicsResource,
     entity: &Entity,
     body_handle: &BodyHandle,
-    circle: Option<&CircleCollider>,
-    square: Option<&SquareCollider>,
+    collider: &Collider,
 ) {
-    let shape_handle = if let Some(c) = circle {
-        ShapeHandle::new(Ball::new(c.radius))
-    } else if let Some(s) = square {
-        let side_length = s.side_length / 2.0;
-        let sides_vec = nalgebra::Vector2::new(side_length, side_length);
-        ShapeHandle::new(Cuboid::new(sides_vec))
-    } else {
-        unreachable!() // the filter should prevent this
+    let shape_handle = match collider {
+        Collider::Circle { radius } => ShapeHandle::new(Ball::new(*radius)),
+        Collider::Square { side_length } => {
+            let half_side = side_length / 2.0;
+            let sides_vec = nalgebra::Vector2::new(half_side, half_side);
+            ShapeHandle::new(Cuboid::new(sides_vec))
+        }
     };
     let collider = ColliderDesc::<f32>::new(shape_handle);
     let handle = ColliderHandle(
@@ -304,10 +188,7 @@ fn make_collider_handles(
 fn remove_collider_handles() -> impl Runnable {
     SystemBuilder::new("remove_collider_handles")
         .write_resource::<PhysicsResource>()
-        .with_query(
-            <(Entity, Read<ColliderHandle>)>::query()
-                .filter(!component::<CircleCollider>() & !component::<SquareCollider>()),
-        )
+        .with_query(<(Entity, Read<ColliderHandle>)>::query().filter(!component::<Collider>()))
         .build(move |commands, world, physics, query| {
             let for_query = world;
             query.for_each_mut(for_query, |(entity, collider_handle)| {
@@ -330,7 +211,7 @@ fn handle_entity_removal_system(state_0: Receiver<Event>) -> impl Runnable {
 #[allow(dead_code)]
 fn handle_entity_removal(
     world: &SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
+    commands: &mut CommandBuffer,
     physics: &mut PhysicsResource,
     receiver: &Receiver<Event>,
 ) {
@@ -369,24 +250,24 @@ fn entity_world_to_physics_world() -> impl Runnable {
         .read_component::<WorldPosition>()
         .read_component::<Velocity>()
         .read_component::<Orientation>()
-        .read_component::<DynamicBody>()
+        .read_component::<PhysicsBody>()
         .write_resource::<PhysicsResource>()
-        .with_query(
-            <(
-                Read<BodyHandle>,
-                Read<WorldPosition>,
-                Read<Velocity>,
-                Read<Orientation>,
-            )>::query()
-            .filter(component::<DynamicBody>()),
-        )
+        .with_query(<(
+            Read<BodyHandle>,
+            Read<PhysicsBody>,
+            Read<WorldPosition>,
+            Read<Velocity>,
+            Read<Orientation>,
+        )>::query())
         .build(move |_, world, physics, query| {
             let physics: &mut PhysicsResource = &mut *physics;
-            for (han, pos, vel, ori) in query.iter(world) {
-                if let Some(body) = physics.bodies.rigid_body_mut(han.0) {
-                    body.set_position(Isometry2::new(c2n(pos.0), cgmath::Rad::from(ori.0).0));
-                    body.set_linear_velocity(c2n(vel.0));
-                    // and force?
+            for (han, bod, pos, vel, ori) in query.iter(world) {
+                if let PhysicsBody::Dynamic { .. } = bod {
+                    if let Some(body) = physics.bodies.rigid_body_mut(han.0) {
+                        body.set_position(Isometry2::new(c2n(pos.0), cgmath::Rad::from(ori.0).0));
+                        body.set_linear_velocity(c2n(vel.0));
+                        // and force?
+                    }
                 }
             }
         })
@@ -404,6 +285,7 @@ fn step_physics_world() -> impl Runnable {
 fn physics_world_to_entity_world() -> impl Runnable {
     SystemBuilder::new("physics_world_to_entity_world")
         .read_component::<BodyHandle>()
+        .read_component::<PhysicsBody>()
         .write_component::<WorldPosition>()
         .write_component::<Velocity>()
         .write_component::<Orientation>()
@@ -412,21 +294,24 @@ fn physics_world_to_entity_world() -> impl Runnable {
             let physics: &PhysicsResource = &*resources;
             let mut query = <(
                 Read<BodyHandle>,
+                Read<PhysicsBody>,
                 TryWrite<WorldPosition>,
                 TryWrite<Velocity>,
                 TryWrite<Orientation>,
             )>::query()
-            .filter(component::<DynamicBody>() & maybe_changed::<BodyHandle>());
-            for (body, pos, vel, ori) in query.iter_mut(world) {
-                if let Some(bod) = physics.bodies.rigid_body(body.0) {
-                    if let Some(p) = pos {
-                        p.0 = n2c(bod.position().translation.vector);
-                    }
-                    if let Some(v) = vel {
-                        v.0 = n2c(bod.velocity().linear);
-                    }
-                    if let Some(o) = ori {
-                        o.0 = cgmath::Deg::from(cgmath::Rad(bod.position().rotation.angle()));
+            .filter(maybe_changed::<BodyHandle>());
+            for (handle, body, pos, vel, ori) in query.iter_mut(world) {
+                if let PhysicsBody::Dynamic { .. } = body {
+                    if let Some(bod) = physics.bodies.rigid_body(handle.0) {
+                        if let Some(p) = pos {
+                            p.0 = n2c(bod.position().translation.vector);
+                        }
+                        if let Some(v) = vel {
+                            v.0 = n2c(bod.velocity().linear);
+                        }
+                        if let Some(o) = ori {
+                            o.0 = cgmath::Deg::from(cgmath::Rad(bod.position().rotation.angle()));
+                        }
                     }
                 }
             }
@@ -436,7 +321,7 @@ fn physics_world_to_entity_world() -> impl Runnable {
 fn movement_system() -> impl Runnable {
     SystemBuilder::new("movement")
         .read_resource::<FrameTime>()
-        .with_query(<(::legion::Write<WorldPosition>, ::legion::Write<Velocity>)>::query())
+        .with_query(<(Write<WorldPosition>, Write<Velocity>)>::query())
         .build(move |cmd, world, resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {

@@ -198,8 +198,8 @@ pub fn dung_gen(
                 // tile specific behaviors
                 match tile_type {
                     TileType::Wall(_) => {
-                        commands.add_component(entity, StaticBody);
-                        commands.add_component(entity, SquareCollider { side_length: 1.0 });
+                        commands.add_component(entity, PhysicsBody::Static);
+                        commands.add_component(entity, Collider::Square { side_length: 1.0 });
                     }
                     TileType::LadderDown => {
                         commands.add_component(entity, MapSwitcher(MapTransition::Deeper));

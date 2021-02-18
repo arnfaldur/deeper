@@ -126,7 +126,6 @@ pub fn camera_control(
 #[read_component(Position3D)]
 #[read_component(Faction)]
 #[read_component(HitPoints)]
-#[read_component(DynamicBody)]
 pub fn player(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,

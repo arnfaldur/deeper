@@ -74,36 +74,15 @@ pub struct Speed(pub f32);
 
 pub struct Acceleration(pub f32);
 
-pub struct CircleCollider {
-    pub radius: f32,
-}
-
-pub struct SquareCollider {
-    pub side_length: f32,
-}
-
-pub enum PhysicsCollider {
+pub enum Collider {
     Circle { radius: f32 },
     Square { side_length: f32 },
 }
 
-pub struct DisabledBody;
-
-pub struct StaticBody;
-
-pub struct DynamicBody {
-    pub mass: f32,
-}
-
 pub enum PhysicsBody {
     Disabled,
-    Static {
-        collider: PhysicsCollider,
-    },
-    Dynamic {
-        mass: f32,
-        collider: PhysicsCollider,
-    },
+    Static,
+    Dynamic { mass: f32 },
 }
 
 pub struct BodyHandle(pub DefaultBodyHandle);
