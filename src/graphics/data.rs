@@ -1,4 +1,4 @@
-use cgmath::Vector3;
+use cgmath::{Vector3, Vector4};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::graphics::MAX_NR_OF_POINT_LIGHTS;
@@ -32,6 +32,14 @@ impl Material {
         mat.albedo = [1.0, 1.0, 1.0, 1.0];
         mat.metallic = 0.1;
         mat.roughness = 0.15;
+        return mat;
+    }
+
+    pub fn color(color: Vector4<f32>) -> Self {
+        let mut mat: Self = Self::default();
+        mat.albedo = color.into();
+        mat.metallic = 0.0;
+        mat.roughness = 0.0;
         return mat;
     }
 

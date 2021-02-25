@@ -102,6 +102,7 @@ impl InputState {
         }
     }
 
+    /// Returns whether the key is currently down
     pub fn is_key_down(&self, key: Key) -> bool {
         return match self.keyboard.get(&key) {
             Some(state) => state.down,
@@ -109,6 +110,7 @@ impl InputState {
         };
     }
 
+    /// Returns whether the key was pressed this frame
     pub fn is_key_pressed(&self, key: Key) -> bool {
         return match self.keyboard.get(&key) {
             Some(state) => state.pressed,

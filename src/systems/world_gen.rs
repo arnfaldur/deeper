@@ -119,28 +119,12 @@ pub fn dung_gen(
                     lights.point_lights[i].color = [2.0, 1.0, 0.1, 1.0];
                 }
 
-                // TODO: go away
-                let temp_buf =
-                    context
-                        .device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: None,
-                            contents: lights.as_bytes(),
-                            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-                        });
-
-                // TODO: you are not welcome here copy_buffer_to_buffer
-                init_encoder.copy_buffer_to_buffer(
-                    &temp_buf,
+                context.queue.write_buffer(
+                    &context.model_render_ctx.lights_uniform_buf,
                     0,
-                    &context.lights_buf,
-                    0,
-                    std::mem::size_of::<graphics::data::Lights>() as u64,
+                    lights.as_bytes(),
                 );
 
-                let command_buffer = init_encoder.finish();
-
-                context.queue.submit(std::iter::once(command_buffer));
                 // End graphics shit
             }
 

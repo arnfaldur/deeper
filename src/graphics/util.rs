@@ -1,0 +1,145 @@
+// Series of utility functions that solve miscellaneous but specific problems
+
+pub fn create_texels(size: usize) -> Vec<u8> {
+    use std::iter;
+
+    (0..size * size)
+        .flat_map(|id| {
+            // get high five for recognizing this ;)
+            let cx = 3.0 * (id % size) as f32 / (size - 1) as f32 - 2.0;
+            let cy = 2.0 * (id / size) as f32 / (size - 1) as f32 - 1.0;
+            let (mut x, mut y, mut count) = (cx, cy, 0);
+            while count < 0xFF && x * x + y * y < 4.0 {
+                let old_x = x;
+                x = x * x - y * y + cx;
+                y = 2.0 * old_x * y + cy;
+                count += 1;
+            }
+            iter::once(0xFF - (count * 5) as u8)
+                .chain(iter::once(0xFF - (count * 15) as u8))
+                .chain(iter::once(0xFF - (count * 50) as u8))
+                .chain(iter::once(1))
+        })
+        .collect()
+}
+
+pub fn sc_desc_from_size(size: winit::dpi::PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
+    wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+        format: crate::graphics::COLOR_FORMAT,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Mailbox,
+    }
+}
+
+pub fn to_pos3<T>(vec: cgmath::Vector3<T>) -> cgmath::Point3<T> {
+    cgmath::Point3::new(vec.x, vec.y, vec.z)
+}
+
+fn pos3(x: f32, y: f32, z: f32) -> cgmath::Point3<f32> { cgmath::Point3::new(x, y, z) }
+
+pub fn to_vec2<T>(vec3: cgmath::Vector3<T>) -> cgmath::Vector2<T> {
+    cgmath::Vector2::new(vec3.x, vec3.y)
+}
+
+pub fn generate_matrix(aspect_ratio: f32, t: f32) -> cgmath::Matrix4<f32> {
+    let mx_projection = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 10.0);
+    let mx_view = cgmath::Matrix4::look_at_rh(
+        pos3(5. * t.cos(), 5.0 * t.sin(), 3.),
+        pos3(0., 0., 0.),
+        cgmath::Vector3::unit_z(),
+    );
+    let mx_correction = correction_matrix();
+    return mx_correction * mx_projection * mx_view;
+}
+
+// Function by Vallentin
+// https://vallentin.dev/2019/08/12/screen-to-world-cgmath
+pub fn project_screen_to_world(
+    screen: cgmath::Vector3<f32>,
+    view_projection: cgmath::Matrix4<f32>,
+    viewport: cgmath::Vector4<i32>,
+) -> Option<cgmath::Vector3<f32>> {
+    use cgmath::SquareMatrix;
+    if let Some(inv_view_projection) = view_projection.invert() {
+        let world = cgmath::Vector4::new(
+            (screen.x - (viewport.x as f32)) / (viewport.z as f32) * 2.0 - 1.0,
+            // Screen Origin is Top Left    (Mouse Origin is Top Left)
+            // (screen.y - (viewport.y as f32)) / (viewport.w as f32) * 2.0 - 1.0,
+            // Screen Origin is Bottom Left (Mouse Origin is Top Left)
+            (1.0 - (screen.y - (viewport.y as f32)) / (viewport.w as f32)) * 2.0 - 1.0,
+            screen.z * 2.0 - 1.0,
+            1.0,
+        );
+        let world = inv_view_projection * world;
+
+        if world.w != 0.0 {
+            Some(world.truncate() * (1.0 / world.w))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+// Function by Vallentin
+// https://vallentin.dev/2019/08/12/screen-to-world-cgmath
+pub fn project_world_to_screen(
+    world: cgmath::Vector3<f32>,
+    view_projection: cgmath::Matrix4<f32>,
+    viewport: cgmath::Vector4<i32>,
+) -> Option<cgmath::Vector3<f32>> {
+    let screen = view_projection * world.extend(1.0);
+
+    if screen.w != 0.0 {
+        let mut screen = screen.truncate() * (1.0 / screen.w);
+
+        screen.x = (screen.x + 1.0) * 0.5 * (viewport.z as f32) + (viewport.x as f32);
+        // Screen Origin is Top Left    (Mouse Origin is Top Left)
+        // screen.y = (screen.y + 1.0) * 0.5 * (viewport.w as f32) + (viewport.y as f32);
+        // Screen Origin is Bottom Left (Mouse Origin is Top Left)
+        screen.y = (1.0 - screen.y) * 0.5 * (viewport.w as f32) + (viewport.y as f32);
+
+        // This is only correct when glDepthRangef(0.0f, 1.0f)
+        screen.z = (screen.z + 1.0) * 0.5;
+
+        Some(screen)
+    } else {
+        None
+    }
+}
+
+pub fn generate_view_matrix(
+    cam: &crate::components::Camera,
+    cam_pos: cgmath::Vector3<f32>,
+    cam_target: cgmath::Vector3<f32>,
+    aspect_ratio: f32,
+) -> cgmath::Matrix4<f32> {
+    let mx_view = cgmath::Matrix4::look_at_rh(
+        to_pos3(cam_pos),
+        to_pos3(cam_target),
+        cgmath::Vector3::unit_z(),
+    );
+
+    let mx_perspective = cgmath::perspective(cgmath::Deg(cam.fov), aspect_ratio, 1.0, 1000.0);
+
+    correction_matrix() * mx_perspective * mx_view
+}
+
+pub fn generate_ortho_matrix(size: winit::dpi::PhysicalSize<f32>) -> cgmath::Matrix4<f32> {
+    let mx_ortho = cgmath::ortho(0.0, size.width, size.height, 0.0, 0.0, 1.0);
+
+    correction_matrix() * mx_ortho // * mx_view
+}
+
+#[rustfmt::skip]
+pub fn correction_matrix() -> cgmath::Matrix4<f32> {
+    cgmath::Matrix4::new(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 0.5, 0.0,
+        0.0, 0.0, 0.5, 1.0,
+    )
+}
