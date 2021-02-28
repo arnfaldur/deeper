@@ -1,11 +1,9 @@
 use std::fmt::{Display, Formatter};
 use std::time::SystemTime;
 
-use cgmath::prelude::*;
 use legion::systems::Runnable;
 use legion::world::SubWorld;
 use legion::*;
-use zerocopy::AsBytes;
 
 use crate::components::*;
 use crate::graphics;
@@ -192,7 +190,7 @@ impl SnakeBoard {
         self.update_board();
     }
 
-    fn print(&self) {
+    fn _print(&self) {
         for row in self.board.iter() {
             for square in row.iter() {
                 print!("{}", *square);
@@ -211,7 +209,7 @@ impl SnakeSystem {
         SystemBuilder::new("snake_game")
             .read_resource::<crate::input::InputState>()
             .write_resource::<crate::graphics::Context>()
-            .build(move |commands, world, (input_state, context), _| {
+            .build(move |_commands, _world, (input_state, context), _| {
                 snake_game(&mut board, &mut time, &mut toggle, input_state, context);
 
                 fn snake_game(
@@ -254,7 +252,7 @@ impl SnakeSystem {
                     for (i, row) in board.board.iter().enumerate() {
                         for (j, square) in row.iter().enumerate() {
                             context.canvas_queue.draw_rect(
-                                crate::graphics::canvas::RectangleDescriptor::AnchorRect {
+                                RectangleDescriptor::AnchorRect {
                                     anchor: AnchorPoint::TopLeft,
                                     position: ScreenVector::new_relative(0.5, 0.5),
                                     dimensions: ScreenVector::new_relative_to_width(0.025, 0.025),

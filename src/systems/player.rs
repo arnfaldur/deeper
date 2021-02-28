@@ -2,13 +2,13 @@ use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
 use cgmath::prelude::*;
-use cgmath::{Vector2, Vector3, Vector4};
+use cgmath::{Point3, Vector2, Vector3, Vector4};
 use legion::world::SubWorld;
 use legion::*;
 
 use crate::components::*;
 use crate::graphics;
-use crate::graphics::util::{correction_matrix, project_screen_to_world, to_pos3};
+use crate::graphics::util::{correction_matrix, project_screen_to_world};
 use crate::input::{InputState, Key};
 
 #[system]
@@ -156,9 +156,9 @@ pub fn player(
         let aspect_ratio = context.window_size.width as f32 / context.window_size.height as f32;
 
         let mx_view = cgmath::Matrix4::look_at_rh(
-            to_pos3(camera_3d_pos),
-            to_pos3(camera_pos.extend(0.)),
-            cgmath::Vector3::unit_z(),
+            Point3::from_vec(camera_3d_pos),
+            Point3::from_vec(camera_pos.extend(0.)),
+            Vector3::unit_z(),
         );
         let mx_projection = cgmath::perspective(cgmath::Deg(camera.fov), aspect_ratio, 1.0, 1000.0);
 

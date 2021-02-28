@@ -124,7 +124,8 @@ impl GuiContext {
     }
 
     pub fn prep_frame(&mut self, window: &winit::window::Window) {
-        self.imgui_platform
+        let _ = self
+            .imgui_platform
             .prepare_frame(self.imgui_ctx.io_mut(), window);
     }
 

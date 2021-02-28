@@ -3,6 +3,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::graphics::MAX_NR_OF_POINT_LIGHTS;
 
+#[allow(unused)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
 pub struct Vertex {
@@ -64,14 +65,6 @@ impl Material {
         mat.albedo = [0.07, 0.07, 0.07, 1.0];
         mat.metallic = 0.0;
         mat.roughness = 0.7;
-        return mat;
-    }
-
-    pub fn bright_stone() -> Self {
-        let mut mat: Self = Default::default();
-        mat.albedo = [0.2, 0.2, 0.2, 1.0];
-        mat.metallic = 0.01;
-        mat.roughness = 0.6;
         return mat;
     }
 }

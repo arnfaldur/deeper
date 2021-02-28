@@ -1,9 +1,11 @@
+#![allow(dead_code)]
+
 extern crate cgmath;
 
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
+use cgmath::{Deg, Matrix4, Vector2, Vector3};
 use legion::Entity;
 use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 

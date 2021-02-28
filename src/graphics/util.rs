@@ -1,4 +1,8 @@
+#![allow(unused)]
+
 // Series of utility functions that solve miscellaneous but specific problems
+
+use cgmath::EuclideanSpace;
 
 pub fn create_texels(size: usize) -> Vec<u8> {
     use std::iter;
@@ -33,21 +37,11 @@ pub fn sc_desc_from_size(size: winit::dpi::PhysicalSize<u32>) -> wgpu::SwapChain
     }
 }
 
-pub fn to_pos3<T>(vec: cgmath::Vector3<T>) -> cgmath::Point3<T> {
-    cgmath::Point3::new(vec.x, vec.y, vec.z)
-}
-
-fn pos3(x: f32, y: f32, z: f32) -> cgmath::Point3<f32> { cgmath::Point3::new(x, y, z) }
-
-pub fn to_vec2<T>(vec3: cgmath::Vector3<T>) -> cgmath::Vector2<T> {
-    cgmath::Vector2::new(vec3.x, vec3.y)
-}
-
 pub fn generate_matrix(aspect_ratio: f32, t: f32) -> cgmath::Matrix4<f32> {
     let mx_projection = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 10.0);
     let mx_view = cgmath::Matrix4::look_at_rh(
-        pos3(5. * t.cos(), 5.0 * t.sin(), 3.),
-        pos3(0., 0., 0.),
+        cgmath::Point3::new(5. * t.cos(), 5.0 * t.sin(), 3.),
+        cgmath::Point3::new(0., 0., 0.),
         cgmath::Vector3::unit_z(),
     );
     let mx_correction = correction_matrix();
@@ -118,8 +112,8 @@ pub fn generate_view_matrix(
     aspect_ratio: f32,
 ) -> cgmath::Matrix4<f32> {
     let mx_view = cgmath::Matrix4::look_at_rh(
-        to_pos3(cam_pos),
-        to_pos3(cam_target),
+        cgmath::Point3::from_vec(cam_pos),
+        cgmath::Point3::from_vec(cam_target),
         cgmath::Vector3::unit_z(),
     );
 

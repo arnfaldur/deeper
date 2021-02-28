@@ -1,11 +1,4 @@
-// warnings are really only relevant when doing cleanup
-// and are distracting otherwise
-// TODO: remove actually fix the warnings
-#![allow(warnings)]
-// in development code can have some unused variables
-// should be periodically removed to remove serious redundancies
-#![allow(unused_variables)]
-#![allow(unused_must_use)]
+#![allow(deprecated)]
 
 extern crate shaderc;
 

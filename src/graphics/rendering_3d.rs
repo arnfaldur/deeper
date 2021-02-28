@@ -2,8 +2,7 @@ use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
 use zerocopy::AsBytes;
 
-use super::data::{GlobalUniforms, Lights, LocalUniforms};
-use crate::components::{Model3D, StaticModel};
+use super::data::{GlobalUniforms, Lights};
 
 // TODO: Have ass_man auto-load all shaders
 const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
@@ -13,7 +12,6 @@ pub struct ModelRenderContext {
     depth_view: wgpu::TextureView,
     global_uniform_buf: wgpu::Buffer,
     pub lights_uniform_buf: wgpu::Buffer,
-    global_bind_group_layout: wgpu::BindGroupLayout,
     pub local_bind_group_layout: wgpu::BindGroupLayout,
     global_bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
@@ -173,7 +171,6 @@ impl ModelRenderContext {
             depth_view,
             global_uniform_buf,
             lights_uniform_buf,
-            global_bind_group_layout,
             local_bind_group_layout,
             global_bind_group,
             pipeline,
@@ -256,16 +253,12 @@ impl ModelRenderContext {
 
     pub fn set_3d_camera(
         &mut self,
-        device: &wgpu::Device,
         queue: &wgpu::Queue,
         window_size: winit::dpi::PhysicalSize<u32>,
         camera: &crate::components::Camera,
         position: cgmath::Vector3<f32>,
         target: cgmath::Vector3<f32>,
     ) {
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
         let proj_view_matrix = super::util::generate_view_matrix(
             camera,
             position,
@@ -273,12 +266,15 @@ impl ModelRenderContext {
             window_size.width as f32 / window_size.height as f32,
         );
 
-        let global_uniforms = GlobalUniforms {
-            projection_view_matrix: proj_view_matrix.into(),
-            eye_position: [position.x, position.y, position.z, 0.0],
-        };
-
-        queue.write_buffer(&self.global_uniform_buf, 0, global_uniforms.as_bytes());
+        queue.write_buffer(
+            &self.global_uniform_buf,
+            0,
+            GlobalUniforms {
+                projection_view_matrix: proj_view_matrix.into(),
+                eye_position: [position.x, position.y, position.z, 0.0],
+            }
+            .as_bytes(),
+        );
     }
 
     pub fn recompile_pipeline(

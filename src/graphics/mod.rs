@@ -1,14 +1,9 @@
-use cgmath::{Deg, Vector3};
 use wgpu::util::DeviceExt;
-use wgpu::{
-    ColorTargetState, DepthStencilState, Device, PipelineLayout, RenderPipeline, ShaderModule,
-    Surface, SwapChain, SwapChainDescriptor,
-};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use zerocopy::AsBytes;
 
-use crate::components::{Camera, Model3D, StaticModel};
+use crate::components::{Model3D, StaticModel};
 // How dirty of me
 use crate::graphics::data::*;
 use crate::loader::AssetManager;
@@ -109,12 +104,9 @@ impl Context {
         let sc_desc = util::sc_desc_from_size(window_size);
         let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
+        // Maybe we should generalize render contexts? 🤔
         let model_render_ctx = ModelRenderContext::new(&device, window_size);
-
         let canvas_render_ctx = canvas::CanvasRenderContext::new(&device, window_size);
-        let canvas_queue = canvas::CanvasQueue {
-            local_uniforms: vec![],
-        };
 
         let context = Context {
             device,
@@ -126,7 +118,7 @@ impl Context {
             model_queue: ModelQueue::new(),
             model_render_ctx,
             canvas_render_ctx,
-            canvas_queue,
+            canvas_queue: canvas::CanvasQueue::new(),
         };
 
         return context;
@@ -148,8 +140,8 @@ impl Context {
     pub fn draw_model(
         &mut self,
         model: &Model3D,
-        position: Vector3<f32>,
-        rotation: Option<Deg<f32>>,
+        position: cgmath::Vector3<f32>,
+        rotation: Option<cgmath::Deg<f32>>,
     ) {
         use cgmath::Matrix4;
 
@@ -173,11 +165,10 @@ impl Context {
     pub fn set_3d_camera(
         &mut self,
         camera: &crate::components::Camera,
-        cam_position: Vector3<f32>,
-        cam_target: Vector3<f32>,
+        cam_position: cgmath::Vector3<f32>,
+        cam_target: cgmath::Vector3<f32>,
     ) {
         self.model_render_ctx.set_3d_camera(
-            &self.device,
             &self.queue,
             self.window_size,
             camera,

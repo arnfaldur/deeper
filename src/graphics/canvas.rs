@@ -1,5 +1,5 @@
+#![allow(unused)]
 use std::mem::MaybeUninit;
-use std::sync::Arc;
 
 use cgmath::{vec2, Vector2};
 use wgpu::util::DeviceExt;
@@ -145,7 +145,7 @@ pub enum RectangleDescriptor {
 }
 
 pub struct CanvasQueue {
-    pub local_uniforms: Vec<super::data::LocalUniforms>,
+    local_uniforms: Vec<super::data::LocalUniforms>,
 }
 
 impl CanvasQueue {
@@ -213,12 +213,8 @@ pub struct CanvasRenderContext {
     global_uniform_buf: wgpu::Buffer,
 
     global_bind_group: wgpu::BindGroup,
-    global_bind_group_layout: wgpu::BindGroupLayout,
-
-    local_bind_group_layout: wgpu::BindGroupLayout,
 
     pipeline: wgpu::RenderPipeline,
-    pipeline_layout: wgpu::PipelineLayout,
 
     quad_mesh: super::data::Mesh,
     immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS],
@@ -349,7 +345,7 @@ impl CanvasRenderContext {
         let pipeline = Self::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
 
         // Maybe use the array crate that automates this?
-        let mut immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS] = unsafe {
+        let immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS] = unsafe {
             let mut arr: [MaybeUninit<ImmediateElement>; MAXIMUM_NUMBER_OF_QUADS] =
                 MaybeUninit::uninit().assume_init();
 
@@ -374,11 +370,8 @@ impl CanvasRenderContext {
 
         Self {
             global_uniform_buf,
-            global_bind_group_layout,
-            local_bind_group_layout,
             global_bind_group,
             pipeline,
-            pipeline_layout,
             quad_mesh,
             immediate_elements,
         }

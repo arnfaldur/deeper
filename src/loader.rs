@@ -192,8 +192,6 @@ impl AssetManager {
         }
     }
 
-    fn update_time_loaded(&mut self, resource: &Path) { if self.assets.contains_key(resource) {} }
-
     fn register_asset(&mut self, path: &Path, asset_kind: AssetKind) {
         let name = path.file_name().unwrap().to_str().unwrap().to_string();
         self.assets.insert(
@@ -337,7 +335,7 @@ pub fn vertex_lists_from_obj(path: &Path) -> Result<Vec<Vec<Vertex>>, String> {
     };
 
     let mut buf = String::new();
-    f.read_to_string(&mut buf);
+    let _ = f.read_to_string(&mut buf);
 
     let obj_set = obj::parse(buf).expect("Failed to parse obj file");
 

@@ -1,9 +1,10 @@
-use cgmath::{prelude::*, Vector2};
-use crossbeam_channel::Receiver;
-use legion::query::Query;
-use legion::systems::{Builder, CommandBuffer, Runnable};
-use legion::world::{Event, SubWorld};
-use legion::*;
+#![allow(dead_code)]
+
+use cgmath::prelude::*;
+use cgmath::Vector2;
+use legion::systems::{Builder, Runnable};
+use legion::world::Event;
+use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World, Write};
 use nalgebra::Isometry2;
 use ncollide2d::shape::ShapeHandle;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
@@ -83,7 +84,6 @@ fn make_body_handles() -> impl Runnable {
                 .filter(!component::<BodyHandle>()),
         )
         .build(move |commands, world, resources, query| {
-            let (mut for_query, _) = world.split_for_query(query);
             let physics: &mut PhysicsResource = &mut *resources;
             for (entity, physics_body, position) in query.iter_mut(world) {
                 let body = match physics_body {
@@ -121,7 +121,7 @@ fn remove_body_handles() -> impl Runnable {
 
 fn flush_command_buffer() -> impl Runnable {
     SystemBuilder::new("flush_command_buffer")
-        .with_query(<(Write<World>)>::query())
+        .with_query(<Write<World>>::query())
         .build(move |commands, world, _, query| {
             let for_query = world; // TODO: simplify this
             query.for_each_mut(for_query, |components| {
@@ -239,10 +239,10 @@ fn physics_world_to_entity_world() -> impl Runnable {
                 if let PhysicsBody::Dynamic { .. } = body {
                     if let Some(bod) = physics.bodies.rigid_body(handle.0) {
                         if let Some(p) = pos {
-                            p.0 = n2c(bod.position().translation.vector);
+                            p.0 = n2c(&bod.position().translation.vector);
                         }
                         if let Some(v) = vel {
-                            v.0 = n2c(bod.velocity().linear);
+                            v.0 = n2c(&bod.velocity().linear);
                         }
                         if let Some(o) = ori {
                             o.0 = cgmath::Deg::from(cgmath::Rad(bod.position().rotation.angle()));
@@ -257,7 +257,7 @@ fn movement_system() -> impl Runnable {
     SystemBuilder::new("movement")
         .read_resource::<FrameTime>()
         .with_query(<(&mut WorldPosition, &mut Velocity)>::query())
-        .build(move |cmd, world, resources, query| {
+        .build(move |_cmd, world, resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
                 movement(&*resources, components.0, components.1);
@@ -265,7 +265,6 @@ fn movement_system() -> impl Runnable {
         })
 }
 
-#[allow(dead_code)]
 fn movement(frame_time: &FrameTime, pos: &mut WorldPosition, vel: &mut Velocity) {
     if vel.0.x.is_finite() && vel.0.y.is_finite() {
         let v = if (vel.0 * frame_time.0).magnitude() < 0.5 {
@@ -280,7 +279,8 @@ fn movement(frame_time: &FrameTime, pos: &mut WorldPosition, vel: &mut Velocity)
         println!("Velocity Hickup");
     }
 }
-fn n2c(input: nalgebra::Vector2<f32>) -> Vector2<f32> {
+
+fn n2c(input: &nalgebra::Vector2<f32>) -> Vector2<f32> {
     return cgmath::Vector2::new(input.x, input.y);
 }
 fn c2n(input: cgmath::Vector2<f32>) -> nalgebra::Vector2<f32> { return [input.x, input.y].into(); }

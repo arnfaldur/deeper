@@ -1,10 +1,10 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{prelude::*, Vector2};
+use cgmath::prelude::*;
+use cgmath::Vector2;
 use legion::systems::{CommandBuffer, Runnable};
 use legion::world::SubWorld;
-use legion::IntoQuery;
-use legion::*;
+use legion::{IntoQuery, *};
 
 use crate::components::*;
 
@@ -37,6 +37,7 @@ pub fn spherical_offset(pos2d: &WorldPosition, follow: &SphericalOffset, pos3d: 
     pos3d.0.z += follow.radius * follow.phi.sin();
 }
 
+#[allow(unused)]
 pub fn hit_point_regen_system() -> impl Runnable {
     SystemBuilder::new("hit_point_regen")
         .read_resource::<FrameTime>()
@@ -65,6 +66,8 @@ pub fn hit_point_regen(
         hp.health = hp.max.min(hp.health);
     }
 }
+
+#[allow(unused)]
 fn ai_follow_system() -> impl Runnable {
     SystemBuilder::new("ai_follow")
         .read_component::<AIFollow>()
