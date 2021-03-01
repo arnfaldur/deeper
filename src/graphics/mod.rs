@@ -139,7 +139,7 @@ impl Context {
 
     pub fn draw_model(
         &mut self,
-        model: Model3D,
+        model: &Model3D,
         transform: cgmath::Matrix4<f32>,
         // position: Vector3<f32>,
         // rotation: Option<Deg<f32>>,

@@ -1,9 +1,8 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{prelude::*, Vector2};
+use cgmath::prelude::*;
 use cgmath::{InnerSpace, Quaternion, Rotation as CGRotation, Vector2, Vector3};
 use legion::systems::{CommandBuffer, ParallelRunnable, Runnable};
-use legion::systems::{CommandBuffer, Runnable};
 use legion::world::SubWorld;
 use legion::{IntoQuery, *};
 
@@ -27,7 +26,7 @@ pub(crate) fn flush_command_buffer() -> impl ParallelRunnable {
         })
 }
 
-pub fn spherical_offset_system() -> impl Runnable {
+pub fn spherical_offset_system() -> impl ParallelRunnable {
     SystemBuilder::new("spherical_offset")
         .with_query(<(&Position, &SphericalOffset, &mut Position3D)>::query())
         .build(move |_cmd, world, _resources, query| {
@@ -76,7 +75,7 @@ pub fn hit_point_regen(
 }
 
 #[allow(unused)]
-fn ai_follow_system() -> impl Runnable {
+fn ai_follow_system() -> impl ParallelRunnable {
     SystemBuilder::new("ai_follow")
         .read_component::<AIFollow>()
         .read_component::<Position>()
@@ -86,6 +85,7 @@ fn ai_follow_system() -> impl Runnable {
             ai_follow(world, cmd);
         })
 }
+
 #[allow(dead_code)]
 fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
     let mut query = <(Entity, TryWrite<Rotation>, &AIFollow, &Position)>::query();
