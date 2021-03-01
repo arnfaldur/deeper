@@ -1,12 +1,14 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{prelude::*, Vector2};
-use legion::systems::{CommandBuffer, Runnable};
+use cgmath::{InnerSpace, Quaternion, Rotation as CGRotation, Vector2, Vector3};
+use legion::systems::{CommandBuffer, ParallelRunnable, Runnable};
 use legion::world::SubWorld;
 use legion::IntoQuery;
 use legion::*;
 
 use crate::components::*;
+use crate::transform::components::{Position, Position3D, Rotation};
+use crate::transform::Rotation3D;
 
 pub mod assets;
 pub mod physics;
@@ -14,13 +16,19 @@ pub mod player;
 pub mod rendering;
 pub mod world_gen;
 
+pub(crate) fn flush_command_buffer() -> impl ParallelRunnable {
+    SystemBuilder::new("flush_command_buffer")
+        .with_query(<(&mut World)>::query())
+        .build(move |commands, world, _, query| {
+            query.for_each_mut(world, |world| {
+                commands.flush(world);
+            });
+        })
+}
+
 pub fn spherical_offset_system() -> impl Runnable {
     SystemBuilder::new("spherical_offset")
-        .with_query(<(
-            ::legion::Read<WorldPosition>,
-            ::legion::Read<SphericalOffset>,
-            ::legion::Write<Position3D>,
-        )>::query())
+        .with_query(<(&Position, &SphericalOffset, &mut Position3D)>::query())
         .build(move |_cmd, world, _resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
@@ -30,14 +38,14 @@ pub fn spherical_offset_system() -> impl Runnable {
 }
 
 #[allow(dead_code)]
-pub fn spherical_offset(pos2d: &WorldPosition, follow: &SphericalOffset, pos3d: &mut Position3D) {
+pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {
     pos3d.0 = pos2d.into();
     pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
     pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
     pos3d.0.z += follow.radius * follow.phi.sin();
 }
 
-pub fn hit_point_regen_system() -> impl Runnable {
+pub fn hit_point_regen_system() -> impl ParallelRunnable {
     SystemBuilder::new("hit_point_regen")
         .read_resource::<FrameTime>()
         .with_query(<(::legion::Entity, ::legion::Write<HitPoints>)>::query())
@@ -68,22 +76,22 @@ pub fn hit_point_regen(
 fn ai_follow_system() -> impl Runnable {
     SystemBuilder::new("ai_follow")
         .read_component::<AIFollow>()
-        .read_component::<WorldPosition>()
+        .read_component::<Position>()
         .write_component::<Destination>()
-        .write_component::<Orientation>()
+        .write_component::<Rotation>()
         .build(move |cmd, world, _resources, _query| {
             ai_follow(world, cmd);
         })
 }
 #[allow(dead_code)]
 fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
-    let mut query = <(Entity, TryWrite<Orientation>, &AIFollow, &WorldPosition)>::query();
+    let mut query = <(Entity, TryWrite<Rotation>, &AIFollow, &Position)>::query();
     let (mut hunter_world, hunted_world) = world.split_for_query(&query);
     for (ent, orient, follow, hunter) in query.iter_mut(&mut hunter_world) {
         if let Some(hunted) = hunted_world
             .entry_ref(follow.target)
             .ok()
-            .map(|e| e.into_component::<WorldPosition>().ok())
+            .map(|e| e.into_component::<Position>().ok())
             .flatten()
         {
             let difference: Vector2<f32> = hunted.0 - hunter.0;
@@ -97,9 +105,10 @@ fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
         }
     }
 }
-pub fn go_to_destination_system() -> impl Runnable {
+
+pub fn go_to_destination_system() -> impl ParallelRunnable {
     SystemBuilder::new("go_to_destination")
-        .read_component::<WorldPosition>()
+        .read_component::<Position>()
         .read_component::<Speed>()
         .read_component::<Acceleration>()
         .write_component::<Destination>()
@@ -119,7 +128,7 @@ pub fn go_to_destination(
     let mut query = <(
         Entity,
         &Destination,
-        &WorldPosition,
+        &Position,
         &mut Velocity,
         &Speed,
         &Acceleration,

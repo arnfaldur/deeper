@@ -264,18 +264,20 @@ impl Context {
     pub fn draw_model(
         &mut self,
         model: Model3D,
-        position: Vector3<f32>,
-        rotation: Option<Deg<f32>>,
+        transform: cgmath::Matrix4<f32>,
+        // position: Vector3<f32>,
+        // rotation: Option<Deg<f32>>,
     ) {
         use cgmath::Matrix4;
 
         let mut matrix = Matrix4::from_scale(model.scale);
-
-        if let Some(rot) = rotation {
-            matrix = Matrix4::from_angle_z(rot) * matrix;
-        }
-
-        matrix = Matrix4::from_translation(position) * matrix;
+        matrix = transform * matrix;
+        //
+        // if let Some(rot) = rotation {
+        //     matrix = Matrix4::from_angle_z(rot) * matrix;
+        // }
+        //
+        // matrix = Matrix4::from_translation(position) * matrix;
 
         self.model_queue.local_uniforms.push(LocalUniforms {
             model_matrix: matrix.into(),

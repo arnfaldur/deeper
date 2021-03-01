@@ -1,8 +1,10 @@
+use cgmath::Deg;
 use legion::storage::Component;
 use legion::systems::CommandBuffer;
 use legion::World;
 
 use crate::components::*;
+use crate::transform::{Position, Rotation};
 
 pub struct EntitySmith<'a> {
     entity: legion::Entity,
@@ -39,14 +41,11 @@ impl<'a> EntitySmith<'a> {
         self.buffer.add_component(self.entity, component);
         return self;
     }
-    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self {
-        self.add_component(WorldPosition(pos))
-    }
+
+    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self { self.add_component(Position(pos)) }
     pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
     pub fn velocity_zero(&mut self) -> &mut Self { self.add_component(Velocity::new()) }
-    pub fn orientation(&mut self, ori: f32) -> &mut Self {
-        self.add_component(Orientation(Deg(ori)))
-    }
+    pub fn orientation(&mut self, ori: f32) -> &mut Self { self.add_component(Rotation(Deg(ori))) }
     pub fn physics_body(&mut self, body: PhysicsBody) -> &mut Self { self.add_component(body) }
     pub fn dynamic_body(&mut self, mass: f32) -> &mut Self {
         self.add_component(PhysicsBody::Dynamic { mass })
@@ -59,6 +58,8 @@ impl<'a> EntitySmith<'a> {
         self.add_component(Speed(speed));
         self.add_component(Acceleration(acceleration))
     }
+    pub fn mark(&mut self) -> &mut Self { self.add_component(Marker) }
+    pub fn name(&mut self, name: &str) -> &mut Self { self.add_component(Name(String::from(name))) }
     #[deprecated(note = "builder method not implemented for a component class.")]
     pub fn any<T: Component>(&mut self, component: T) -> &mut Self { self.add_component(component) }
 }

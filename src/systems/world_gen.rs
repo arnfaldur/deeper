@@ -10,6 +10,7 @@ use zerocopy::AsBytes;
 use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::dung_gen::DungGen;
+use crate::transform::components::Position;
 use crate::{graphics, loader};
 
 //pub struct MapSwitchingSystem;
@@ -85,14 +86,14 @@ pub fn dung_gen(
             // Reset player position and stuff
             commands.add_component(
                 player.entity,
-                WorldPosition(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
+                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
             );
             //updater.insert(player.entity, Orientation(Deg(0.0)));
             commands.add_component(player.entity, Velocity::new());
 
             commands.add_component(
                 player_camera.entity,
-                WorldPosition(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
+                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
             );
 
             // TODO: Turn lights into entities
@@ -192,7 +193,7 @@ pub fn dung_gen(
                 match tile_type {
                     TileType::Nothing => {}
                     _ => {
-                        commands.add_component(entity, WorldPosition(pos));
+                        commands.add_component(entity, Position(pos));
                     }
                 }
                 // tile specific behaviors
@@ -218,7 +219,8 @@ pub fn dung_gen(
                     && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
                 {
                     let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
-                    EntitySmith::from_buffer(commands)
+                    let mut smith = EntitySmith::from_buffer(commands);
+                    smith
                         .position(
                             pos + Vector2::new(rng.gen_range(-0.3..0.3), rng.gen_range(-0.3..0.3)),
                         )

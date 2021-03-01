@@ -12,17 +12,19 @@ extern crate shaderc;
 use std::time::{Instant, SystemTime};
 
 use cgmath::{Vector2, Vector3, Zero};
-use components::*;
-use input::InputState;
 use legion::{Resources, Schedule, World};
-use loader::AssetManager;
-use systems::physics::PhysicsBuilderExtender;
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::components::entity_builder::EntitySmith;
+use crate::components::*;
+use crate::input::InputState;
+use crate::loader::AssetManager;
+use crate::systems::physics::PhysicsBuilderExtender;
 use crate::systems::rendering::RenderBuilderExtender;
+use crate::transform::components::Position3D;
+use crate::transform::TransformBuilderExtender;
 
 mod components;
 mod dung_gen;
@@ -30,6 +32,7 @@ mod graphics;
 mod input;
 mod loader;
 mod systems;
+mod transform;
 
 async fn run_async() {
     let mut ass_man = AssetManager::new();
@@ -63,10 +66,11 @@ async fn run_async() {
         ))
         .add_system(systems::player::player_system())
         .add_system(systems::player::camera_control_system())
+        .add_system(systems::world_gen::dung_gen_system())
         .add_system(systems::go_to_destination_system())
         .add_physics_systems(&mut world, &mut resources)
         .add_system(systems::spherical_offset_system())
-        .add_system(systems::world_gen::dung_gen_system())
+        .add_transform_systems()
         .add_system(systems::assets::hot_loading_system(
             SystemTime::now(),
             false,
@@ -77,6 +81,7 @@ async fn run_async() {
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
     let player = EntitySmith::from(&mut command_buffer)
+        .name("Player")
         .position(Vector2::unit_x())
         .orientation(0.0)
         .agent(5., 30.)
@@ -90,7 +95,9 @@ async fn run_async() {
         .get_entity();
 
     let player_camera = EntitySmith::from(&mut command_buffer)
+        .name("The camera")
         .any(Parent(player))
+        .any(Target(player))
         .position(Vector2::unit_x())
         .velocity(Vector2::zero())
         .any(components::Camera {

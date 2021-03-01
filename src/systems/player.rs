@@ -10,6 +10,7 @@ use crate::components::*;
 use crate::graphics;
 use crate::graphics::{correction_matrix, project_screen_to_world, to_pos3};
 use crate::input::{InputState, Key};
+use crate::transform::components::{Position, Position3D, Rotation};
 
 #[system]
 #[write_component(Camera)]
@@ -17,7 +18,7 @@ use crate::input::{InputState, Key};
 #[write_component(Destination)]
 #[write_component(Velocity)]
 #[read_component(Position3D)]
-#[read_component(WorldPosition)]
+#[read_component(Position)]
 pub fn camera_control(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
@@ -40,11 +41,9 @@ pub fn camera_control(
     let mut camera = { player_cam_entity.get_component_mut::<Camera>().unwrap() };
 
     let mut player_cam_entity = offset_world.entry_mut(player_cam.entity).unwrap();
-    let mut cam_offset = {
-        player_cam_entity
-            .get_component_mut::<SphericalOffset>()
-            .unwrap()
-    };
+    let mut cam_offset = player_cam_entity
+        .get_component_mut::<SphericalOffset>()
+        .unwrap();
 
     // Zoom controls
     cam_offset.radius += -input.mouse.scroll * cam_offset.radius_delta;
@@ -63,7 +62,7 @@ pub fn camera_control(
     let cam_pos = world
         .entry_ref(player_cam.entity)
         .unwrap()
-        .get_component::<WorldPosition>()
+        .get_component::<Position>()
         .unwrap()
         .0;
 
@@ -110,7 +109,7 @@ pub fn camera_control(
         let player_pos = world
             .entry_ref(player.entity)
             .unwrap()
-            .get_component::<WorldPosition>()
+            .get_component::<Position>()
             .unwrap()
             .0;
 
@@ -119,10 +118,10 @@ pub fn camera_control(
 }
 
 #[system]
-#[write_component(Orientation)]
+#[write_component(Rotation)]
 #[write_component(Destination)]
 #[write_component(Camera)]
-#[read_component(WorldPosition)]
+#[read_component(Position)]
 #[read_component(Position3D)]
 #[read_component(Faction)]
 #[read_component(HitPoints)]
@@ -137,7 +136,7 @@ pub fn player(
     // We need to do this to get mutable accesses to multiple components at once.
     // It is possible that we can fix this by creating more systems
     let (mut camera_world, mut world) = world.split::<&mut Camera>();
-    let (mut orient_world, world) = world.split::<&mut Orientation>();
+    let (mut orient_world, world) = world.split::<&mut Rotation>();
 
     let mouse_pos = input.mouse.pos;
 
@@ -150,14 +149,14 @@ pub fn player(
         let mut camera = player_cam_entry.get_component_mut::<Camera>().unwrap();
 
         let player_cam_entry = world.entry_ref(player_cam.entity).unwrap();
-        let camera_3d_pos = player_cam_entry.get_component::<Position3D>().unwrap().0;
-        let camera_pos = player_cam_entry.get_component::<WorldPosition>().unwrap().0;
+        let camera_position = player_cam_entry.get_component::<Position3D>().unwrap().0;
+        let camera_target = player_cam_entry.get_component::<Position>().unwrap().0;
 
         let aspect_ratio = context.sc_desc.width as f32 / context.sc_desc.height as f32;
 
         let mx_view = cgmath::Matrix4::look_at_rh(
-            to_pos3(camera_3d_pos),
-            to_pos3(camera_pos.extend(0.)),
+            to_pos3(camera_position),
+            to_pos3(camera_target.extend(0.)),
             cgmath::Vector3::unit_z(),
         );
         let mx_projection = cgmath::perspective(cgmath::Deg(camera.fov), aspect_ratio, 1.0, 1000.0);
@@ -172,7 +171,7 @@ pub fn player(
                 context.sc_desc.height as i32,
             ),
         ) {
-            let ray_delta: Vector3<f32> = mouse_world_pos - camera_3d_pos;
+            let ray_delta: Vector3<f32> = mouse_world_pos - camera_position;
             let t: f32 = mouse_world_pos.z / ray_delta.z;
             let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
 
@@ -182,7 +181,7 @@ pub fn player(
             let difference: Vector2<f32> = {
                 let player_entry = world.entry_ref(player.entity).unwrap();
                 let player_pos = player_entry
-                    .get_component::<WorldPosition>()
+                    .get_component::<Position>()
                     .expect("I have no place in this world.")
                     .0;
                 ray_hit - player_pos
@@ -195,7 +194,7 @@ pub fn player(
             {
                 let mut player_entry = orient_world.entry_mut(player.entity).unwrap();
                 let mut player_orient = player_entry
-                    .get_component_mut::<Orientation>()
+                    .get_component_mut::<Rotation>()
                     .expect("We have no direction in life.");
                 (player_orient.0).0 = new_rotation;
             }

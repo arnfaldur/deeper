@@ -1,16 +1,14 @@
-extern crate cgmath;
-
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-use cgmath::{Deg, Matrix4, Vector2, Vector3, Zero};
+use cgmath::{Matrix4, Vector2, Vector3};
+use imgui::__core::fmt::Formatter;
 use legion::Entity;
 use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
-use self::cgmath::Quaternion;
 use crate::graphics;
 
-pub mod entity_builder;
+pub(crate) mod entity_builder;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -29,23 +27,9 @@ pub struct Parent(pub Entity);
 
 // end entity pointers
 
+pub struct Marker;
+
 pub struct FrameTime(pub f32);
-
-#[derive(Debug)]
-#[derive(Copy, Clone)]
-pub struct WorldPosition(pub Vector2<f32>);
-
-impl From<WorldPosition> for Vector2<f32> {
-    fn from(pos: WorldPosition) -> Self { pos.0 }
-}
-
-impl From<WorldPosition> for Vector3<f32> {
-    fn from(pos: WorldPosition) -> Self { pos.0.extend(0.) }
-}
-
-impl From<&WorldPosition> for Vector3<f32> {
-    fn from(pos: &WorldPosition) -> Self { pos.0.extend(0.) }
-}
 
 #[derive(Debug)]
 pub struct Velocity(pub Vector2<f32>);
@@ -59,16 +43,6 @@ pub struct Force(pub nphysics2d::algebra::Force2<f32>);
 impl Default for Force {
     fn default() -> Self { Force(nphysics2d::algebra::Force2::zero()) }
 }
-
-pub struct Orientation(pub Deg<f32>);
-
-pub struct Rotation(pub Quaternion<f32>);
-
-impl Rotation {
-    pub fn orientation(deg: f32) -> Self { Rotation(Quaternion::new(deg, 0., 0., 0.)) }
-}
-
-pub struct Scale(pub f32);
 
 pub struct Speed(pub f32);
 
@@ -110,6 +84,12 @@ impl Destination {
     }
 }
 
+pub struct Name(String);
+
+impl std::fmt::Display for Name {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
+}
+
 #[derive(Eq, PartialEq)]
 #[derive(Copy, Clone)]
 pub enum Faction {
@@ -137,8 +117,6 @@ pub struct Camera {
 }
 
 pub struct Target(pub Entity);
-
-pub struct Position3D(pub Vector3<f32>);
 
 pub struct SphericalOffset {
     pub phi: f32,

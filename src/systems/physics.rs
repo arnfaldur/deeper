@@ -1,7 +1,7 @@
 use cgmath::{prelude::*, Vector2};
 use crossbeam_channel::Receiver;
 use legion::query::Query;
-use legion::systems::{Builder, CommandBuffer, Runnable};
+use legion::systems::{Builder, CommandBuffer, ParallelRunnable};
 use legion::world::{Event, SubWorld};
 use legion::*;
 use nalgebra::Isometry2;
@@ -15,6 +15,7 @@ use nphysics2d::object::{
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
 use crate::components::*;
+use crate::transform::components::{Position, Rotation};
 
 pub(crate) trait PhysicsBuilderExtender {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self;
@@ -75,12 +76,11 @@ impl Default for PhysicsResource {
     }
 }
 
-fn make_body_handles() -> impl Runnable {
+fn make_body_handles() -> impl ParallelRunnable {
     SystemBuilder::new("make_body_handles")
         .write_resource::<PhysicsResource>()
         .with_query(
-            <(Entity, &PhysicsBody, Option<&WorldPosition>)>::query()
-                .filter(!component::<BodyHandle>()),
+            <(Entity, &PhysicsBody, Option<&Position>)>::query().filter(!component::<BodyHandle>()),
         )
         .build(move |commands, world, resources, query| {
             let (mut for_query, _) = world.split_for_query(query);
@@ -93,7 +93,7 @@ fn make_body_handles() -> impl Runnable {
                     PhysicsBody::Static => RigidBodyDesc::<f32>::new()
                         .status(BodyStatus::Static)
                         .position(Isometry2::new(
-                            c2n(position.unwrap_or(&WorldPosition(cgmath::vec2(0., 0.))).0),
+                            c2n(position.unwrap_or(&Position(cgmath::vec2(0., 0.))).0),
                             0.,
                         )),
                     PhysicsBody::Dynamic { mass } => RigidBodyDesc::<f32>::new()
@@ -107,7 +107,7 @@ fn make_body_handles() -> impl Runnable {
         })
 }
 
-fn remove_body_handles() -> impl Runnable {
+fn remove_body_handles() -> impl ParallelRunnable {
     SystemBuilder::new("remove_body_handles")
         .write_resource::<PhysicsResource>()
         .with_query(<(Entity, &BodyHandle)>::query().filter(!component::<PhysicsBody>()))
@@ -119,24 +119,15 @@ fn remove_body_handles() -> impl Runnable {
         })
 }
 
-fn flush_command_buffer() -> impl Runnable {
-    SystemBuilder::new("flush_command_buffer")
-        .with_query(<(Write<World>)>::query())
-        .build(move |commands, world, _, query| {
-            let for_query = world; // TODO: simplify this
-            query.for_each_mut(for_query, |components| {
-                commands.flush(components);
-            });
-        })
-}
-
-fn make_collider_handles() -> impl Runnable {
+fn make_collider_handles() -> impl ParallelRunnable {
     SystemBuilder::new("make_collider_handles")
         .write_resource::<PhysicsResource>()
         .with_query(
             <(Entity, &BodyHandle, &Collider)>::query().filter(!component::<ColliderHandle>()),
         )
         .build(move |commands, world, resources, query| {
+            // TODO: figure out if this split does anything
+            // or if `world` is already the same as `for_query`
             let (mut for_query, _) = world.split_for_query(query);
             let physics: &mut PhysicsResource = &mut *resources;
             for components in query.iter_mut(&mut for_query) {
@@ -160,7 +151,7 @@ fn make_collider_handles() -> impl Runnable {
         })
 }
 
-fn remove_collider_handles() -> impl Runnable {
+fn remove_collider_handles() -> impl ParallelRunnable {
     SystemBuilder::new("remove_collider_handles")
         .write_resource::<PhysicsResource>()
         .with_query(<(Entity, &ColliderHandle)>::query().filter(!component::<Collider>()))
@@ -173,21 +164,15 @@ fn remove_collider_handles() -> impl Runnable {
         })
 }
 
-fn entity_world_to_physics_world() -> impl Runnable {
+fn entity_world_to_physics_world() -> impl ParallelRunnable {
     SystemBuilder::new("entity_world_to_physics_world")
         .read_component::<BodyHandle>()
-        .read_component::<WorldPosition>()
+        .read_component::<Position>()
         .read_component::<Velocity>()
-        .read_component::<Orientation>()
+        .read_component::<Rotation>()
         .read_component::<PhysicsBody>()
         .write_resource::<PhysicsResource>()
-        .with_query(<(
-            &BodyHandle,
-            &PhysicsBody,
-            &WorldPosition,
-            &Velocity,
-            &Orientation,
-        )>::query())
+        .with_query(<(&BodyHandle, &PhysicsBody, &Position, &Velocity, &Rotation)>::query())
         .build(move |_, world, physics, query| {
             let physics: &mut PhysicsResource = &mut *physics;
             for (han, bod, pos, vel, ori) in query.iter(world) {
@@ -202,7 +187,7 @@ fn entity_world_to_physics_world() -> impl Runnable {
         })
 }
 
-fn step_physics_world() -> impl Runnable {
+fn step_physics_world() -> impl ParallelRunnable {
     SystemBuilder::new("step_physics_world")
         .write_resource::<PhysicsResource>()
         .build(move |_, _, physics, _| {
@@ -211,20 +196,21 @@ fn step_physics_world() -> impl Runnable {
         })
 }
 
-fn physics_world_to_entity_world() -> impl Runnable {
+// TODO: See if .read_component and write are neccesary
+fn physics_world_to_entity_world() -> impl ParallelRunnable {
     SystemBuilder::new("physics_world_to_entity_world")
         .read_component::<BodyHandle>()
         .read_component::<PhysicsBody>()
-        .write_component::<WorldPosition>()
+        .write_component::<Position>()
         .write_component::<Velocity>()
-        .write_component::<Orientation>()
+        .write_component::<Rotation>()
         .read_resource::<PhysicsResource>()
         .with_query(<(
             &BodyHandle,
             &PhysicsBody,
-            Option<&mut WorldPosition>,
+            Option<&mut Position>,
             Option<&mut Velocity>,
-            Option<&mut Orientation>,
+            Option<&mut Rotation>,
         )>::query())
         .build(move |_, world, resources, query| {
             let physics: &PhysicsResource = &*resources;
@@ -232,9 +218,9 @@ fn physics_world_to_entity_world() -> impl Runnable {
                 let (handle, body, pos, vel, ori): (
                     &BodyHandle,
                     &PhysicsBody,
-                    Option<&mut WorldPosition>,
+                    Option<&mut Position>,
                     Option<&mut Velocity>,
-                    Option<&mut Orientation>,
+                    Option<&mut Rotation>,
                 ) = components;
                 if let PhysicsBody::Dynamic { .. } = body {
                     if let Some(bod) = physics.bodies.rigid_body(handle.0) {
@@ -253,10 +239,10 @@ fn physics_world_to_entity_world() -> impl Runnable {
         })
 }
 
-fn movement_system() -> impl Runnable {
+fn movement_system() -> impl ParallelRunnable {
     SystemBuilder::new("movement")
         .read_resource::<FrameTime>()
-        .with_query(<(&mut WorldPosition, &mut Velocity)>::query())
+        .with_query(<(&mut Position, &mut Velocity)>::query())
         .build(move |cmd, world, resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
@@ -266,7 +252,7 @@ fn movement_system() -> impl Runnable {
 }
 
 #[allow(dead_code)]
-fn movement(frame_time: &FrameTime, pos: &mut WorldPosition, vel: &mut Velocity) {
+fn movement(frame_time: &FrameTime, pos: &mut Position, vel: &mut Velocity) {
     if vel.0.x.is_finite() && vel.0.y.is_finite() {
         let v = if (vel.0 * frame_time.0).magnitude() < 0.5 {
             vel.0 * frame_time.0
