@@ -1,6 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{InnerSpace, Quaternion, Rotation as CGRotation, Vector2, Vector3};
+use cgmath::{InnerSpace, Vector2};
 use legion::systems::{CommandBuffer, ParallelRunnable};
 use legion::world::SubWorld;
 use legion::{IntoQuery, *};
@@ -43,6 +43,7 @@ pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut 
     pos3d.0.z += follow.radius * follow.phi.sin();
 }
 
+#[allow(dead_code)]
 pub fn hit_point_regen_system() -> impl ParallelRunnable {
     SystemBuilder::new("hit_point_regen")
         .read_resource::<FrameTime>()

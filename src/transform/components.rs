@@ -1,4 +1,4 @@
-use cgmath::{Array, Deg, Matrix4, Quaternion, Rotation3, SquareMatrix, Vector2, Vector3, Zero};
+use cgmath::{Deg, Matrix4, Quaternion, Rotation3, Vector2, Vector3};
 
 pub struct Position(pub Vector2<f32>);
 
@@ -50,6 +50,7 @@ impl From<&NonUniformScale> for Matrix4<f32> {
     }
 }
 
+#[allow(dead_code)]
 pub struct RelativeTransform(pub Matrix4<f32>);
 
 pub struct AbsoluteTransform(pub Matrix4<f32>);

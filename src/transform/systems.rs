@@ -1,8 +1,6 @@
 use cgmath::{Matrix4, SquareMatrix};
 use legion::systems::{Builder, ParallelRunnable};
-use legion::{
-    component, maybe_changed, Entity, EntityStore, IntoQuery, Resources, SystemBuilder, World,
-};
+use legion::{component, maybe_changed, Entity, IntoQuery, SystemBuilder};
 
 use crate::components::Name;
 use crate::systems::flush_command_buffer;
