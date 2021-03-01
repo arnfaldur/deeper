@@ -1,9 +1,8 @@
+#![allow(dead_code)]
+
 use cgmath::{prelude::*, Vector2};
-
-
 use legion::systems::{Builder, ParallelRunnable};
-use legion::world::{Event};
-
+use legion::world::Event;
 use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World};
 use nalgebra::Isometry2;
 use ncollide2d::shape::ShapeHandle;

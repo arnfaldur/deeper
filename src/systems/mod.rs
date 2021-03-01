@@ -1,6 +1,5 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::prelude::*;
 use cgmath::{InnerSpace, Quaternion, Rotation as CGRotation, Vector2, Vector3};
 use legion::systems::{CommandBuffer, ParallelRunnable};
 use legion::world::SubWorld;
@@ -8,7 +7,6 @@ use legion::{IntoQuery, *};
 
 use crate::components::*;
 use crate::transform::components::{Position, Position3D, Rotation};
-
 
 pub mod assets;
 pub mod physics;

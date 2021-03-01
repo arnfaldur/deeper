@@ -53,38 +53,3 @@ impl From<&NonUniformScale> for Matrix4<f32> {
 pub struct RelativeTransform(pub Matrix4<f32>);
 
 pub struct AbsoluteTransform(pub Matrix4<f32>);
-
-pub struct Transform {
-    position: Vector3<f32>,
-    rotation: Quaternion<f32>,
-    scale: Vector3<f32>,
-    relative: Matrix4<f32>,
-    global: Matrix4<f32>,
-}
-
-impl Default for Transform {
-    fn default() -> Self {
-        Self {
-            position: Vector3::zero(),
-            rotation: Quaternion::zero(),
-            scale: Vector3::from_value(1.0),
-            relative: Matrix4::identity(),
-            global: Matrix4::identity(),
-        }
-    }
-}
-
-impl Transform {
-    pub fn new(position: Vector3<f32>, rotation: Quaternion<f32>, scale: Vector3<f32>) -> Self {
-        let relative = Matrix4::from_translation(position)
-            * Matrix4::from(rotation)
-            * Matrix4::from_diagonal(scale.extend(0.));
-        Self {
-            position,
-            rotation,
-            scale,
-            relative,
-            global: Matrix4::identity(),
-        }
-    }
-}
