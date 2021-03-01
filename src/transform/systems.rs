@@ -1,5 +1,5 @@
 use cgmath::{Matrix4, SquareMatrix};
-use legion::systems::{Builder, ParallelRunnable, Runnable};
+use legion::systems::{Builder, ParallelRunnable};
 use legion::{
     component, maybe_changed, Entity, EntityStore, IntoQuery, Resources, SystemBuilder, World,
 };
@@ -34,7 +34,7 @@ fn player_transform_shower() -> impl ParallelRunnable {
     SystemBuilder::new("player_transform_shower")
         .with_query(<(Entity, &AbsoluteTransform)>::query())
         .read_resource::<crate::components::Player>()
-        .build(move |cmd, world, resources, queries| {
+        .build(move |_cmd, world, resources, queries| {
             let player: &crate::components::Player = resources;
             queries.for_each(world, |(ent, abt)| {
                 if *ent == player.entity {
@@ -46,7 +46,7 @@ fn player_transform_shower() -> impl ParallelRunnable {
 
 fn populate_transforms() -> impl ParallelRunnable {
     SystemBuilder::new("populate_transforms")
-        .with_query(<(Entity)>::query().filter(
+        .with_query(<Entity>::query().filter(
             !component::<AbsoluteTransform>()
                 & (component::<Position>()
                     | component::<Rotation>()
@@ -63,7 +63,7 @@ fn populate_transforms() -> impl ParallelRunnable {
 
 fn depopulate_transforms() -> impl ParallelRunnable {
     SystemBuilder::new("depopulate_transforms")
-        .with_query(<(Entity)>::query().filter(
+        .with_query(<Entity>::query().filter(
             component::<AbsoluteTransform>()
                 & !component::<Position>()
                 & !component::<Rotation>()
@@ -81,7 +81,7 @@ fn depopulate_transforms() -> impl ParallelRunnable {
 // when a transform informing component changes, reset the transform such that it can be recalculated
 fn reset_transforms() -> impl ParallelRunnable {
     SystemBuilder::new("populate_transforms")
-        .with_query(<(&mut AbsoluteTransform)>::query().filter(
+        .with_query(<&mut AbsoluteTransform>::query().filter(
             maybe_changed::<Position>()
                 | maybe_changed::<Rotation>()
                 | maybe_changed::<Rotation3D>()
@@ -89,7 +89,7 @@ fn reset_transforms() -> impl ParallelRunnable {
                 | maybe_changed::<NonUniformScale>(),
         ))
         .build(move |_, world, _, query| {
-            query.for_each_mut(world, |(abs_tran): (&mut AbsoluteTransform)| {
+            query.for_each_mut(world, |abs_tran: &mut AbsoluteTransform| {
                 abs_tran.0 = Matrix4::identity();
             });
         })

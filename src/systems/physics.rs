@@ -1,10 +1,10 @@
 use cgmath::{prelude::*, Vector2};
-use crossbeam_channel::Receiver;
-use legion::query::Query;
-use legion::systems::{Builder, CommandBuffer, ParallelRunnable};
-use legion::world::{Event, SubWorld};
-use legion::*;
-use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World, Write};
+
+
+use legion::systems::{Builder, ParallelRunnable};
+use legion::world::{Event};
+
+use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World};
 use nalgebra::Isometry2;
 use ncollide2d::shape::ShapeHandle;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
@@ -243,7 +243,7 @@ fn movement_system() -> impl ParallelRunnable {
     SystemBuilder::new("movement")
         .read_resource::<FrameTime>()
         .with_query(<(&mut Position, &mut Velocity)>::query())
-        .build(move |cmd, world, resources, query| {
+        .build(move |_cmd, world, resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
                 movement(&*resources, components.0, components.1);

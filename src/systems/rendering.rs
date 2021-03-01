@@ -9,7 +9,7 @@ use crate::components::*;
 use crate::graphics;
 use crate::graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use crate::loader::AssetManager;
-use crate::transform::components::{Position, Position3D, Rotation};
+use crate::transform::components::{Position, Position3D};
 use crate::transform::AbsoluteTransform;
 
 pub trait RenderBuilderExtender {

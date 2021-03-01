@@ -76,7 +76,7 @@ impl Default for Transform {
 
 impl Transform {
     pub fn new(position: Vector3<f32>, rotation: Quaternion<f32>, scale: Vector3<f32>) -> Self {
-        let mut relative = Matrix4::from_translation(position)
+        let relative = Matrix4::from_translation(position)
             * Matrix4::from(rotation)
             * Matrix4::from_diagonal(scale.extend(0.));
         Self {

@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-use cgmath::{Deg, Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Vector2, Vector3};
 use imgui::__core::fmt::Formatter;
 use legion::Entity;
 use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};

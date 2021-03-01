@@ -2,13 +2,13 @@ use std::f32::consts::FRAC_PI_2;
 
 use cgmath::prelude::*;
 use cgmath::{InnerSpace, Quaternion, Rotation as CGRotation, Vector2, Vector3};
-use legion::systems::{CommandBuffer, ParallelRunnable, Runnable};
+use legion::systems::{CommandBuffer, ParallelRunnable};
 use legion::world::SubWorld;
 use legion::{IntoQuery, *};
 
 use crate::components::*;
 use crate::transform::components::{Position, Position3D, Rotation};
-use crate::transform::Rotation3D;
+
 
 pub mod assets;
 pub mod physics;
@@ -18,7 +18,7 @@ pub mod world_gen;
 
 pub(crate) fn flush_command_buffer() -> impl ParallelRunnable {
     SystemBuilder::new("flush_command_buffer")
-        .with_query(<(&mut World)>::query())
+        .with_query(<&mut World>::query())
         .build(move |commands, world, _, query| {
             query.for_each_mut(world, |world| {
                 commands.flush(world);
