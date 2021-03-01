@@ -1,8 +1,9 @@
-use cgmath::Vector3;
+use cgmath::{Vector3, Vector4};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::graphics::MAX_NR_OF_POINT_LIGHTS;
 
+#[allow(unused)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
 pub struct Vertex {
@@ -35,6 +36,14 @@ impl Material {
         return mat;
     }
 
+    pub fn color(color: Vector4<f32>) -> Self {
+        let mut mat: Self = Self::default();
+        mat.albedo = color.into();
+        mat.metallic = 0.0;
+        mat.roughness = 0.0;
+        return mat;
+    }
+
     pub fn glossy(color: Vector3<f32>) -> Self {
         let mut mat: Self = Self::default();
         mat.albedo = [color.x, color.y, color.z, 1.0];
@@ -56,14 +65,6 @@ impl Material {
         mat.albedo = [0.07, 0.07, 0.07, 1.0];
         mat.metallic = 0.0;
         mat.roughness = 0.7;
-        return mat;
-    }
-
-    pub fn bright_stone() -> Self {
-        let mut mat: Self = Default::default();
-        mat.albedo = [0.2, 0.2, 0.2, 1.0];
-        mat.metallic = 0.01;
-        mat.roughness = 0.6;
         return mat;
     }
 }

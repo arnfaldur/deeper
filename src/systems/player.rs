@@ -2,13 +2,13 @@ use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
 use cgmath::prelude::*;
-use cgmath::{Vector2, Vector3, Vector4};
+use cgmath::{Point3, Vector2, Vector3, Vector4};
 use legion::world::SubWorld;
 use legion::*;
 
 use crate::components::*;
 use crate::graphics;
-use crate::graphics::{correction_matrix, project_screen_to_world, to_pos3};
+use crate::graphics::util::{correction_matrix, project_screen_to_world};
 use crate::input::{InputState, Key};
 use crate::transform::components::{Position, Position3D, Rotation};
 
@@ -80,19 +80,19 @@ pub fn camera_control(
     let mut new_velocity = Vector2::new(0.0, 0.0);
 
     if input.is_key_down(Key::E) {
-        new_velocity += cam_front;
+        new_velocity += cam_front.clone();
         camera.roaming = true;
     }
     if input.is_key_down(Key::S) {
-        new_velocity -= cam_right;
+        new_velocity -= cam_right.clone();
         camera.roaming = true;
     }
     if input.is_key_down(Key::D) {
-        new_velocity -= cam_front;
+        new_velocity -= cam_front.clone();
         camera.roaming = true;
     }
     if input.is_key_down(Key::F) {
-        new_velocity += cam_right;
+        new_velocity += cam_right.clone();
         camera.roaming = true;
     }
 
@@ -152,12 +152,12 @@ pub fn player(
         let camera_position = player_cam_entry.get_component::<Position3D>().unwrap().0;
         let camera_target = player_cam_entry.get_component::<Position>().unwrap().0;
 
-        let aspect_ratio = context.sc_desc.width as f32 / context.sc_desc.height as f32;
+        let aspect_ratio = context.window_size.width as f32 / context.window_size.height as f32;
 
         let mx_view = cgmath::Matrix4::look_at_rh(
-            to_pos3(camera_position),
-            to_pos3(camera_target.extend(0.)),
-            cgmath::Vector3::unit_z(),
+            Point3::from_vec(camera_position),
+            Point3::from_vec(camera_target.extend(0.)),
+            Vector3::unit_z(),
         );
         let mx_projection = cgmath::perspective(cgmath::Deg(camera.fov), aspect_ratio, 1.0, 1000.0);
 
@@ -167,8 +167,8 @@ pub fn player(
             Vector4::new(
                 0,
                 0,
-                context.sc_desc.width as i32,
-                context.sc_desc.height as i32,
+                context.window_size.width as i32,
+                context.window_size.height as i32,
             ),
         ) {
             let ray_delta: Vector3<f32> = mouse_world_pos - camera_position;

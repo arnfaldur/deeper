@@ -2,6 +2,12 @@
 
 /// Did not want to go this way, but basically feel obligated to do so
 /// Based on the way that Amethyst integrates imgui into their engine
+/// This solves a problem where we must keep a reference to the current
+/// imgui::Ui, which is a mutable reference to the imgui context.
+/// The ECS resources will take ownership of the reference, which
+/// the borrow checker does not like. The current solution as inspired
+/// heavily by amethyst is to just bypass the borrow checker entirely
+/// and manage a reference to the memory manually.
 pub static mut CURRENT_UI: Option<imgui::Ui<'static>> = None;
 pub unsafe fn current_ui<'a>() -> Option<&'a imgui::Ui<'a>> { CURRENT_UI.as_ref() }
 
@@ -65,13 +71,61 @@ impl GuiContext {
         };
     }
 
+    pub fn render(
+        &mut self,
+        window: &winit::window::Window,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        view: &wgpu::TextureView,
+    ) {
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("ImGui Command Encoder"),
+        });
+
+        unsafe {
+            if let Some(ui) = current_ui() {
+                self.imgui_platform.prepare_render(&ui, &window);
+            } else {
+                panic!("Attempt to render ImGui with no valid Ui reference!");
+            }
+        }
+
+        let draw_data = unsafe {
+            CURRENT_UI = None;
+            imgui::sys::igRender();
+            &*(imgui::sys::igGetDrawData() as *mut imgui::DrawData)
+        };
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                attachment: view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        self.imgui_renderer
+            .render(draw_data, queue, device, &mut render_pass)
+            .expect("Rendering failed");
+
+        drop(render_pass);
+
+        queue.submit(std::iter::once(encoder.finish()));
+    }
+
     pub fn wants_input(&self) -> bool {
         let io = self.imgui_ctx.io();
         io.want_capture_mouse || io.want_capture_keyboard || io.want_text_input
     }
 
     pub fn prep_frame(&mut self, window: &winit::window::Window) {
-        self.imgui_platform
+        let _ = self
+            .imgui_platform
             .prepare_frame(self.imgui_ctx.io_mut(), window);
     }
 

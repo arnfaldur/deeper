@@ -1,7 +1,6 @@
 use cgmath::Deg;
 use legion::storage::Component;
 use legion::systems::CommandBuffer;
-use legion::World;
 
 use crate::components::*;
 use crate::transform::{Position, Rotation};
@@ -36,7 +35,7 @@ impl<'a> EntitySmith<'a> {
     }
     pub fn done(&self) {}
     pub fn get_entity(&self) -> Entity { self.entity }
-    pub fn craft(mut self) -> EntitySmith<'a> { self }
+    pub fn craft(self) -> EntitySmith<'a> { self }
     fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
         self.buffer.add_component(self.entity, component);
         return self;

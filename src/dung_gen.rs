@@ -77,11 +77,6 @@ impl DungGen {
         return self;
     }
 
-    pub fn world(mut self, world: HashMap<(i32, i32), TileType>) -> DungGen {
-        self.world = world;
-        return self;
-    }
-
     pub fn generate(mut self) -> DungGen {
         let mut rng = rand::thread_rng();
 
@@ -346,6 +341,7 @@ impl DungGen {
         return self;
     }
 
+    #[allow(dead_code)]
     pub fn print(self) -> DungGen {
         for y in 0..self.height {
             for x in 0..self.width {

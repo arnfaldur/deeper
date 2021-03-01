@@ -1,10 +1,11 @@
 use std::f32::consts::FRAC_PI_2;
 
+use cgmath::{prelude::*, Vector2};
 use cgmath::{InnerSpace, Quaternion, Rotation as CGRotation, Vector2, Vector3};
 use legion::systems::{CommandBuffer, ParallelRunnable, Runnable};
+use legion::systems::{CommandBuffer, Runnable};
 use legion::world::SubWorld;
-use legion::IntoQuery;
-use legion::*;
+use legion::{IntoQuery, *};
 
 use crate::components::*;
 use crate::transform::components::{Position, Position3D, Rotation};
@@ -73,6 +74,8 @@ pub fn hit_point_regen(
         hp.health = hp.max.min(hp.health);
     }
 }
+
+#[allow(unused)]
 fn ai_follow_system() -> impl Runnable {
     SystemBuilder::new("ai_follow")
         .read_component::<AIFollow>()

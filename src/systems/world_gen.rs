@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use cgmath::{Deg, Vector2, Vector3, Zero};
+use cgmath::{Vector2, Vector3};
 use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
-use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
 use crate::components::entity_builder::EntitySmith;
@@ -98,10 +97,6 @@ pub fn dung_gen(
 
             // TODO: Turn lights into entities
             {
-                let mut init_encoder = context
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
                 let mut lights: graphics::data::Lights = Default::default();
 
                 lights.directional_light = graphics::data::DirectionalLight {
@@ -114,34 +109,20 @@ pub fn dung_gen(
                     if i >= graphics::MAX_NR_OF_POINT_LIGHTS {
                         break;
                     }
-                    lights.point_lights[i] = Default::default();
-                    lights.point_lights[i].radius = 10.0;
-                    lights.point_lights[i].position = [x as f32, y as f32, 5.0, 1.0];
-                    lights.point_lights[i].color = [2.0, 1.0, 0.1, 1.0];
+                    lights.point_lights[i] = graphics::data::PointLight {
+                        position: [x as f32, y as f32, 5.0, 1.0],
+                        radius: 10.0,
+                        color: [2.0, 1.0, 0.1, 1.0],
+                        ..Default::default()
+                    };
                 }
 
-                // TODO: go away
-                let temp_buf =
-                    context
-                        .device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: None,
-                            contents: lights.as_bytes(),
-                            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
-                        });
-
-                // TODO: you are not welcome here copy_buffer_to_buffer
-                init_encoder.copy_buffer_to_buffer(
-                    &temp_buf,
+                context.queue.write_buffer(
+                    &context.model_render_ctx.lights_uniform_buf,
                     0,
-                    &context.lights_buf,
-                    0,
-                    std::mem::size_of::<graphics::data::Lights>() as u64,
+                    lights.as_bytes(),
                 );
 
-                let command_buffer = init_encoder.finish();
-
-                context.queue.submit(std::iter::once(command_buffer));
                 // End graphics shit
             }
 
