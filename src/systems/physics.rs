@@ -119,13 +119,15 @@ fn remove_body_handles() -> impl Runnable {
         })
 }
 
+#[deprecated(note = "CommandBuffer needs resources to flush")]
+#[allow(unused)]
 fn flush_command_buffer() -> impl Runnable {
     SystemBuilder::new("flush_command_buffer")
         .with_query(<Write<World>>::query())
         .build(move |commands, world, _, query| {
             let for_query = world; // TODO: simplify this
             query.for_each_mut(for_query, |components| {
-                commands.flush(components);
+                //commands.flush(components);
             });
         })
 }

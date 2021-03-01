@@ -95,7 +95,7 @@ async fn run_async() {
         .any(SphericalOffset::camera_offset())
         .get_entity();
 
-    command_buffer.flush(&mut world);
+    command_buffer.flush(&mut world, &mut resources);
 
     resources.insert(Player { entity: player });
     resources.insert(ActiveCamera {
