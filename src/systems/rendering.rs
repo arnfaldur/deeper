@@ -21,8 +21,7 @@ impl RenderBuilderExtender for legion::systems::Builder {
         self.add_thread_local(update_camera_system())
             .add_thread_local(render_draw_static_models_system())
             .add_thread_local(render_draw_models_system())
-            .add_thread_local(render_gui_init_system())
-            .add_thread_local(render_gui_test_system())
+            //.add_thread_local(render_gui_test_system())
             .add_thread_local(SnakeSystem::new())
             .add_thread_local(render_system())
     }
@@ -297,15 +296,6 @@ fn render_draw_models(
 #[system(for_each)]
 fn render_draw_static_models(model: &StaticModel, #[resource] context: &mut graphics::Context) {
     context.draw_static_model(model.clone());
-}
-
-#[system]
-fn render_gui_init(
-    #[resource] gui_context: &mut graphics::gui::GuiContext,
-    #[resource] window: &winit::window::Window,
-) {
-    gui_context.prep_frame(window);
-    gui_context.new_frame();
 }
 
 #[system]

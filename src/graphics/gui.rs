@@ -64,11 +64,16 @@ impl GuiContext {
             },
         );
 
-        return Self {
+        let mut result = Self {
             imgui_ctx,
             imgui_platform,
             imgui_renderer,
         };
+
+        result.prep_frame(window);
+        result.new_frame();
+
+        return result;
     }
 
     pub fn render(
@@ -116,6 +121,8 @@ impl GuiContext {
         drop(render_pass);
 
         queue.submit(std::iter::once(encoder.finish()));
+        self.prep_frame(window);
+        self.new_frame();
     }
 
     pub fn wants_input(&self) -> bool {
