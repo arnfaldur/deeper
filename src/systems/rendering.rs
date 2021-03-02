@@ -324,6 +324,7 @@ fn render(
     #[resource] context: &mut graphics::Context,
     #[resource] ass_man: &AssetManager,
     #[resource] window: &winit::window::Window,
+    #[resource] debug_timer: &mut crate::debug::DebugTimer,
 ) {
-    context.render(ass_man, gui_context, window);
+    context.render(ass_man, gui_context, window, debug_timer);
 }

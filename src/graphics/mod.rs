@@ -182,8 +182,11 @@ impl Context {
         ass_man: &AssetManager,
         gui_context: &mut gui::GuiContext,
         window: &winit::window::Window,
+        debug_timer: &mut crate::debug::DebugTimer, // TODO: Revisit
     ) {
         let current_frame = self.swap_chain.get_current_frame().unwrap();
+
+        debug_timer.push("Dynamic Models");
 
         self.model_render_ctx.render(
             &self.device,
@@ -195,6 +198,9 @@ impl Context {
 
         self.model_queue.clear();
 
+        debug_timer.pop();
+        debug_timer.push("Canvas");
+
         self.canvas_render_ctx.render(
             &self.device,
             &self.queue,
@@ -204,12 +210,17 @@ impl Context {
 
         self.canvas_queue.clear();
 
+        debug_timer.pop();
+        debug_timer.push("ImGui");
+
         gui_context.render(
             window,
             &self.device,
             &self.queue,
             &current_frame.output.view,
         );
+
+        debug_timer.pop();
     }
 
     // Note(Jökull): A step in the right direction, but a bit heavy-handed

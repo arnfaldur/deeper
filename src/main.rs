@@ -1,4 +1,5 @@
 #![allow(deprecated)]
+#![feature(slice_group_by)]
 
 extern crate shaderc;
 
@@ -18,6 +19,7 @@ use crate::components::entity_builder::EntitySmith;
 use crate::systems::rendering::RenderBuilderExtender;
 
 mod components;
+mod debug;
 mod dung_gen;
 mod graphics;
 mod input;
@@ -131,10 +133,21 @@ async fn run_async() {
                 let frame_time = resources.get::<Instant>().unwrap().elapsed();
                 resources.insert(FrameTime(frame_time.as_secs_f32()));
                 resources.insert(Instant::now());
+                let mut debug_timer = debug::DebugTimer::new();
+                debug_timer.push("Frame");
+                resources.insert(debug_timer);
 
                 schedule.execute(&mut world, &mut resources);
 
                 resources.get_mut::<InputState>().unwrap().new_frame();
+
+                // TODO: Display in ImGui window
+                {
+                    let debug_timer = resources.remove::<debug::DebugTimer>().unwrap();
+
+                    let _debuginfo = debug_timer.finish();
+                    // _debuginfo.print();
+                }
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
