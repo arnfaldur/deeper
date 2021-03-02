@@ -9,6 +9,8 @@ use crate::components::*;
 use crate::graphics;
 use crate::graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use crate::loader::AssetManager;
+use crate::transform::components::{Position, Position3D};
+use crate::transform::AbsoluteTransform;
 
 pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
@@ -29,14 +31,14 @@ impl RenderBuilderExtender for legion::systems::Builder {
 #[system]
 #[read_component(Camera)]
 #[read_component(Position3D)]
-#[read_component(WorldPosition)]
+#[read_component(Position)]
 fn update_camera(
     world: &SubWorld,
     #[resource] context: &mut graphics::Context,
     #[resource] active_cam: &ActiveCamera,
 ) {
     let (cam, cam_pos, cam_target) = {
-        <(&Camera, &Position3D, &WorldPosition)>::query()
+        <(&Camera, &Position3D, &Position)>::query()
             .get(world, active_cam.entity)
             .unwrap()
     };
@@ -279,14 +281,16 @@ impl SnakeSystem {
 #[system(for_each)]
 fn render_draw_models(
     model: &Model3D,
-    position: &WorldPosition,
-    orientation: Option<&Orientation>,
+    transform: &AbsoluteTransform,
+    // position: &Position,
+    // orientation: Option<&Rotation>,
     #[resource] context: &mut graphics::Context,
 ) {
     context.draw_model(
         model,
-        position.into(),
-        orientation.and(Option::from(orientation.unwrap().0)),
+        transform.0,
+        // position.into(),
+        // orientation.and(Option::from(orientation.unwrap().0)),
     );
 }
 
