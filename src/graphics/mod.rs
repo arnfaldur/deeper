@@ -185,6 +185,7 @@ impl Context {
         gui_context: &mut gui::GuiContext,
         window: &winit::window::Window,
         debug_timer: &mut crate::debug::DebugTimer, // TODO: Revisit
+        draw_debug: bool,
     ) {
         let current_frame = self.swap_chain.get_current_frame().unwrap();
 
@@ -213,16 +214,18 @@ impl Context {
         self.canvas_queue.clear();
 
         debug_timer.pop();
-        debug_timer.push("ImGui");
 
-        gui_context.render(
+        gui_context.debug_render(
             window,
             &self.device,
             &self.queue,
             &current_frame.output.view,
+            if draw_debug {
+                Some(debug_timer.finish())
+            } else {
+                None
+            },
         );
-
-        debug_timer.pop();
     }
 
     // Note(Jökull): A step in the right direction, but a bit heavy-handed

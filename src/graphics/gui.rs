@@ -64,11 +64,16 @@ impl GuiContext {
             },
         );
 
-        return Self {
+        let mut ret = Self {
             imgui_ctx,
             imgui_platform,
             imgui_renderer,
         };
+
+        ret.prep_frame(window);
+        ret.new_frame();
+
+        ret
     }
 
     pub fn render(
@@ -116,6 +121,47 @@ impl GuiContext {
         drop(render_pass);
 
         queue.submit(std::iter::once(encoder.finish()));
+
+        self.prep_frame(window);
+        self.new_frame();
+    }
+
+    pub fn debug_render(
+        &mut self,
+        window: &winit::window::Window,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        view: &wgpu::TextureView,
+        debug_info: Option<crate::debug::DebugTimerInfo>,
+    ) {
+        use imgui::{im_str, CollapsingHeader, Condition, Ui};
+        if let Some(debug_info) = debug_info {
+            Self::with_ui(|ui| {
+                fn foo(info: &crate::debug::TimerInfo, ui: &Ui) {
+                    if CollapsingHeader::new(&im_str!("{} : {:?}", info.label, info.duration))
+                        .default_open(true)
+                        .build(ui)
+                    {
+                        for child in &info.children {
+                            foo(child, ui);
+                        }
+                    }
+                }
+
+                let debug_window = imgui::Window::new(im_str!("Debug Information"));
+
+                debug_window
+                    .size([300.0, 100.0], Condition::Appearing)
+                    .no_decoration()
+                    .build(ui, || {
+                        for root in &debug_info.roots {
+                            foo(root, ui);
+                        }
+                    });
+            });
+        }
+
+        self.render(window, device, queue, view);
     }
 
     pub fn wants_input(&self) -> bool {

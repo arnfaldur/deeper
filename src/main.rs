@@ -13,10 +13,9 @@ use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
-use crate::input::InputState;
+use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
 use crate::systems::physics::PhysicsBuilderExtender;
-use crate::systems::rendering::RenderBuilderExtender;
 use crate::transform::components::Position3D;
 use crate::transform::TransformBuilderExtender;
 
@@ -54,7 +53,7 @@ async fn run_async() {
     let mut world = World::default();
     let mut resources = Resources::default();
 
-    let mut schedule = Schedule::builder()
+    let mut logic_schedule = Schedule::builder()
         .add_system(systems::assets::hot_loading_system(
             SystemTime::now(),
             false,
@@ -70,8 +69,9 @@ async fn run_async() {
             SystemTime::now(),
             false,
         ))
-        .add_render_systems()
         .build();
+
+    let mut render_schedule = systems::rendering::render_system_schedule();
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
@@ -122,6 +122,7 @@ async fn run_async() {
     resources.insert(MapTransition::Deeper);
     resources.insert(FloorNumber(7));
     resources.insert(InputState::new());
+    resources.insert(CommandManager::default_bindings());
 
     event_loop.run(move |event, _, control_flow| {
         let imgui_wants_input = {
@@ -144,17 +145,26 @@ async fn run_async() {
                 debug_timer.push("Frame");
                 resources.insert(debug_timer);
 
-                schedule.execute(&mut world, &mut resources);
+                resources
+                    .get_mut::<CommandManager>()
+                    .unwrap()
+                    .update(&resources.get::<InputState>().unwrap());
+
+                if resources
+                    .get::<CommandManager>()
+                    .unwrap()
+                    .get(input::Command::DebugToggleLogic)
+                    || resources
+                        .get::<CommandManager>()
+                        .unwrap()
+                        .get(input::Command::DebugStepLogic)
+                {
+                    logic_schedule.execute(&mut world, &mut resources);
+                }
+
+                render_schedule.execute(&mut world, &mut resources);
 
                 resources.get_mut::<InputState>().unwrap().new_frame();
-
-                // TODO: Display in ImGui window
-                {
-                    let debug_timer = resources.remove::<debug::DebugTimer>().unwrap();
-
-                    let _debuginfo = debug_timer.finish();
-                    // _debuginfo.print();
-                }
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),

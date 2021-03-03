@@ -30,12 +30,12 @@ impl DebugTimer {
         }
     }
 
-    pub fn finish(mut self) -> DebugTimerInfo {
+    pub fn finish(&mut self) -> DebugTimerInfo {
         while !self.stack.is_empty() {
             self.pop();
         }
 
-        DebugTimerInfo::new(self.popped)
+        DebugTimerInfo::new(&self.popped)
     }
 }
 
@@ -83,9 +83,7 @@ pub struct DebugTimerInfo {
 }
 
 impl DebugTimerInfo {
-    fn new(input_vec: Vec<(String, Duration, Generation)>) -> Self {
-        println!("{:?}", input_vec);
-
+    fn new(input_vec: &Vec<(String, Duration, Generation)>) -> Self {
         let groups = input_vec.group_by(|(_, _, a), _| *a != 0);
 
         let mut roots = vec![];
