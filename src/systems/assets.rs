@@ -3,7 +3,7 @@ use std::time::SystemTime;
 
 use legion::*;
 
-use crate::input::{InputState, Key};
+use crate::input::{Command, CommandManager};
 use crate::{graphics, loader};
 
 #[system]
@@ -12,9 +12,9 @@ pub fn hot_loading(
     #[state] hotload_shaders_turned_on: &mut bool,
     #[resource] ass_man: &mut loader::AssetManager,
     #[resource] context: &mut graphics::Context,
-    #[resource] input: &InputState,
+    #[resource] input: &CommandManager,
 ) {
-    if input.is_key_pressed(Key::H) {
+    if input.get(Command::DevToggleHotLoading) {
         println!(
             "Hotloading shaders turned {}",
             if *hotload_shaders_turned_on {
@@ -26,7 +26,7 @@ pub fn hot_loading(
         *hotload_shaders_turned_on = !*hotload_shaders_turned_on;
     }
 
-    if input.is_key_pressed(Key::L) {
+    if input.get(Command::DevHotLoadModels) {
         println!("Hotloading models...");
         ass_man.load_models(&context);
     }

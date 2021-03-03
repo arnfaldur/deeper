@@ -16,15 +16,16 @@ pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
 }
 
-impl RenderBuilderExtender for legion::systems::Builder {
-    fn add_render_systems(&mut self) -> &mut Self {
-        self.add_thread_local(update_camera_system())
-            .add_thread_local(render_draw_static_models_system())
-            .add_thread_local(render_draw_models_system())
-            //.add_thread_local(render_gui_test_system())
-            .add_thread_local(SnakeSystem::new())
-            .add_thread_local(render_system())
-    }
+const DISPLAY_DEBUG_DEFAULT: bool = true;
+
+pub fn render_system_schedule() -> legion::systems::Schedule {
+    legion::systems::Schedule::builder()
+        .add_thread_local(update_camera_system())
+        .add_thread_local(render_draw_static_models_system())
+        .add_thread_local(render_draw_models_system())
+        .add_thread_local(SnakeSystem::new())
+        .add_thread_local(render_system(DISPLAY_DEBUG_DEFAULT))
+        .build()
 }
 
 #[system]
@@ -204,44 +205,34 @@ impl SnakeBoard {
 struct SnakeSystem;
 
 impl SnakeSystem {
-    fn new() -> impl Runnable { Self::system(SnakeBoard::new(), SystemTime::now(), false) }
+    fn new() -> impl Runnable { Self::system(SnakeBoard::new(), SystemTime::now()) }
 
-    fn system(mut board: SnakeBoard, mut time: SystemTime, mut toggle: bool) -> impl Runnable {
+    fn system(mut board: SnakeBoard, mut time: SystemTime) -> impl Runnable {
         SystemBuilder::new("snake_game")
-            .read_resource::<crate::input::InputState>()
+            .read_resource::<crate::input::CommandManager>()
             .write_resource::<crate::graphics::Context>()
-            .build(move |_commands, _world, (input_state, context), _| {
-                snake_game(&mut board, &mut time, &mut toggle, input_state, context);
+            .build(move |_commands, _world, (input, context), _| {
+                snake_game(&mut board, &mut time, input, context);
 
                 fn snake_game(
                     board: &mut SnakeBoard,
                     time: &mut SystemTime,
-                    toggle: &mut bool,
-                    input_state: &crate::input::InputState,
+                    input: &crate::input::CommandManager,
                     context: &mut graphics::Context,
                 ) {
-                    use crate::input::Key;
+                    use crate::input::Command;
 
-                    if input_state.is_key_pressed(Key::P) {
-                        *toggle = !*toggle;
-                    }
-
-                    if !*toggle {
+                    if !input.get(Command::DebugToggleSnake) {
                         return;
                     }
 
-                    let key_up = input_state.is_key_pressed(Key::Up);
-                    let key_down = input_state.is_key_pressed(Key::Down);
-                    let key_left = input_state.is_key_pressed(Key::Left);
-                    let key_right = input_state.is_key_pressed(Key::Right);
-
-                    if key_up {
+                    if input.get(Command::SnakeMoveUp) {
                         board.new_dir = Direction::Up;
-                    } else if key_down {
+                    } else if input.get(Command::SnakeMoveDown) {
                         board.new_dir = Direction::Down;
-                    } else if key_left {
+                    } else if input.get(Command::SnakeMoveLeft) {
                         board.new_dir = Direction::Left;
-                    } else if key_right {
+                    } else if input.get(Command::SnakeMoveRight) {
                         board.new_dir = Direction::Right;
                     }
 
@@ -299,25 +290,19 @@ fn render_draw_static_models(model: &StaticModel, #[resource] context: &mut grap
 }
 
 #[system]
-fn render_gui_test(#[resource] _gui_context: &mut graphics::gui::GuiContext) {
-    graphics::gui::GuiContext::with_ui(|ui| {
-        use imgui::{im_str, Condition};
-        let test_window = imgui::Window::new(im_str!("Test Window"));
-
-        test_window
-            .size([300.0, 100.0], Condition::FirstUseEver)
-            .build(ui, || {
-                ui.text("Welcome to deeper.");
-            });
-    });
-}
-
-#[system]
 fn render(
     #[resource] gui_context: &mut graphics::gui::GuiContext,
     #[resource] context: &mut graphics::Context,
     #[resource] ass_man: &AssetManager,
     #[resource] window: &winit::window::Window,
+    #[resource] debug_timer: &mut crate::debug::DebugTimer,
+    #[resource] input_state: &crate::input::CommandManager,
+    #[state] toggle: &mut bool,
 ) {
-    context.render(ass_man, gui_context, window);
+    use crate::input::Command;
+    if input_state.get(Command::DebugToggleInfo) {
+        *toggle = !*toggle;
+    }
+
+    context.render(ass_man, gui_context, window, debug_timer, *toggle);
 }

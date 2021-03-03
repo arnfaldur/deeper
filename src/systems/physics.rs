@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
-use cgmath::{prelude::*, Vector2};
+use cgmath::prelude::*;
+use cgmath::Vector2;
 use legion::systems::{Builder, ParallelRunnable};
 use legion::world::Event;
 use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World};

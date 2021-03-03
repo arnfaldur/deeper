@@ -9,7 +9,7 @@ use legion::*;
 use crate::components::*;
 use crate::graphics;
 use crate::graphics::util::{correction_matrix, project_screen_to_world};
-use crate::input::{InputState, Key};
+use crate::input::{Command, CommandManager, InputState};
 use crate::transform::components::{Position, Position3D, Rotation};
 
 #[system]
@@ -22,6 +22,7 @@ use crate::transform::components::{Position, Position3D, Rotation};
 pub fn camera_control(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
+    #[resource] command_manager: &CommandManager,
     #[resource] input: &InputState,
     #[resource] player: &Player,
     #[resource] player_cam: &PlayerCamera,
@@ -54,7 +55,7 @@ pub fn camera_control(
         + MINIMUM_PHI;
 
     // camera orbiting system enabled for now
-    if input.mouse.right.down {
+    if command_manager.get(Command::PlayerOrbitCamera) {
         let mouse_delta = input.mouse.delta();
         cam_offset.theta += cam_offset.theta_delta * mouse_delta.x;
     }
@@ -79,19 +80,19 @@ pub fn camera_control(
 
     let mut new_velocity = Vector2::new(0.0, 0.0);
 
-    if input.is_key_down(Key::E) {
+    if command_manager.get(Command::PlayerCameraMoveUp) {
         new_velocity += cam_front.clone();
         camera.roaming = true;
     }
-    if input.is_key_down(Key::S) {
+    if command_manager.get(Command::PlayerCameraMoveLeft) {
         new_velocity -= cam_right.clone();
         camera.roaming = true;
     }
-    if input.is_key_down(Key::D) {
+    if command_manager.get(Command::PlayerCameraMoveDown) {
         new_velocity -= cam_front.clone();
         camera.roaming = true;
     }
-    if input.is_key_down(Key::F) {
+    if command_manager.get(Command::PlayerCameraMoveRight) {
         new_velocity += cam_right.clone();
         camera.roaming = true;
     }

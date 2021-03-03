@@ -34,9 +34,9 @@ fn player_transform_shower() -> impl ParallelRunnable {
         .read_resource::<crate::components::Player>()
         .build(move |_cmd, world, resources, queries| {
             let player: &crate::components::Player = resources;
-            queries.for_each(world, |(ent, abt)| {
+            queries.for_each(world, |(ent, _abt)| {
                 if *ent == player.entity {
-                    eprintln!("abt = {:?}", abt.0);
+                    //eprintln!("abt = {:?}", abt.0);
                 }
             })
         })
