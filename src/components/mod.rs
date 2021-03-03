@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::HashSet;
 use std::f32::consts::PI;
 use std::sync::Arc;
 
@@ -26,6 +27,8 @@ pub struct PlayerCamera {
 }
 
 pub struct Parent(pub Entity);
+
+pub struct Children(pub HashSet<Entity>);
 
 // end entity pointers
 

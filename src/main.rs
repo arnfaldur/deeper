@@ -91,7 +91,7 @@ async fn run_async() {
 
     let player_camera = EntitySmith::from(&mut command_buffer)
         .name("The camera")
-        .any(Parent(player))
+        //.any(Parent(player))
         .any(Target(player))
         .position(Vector2::unit_x())
         .velocity(Vector2::zero())

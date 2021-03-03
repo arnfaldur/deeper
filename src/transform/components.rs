@@ -1,4 +1,4 @@
-use cgmath::{Deg, Matrix4, Quaternion, Rotation3, Vector2, Vector3};
+use cgmath::{Deg, Matrix4, Quaternion, Rotation3, SquareMatrix, Vector2, Vector3};
 
 pub struct Position(pub Vector2<f32>);
 
@@ -50,7 +50,20 @@ impl From<&NonUniformScale> for Matrix4<f32> {
     }
 }
 
-#[allow(dead_code)]
-pub struct RelativeTransform(pub Matrix4<f32>);
+// #[allow(dead_code)]
+// pub struct RelativeTransform(pub Matrix4<f32>);
 
-pub struct AbsoluteTransform(pub Matrix4<f32>);
+#[derive(Copy, Clone)]
+pub struct Transform {
+    pub absolute: Matrix4<f32>,
+    pub relative: Matrix4<f32>,
+}
+
+impl Transform {
+    pub fn identity() -> Self {
+        Transform {
+            absolute: Matrix4::identity(),
+            relative: Matrix4::identity(),
+        }
+    }
+}

@@ -10,7 +10,7 @@ use crate::graphics;
 use crate::graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use crate::loader::AssetManager;
 use crate::transform::components::{Position, Position3D};
-use crate::transform::AbsoluteTransform;
+use crate::transform::Transform;
 
 pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
@@ -28,15 +28,19 @@ pub fn render_system_schedule() -> legion::systems::Schedule {
         .build()
 }
 
-#[system]
-#[read_component(Camera)]
-#[read_component(Position3D)]
-#[read_component(Position)]
-fn update_camera(
-    world: &SubWorld,
-    #[resource] context: &mut graphics::Context,
-    #[resource] active_cam: &ActiveCamera,
-) {
+fn update_camera_system() -> impl Runnable {
+    SystemBuilder::new("update_camera")
+        .read_component::<Camera>()
+        .read_component::<Position3D>()
+        .read_component::<Position>()
+        .read_resource::<ActiveCamera>()
+        .write_resource::<graphics::Context>()
+        .build(move |_, world, resources, _| {
+            update_camera(world, &mut *resources.1, &*resources.0);
+        })
+}
+
+fn update_camera(world: &SubWorld, context: &mut graphics::Context, active_cam: &ActiveCamera) {
     let (cam, cam_pos, cam_target) = {
         <(&Camera, &Position3D, &Position)>::query()
             .get(world, active_cam.entity)
@@ -268,36 +272,78 @@ impl SnakeSystem {
     }
 }
 
-#[system(for_each)]
+fn render_draw_models_system() -> impl Runnable {
+    SystemBuilder::new("render_draw_models")
+        .write_resource::<graphics::Context>()
+        .with_query(<(&Model3D, &Transform)>::query())
+        .build(move |_, world, resources, query| {
+            let for_query = world;
+            query.for_each_mut(for_query, |components| {
+                render_draw_models(components.0, components.1, &mut *resources);
+            });
+        })
+}
+
 fn render_draw_models(
     model: &Model3D,
-    transform: &AbsoluteTransform,
+    transform: &Transform,
     // position: &Position,
     // orientation: Option<&Rotation>,
-    #[resource] context: &mut graphics::Context,
+    context: &mut graphics::Context,
 ) {
     context.draw_model(
         model,
-        transform.0,
+        transform.absolute,
         // position.into(),
         // orientation.and(Option::from(orientation.unwrap().0)),
     );
 }
 
-#[system(for_each)]
-fn render_draw_static_models(model: &StaticModel, #[resource] context: &mut graphics::Context) {
+fn render_draw_static_models_system() -> impl Runnable {
+    SystemBuilder::new("render_draw_static_models_system")
+        .write_resource::<graphics::Context>()
+        .with_query(<&StaticModel>::query())
+        .build(move |_, world, resources, query| {
+            let for_query = world;
+            query.for_each_mut(for_query, |components| {
+                render_draw_static_models(components, &mut *resources);
+            });
+        })
+}
+
+fn render_draw_static_models(model: &StaticModel, context: &mut graphics::Context) {
     context.draw_static_model(model.clone());
 }
 
-#[system]
+fn render_system(mut state_0: bool) -> impl Runnable {
+    SystemBuilder::new("render_system")
+        .read_resource::<AssetManager>()
+        .read_resource::<winit::window::Window>()
+        .read_resource::<crate::input::CommandManager>()
+        .write_resource::<graphics::gui::GuiContext>()
+        .write_resource::<graphics::Context>()
+        .write_resource::<crate::debug::DebugTimer>()
+        .build(move |_, _, resources, _| {
+            render(
+                &mut *resources.3,
+                &mut *resources.4,
+                &*resources.0,
+                &*resources.1,
+                &mut *resources.5,
+                &*resources.2,
+                &mut state_0,
+            );
+        })
+}
+
 fn render(
-    #[resource] gui_context: &mut graphics::gui::GuiContext,
-    #[resource] context: &mut graphics::Context,
-    #[resource] ass_man: &AssetManager,
-    #[resource] window: &winit::window::Window,
-    #[resource] debug_timer: &mut crate::debug::DebugTimer,
-    #[resource] input_state: &crate::input::CommandManager,
-    #[state] toggle: &mut bool,
+    gui_context: &mut graphics::gui::GuiContext,
+    context: &mut graphics::Context,
+    ass_man: &AssetManager,
+    window: &winit::window::Window,
+    debug_timer: &mut crate::debug::DebugTimer,
+    input_state: &crate::input::CommandManager,
+    toggle: &mut bool,
 ) {
     use crate::input::Command;
     if input_state.get(Command::DebugToggleInfo) {

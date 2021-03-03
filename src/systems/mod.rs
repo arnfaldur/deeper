@@ -14,14 +14,11 @@ pub mod player;
 pub mod rendering;
 pub mod world_gen;
 
-pub fn flush_command_buffer() -> impl ParallelRunnable {
-    SystemBuilder::new("flush_command_buffer")
-        .with_query(<&mut World>::query())
-        .build(move |commands, world, _, query| {
-            query.for_each_mut(world, |world| {
-                commands.flush(world, &mut legion::Resources::default());
-            });
-        })
+#[allow(dead_code)]
+pub(crate) fn order_tester(message: &'static str) -> impl ParallelRunnable {
+    SystemBuilder::new("order_tester: \"".to_owned() + message + "\"").build(move |_, _, _, _| {
+        eprintln!("{}", message);
+    })
 }
 
 pub fn spherical_offset_system() -> impl ParallelRunnable {
