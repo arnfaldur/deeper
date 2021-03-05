@@ -1,14 +1,13 @@
 use std::time::SystemTime;
 
 use legion::systems::Runnable;
-use legion::world::SubWorld;
 use legion::*;
 
 use crate::components::*;
 use crate::graphics;
 use crate::graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use crate::loader::AssetManager;
-use crate::transform::components::{Position, Position3D};
+use crate::transform::components::Position;
 use crate::transform::Transform;
 
 pub trait RenderBuilderExtender {
@@ -30,23 +29,24 @@ pub fn render_system_schedule() -> legion::systems::Schedule {
 fn update_camera_system() -> impl Runnable {
     SystemBuilder::new("update_camera")
         .read_component::<Camera>()
-        .read_component::<Position3D>()
         .read_component::<Position>()
+        .read_component::<Transform>()
+        .read_component::<Target>()
         .read_resource::<ActiveCamera>()
         .write_resource::<graphics::Context>()
-        .build(move |_, world, resources, _| {
-            update_camera(world, &mut *resources.1, &*resources.0);
+        .build(move |_, world, (active_cam, context), _| {
+            if let Ok((cam, cam_pos, target)) =
+                <(&Camera, &Transform, &Target)>::query().get(world, active_cam.entity)
+            {
+                if let Ok(target_pos) = <&Transform>::query().get(world, target.0) {
+                    context.set_3d_camera(
+                        cam,
+                        cam_pos.absolute.w.truncate(),
+                        target_pos.absolute.w.truncate(),
+                    );
+                }
+            }
         })
-}
-
-fn update_camera(world: &SubWorld, context: &mut graphics::Context, active_cam: &ActiveCamera) {
-    let (cam, cam_pos, cam_target) = {
-        <(&Camera, &Position3D, &Position)>::query()
-            .get(world, active_cam.entity)
-            .unwrap()
-    };
-
-    context.set_3d_camera(cam, cam_pos.0, cam_target.0.extend(0.0));
 }
 
 struct SnakeSystem;

@@ -41,7 +41,7 @@ impl<'a> EntitySmith<'a> {
         return self;
     }
 
-    pub fn position(&mut self, pos: Vector2<f32>) -> &mut Self { self.add_component(Position(pos)) }
+    pub fn position(&mut self, pos: Vector3<f32>) -> &mut Self { self.add_component(Position(pos)) }
     pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
     pub fn velocity_zero(&mut self) -> &mut Self { self.add_component(Velocity::new()) }
     pub fn orientation(&mut self, ori: f32) -> &mut Self { self.add_component(Rotation(Deg(ori))) }

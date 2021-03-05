@@ -15,6 +15,8 @@ use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
 use crate::transform::components::Position3D;
+use crate::systems::physics::PhysicsBuilderExtender;
+use crate::transform::TransformBuilderExtender;
 
 mod components;
 mod debug;
@@ -62,19 +64,26 @@ async fn run_async() {
 
     let player = EntitySmith::from(&mut command_buffer)
         .name("Player")
-        .position(Vector2::unit_x())
+        .position(Vector3::unit_x())
         .orientation(0.0)
         .agent(5., 30.)
         .velocity(Vector2::zero())
         .dynamic_body(1.)
         .circle_collider(0.3)
+        .get_entity();
+
+    let player_model = EntitySmith::from(&mut command_buffer)
+        .name("Player model")
+        .any(Parent(player))
+        .orientation(0.0)
         .model(Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
         .get_entity();
 
     let player_camera = EntitySmith::from(&mut command_buffer)
         .name("The camera")
+        .any(Parent(player))
         .any(Target(player))
-        .position(Vector2::unit_x())
+        .position(Vector3::zero())
         .velocity(Vector2::zero())
         .any(components::Camera {
             up: Vector3::unit_z(),
@@ -89,6 +98,11 @@ async fn run_async() {
 
     ecs.resources.insert(Player { entity: player });
     ecs.resources.insert(ActiveCamera {
+    resources.insert(Player {
+        player,
+        model: player_model,
+    });
+    resources.insert(ActiveCamera {
         entity: player_camera,
     });
     ecs.resources.insert(PlayerCamera {
@@ -104,6 +118,8 @@ async fn run_async() {
     ecs.resources.insert(FloorNumber(7));
     ecs.resources.insert(InputState::new());
     ecs.resources.insert(CommandManager::default_bindings());
+
+    resources.insert(0 as i64);
 
     event_loop.run(move |event, _, control_flow| {
         let imgui_wants_input = {

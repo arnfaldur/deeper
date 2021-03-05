@@ -15,7 +15,8 @@ pub(crate) mod entity_builder;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
-    pub entity: Entity,
+    pub model: Entity,
+    pub player: Entity,
 }
 
 pub struct ActiveCamera {

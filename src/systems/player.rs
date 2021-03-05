@@ -1,31 +1,43 @@
 use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
-use cgmath::prelude::*;
-use cgmath::{Point3, Vector2, Vector3, Vector4};
+use cgmath::{EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
+use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
 use legion::*;
 
+use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::graphics;
 use crate::graphics::util::{correction_matrix, project_screen_to_world};
 use crate::input::{Command, CommandManager, InputState};
 use crate::transform::components::{Position, Position3D, Rotation};
+use crate::transform::Transform;
 
-#[system]
-#[write_component(Camera)]
-#[write_component(SphericalOffset)]
-#[write_component(Destination)]
-#[write_component(Velocity)]
-#[read_component(Position3D)]
-#[read_component(Position)]
+pub(crate) fn camera_control_system() -> impl ParallelRunnable {
+    SystemBuilder::new("camera_control_system")
+        .write_component::<Camera>()
+        .write_component::<SphericalOffset>()
+        .write_component::<Destination>()
+        .write_component::<Velocity>()
+        .read_component::<Position3D>()
+        .read_component::<Position>()
+        .read_component::<Target>()
+        .read_component::<Transform>()
+        .read_resource::<CommandManager>()
+        .read_resource::<InputState>()
+        .read_resource::<PlayerCamera>()
+        .build(move |cmd, world, resources, _| {
+            camera_control(world, cmd, &resources.0, &resources.1, &resources.2);
+        })
+}
+
 pub fn camera_control(
     world: &mut SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
-    #[resource] command_manager: &CommandManager,
-    #[resource] input: &InputState,
-    #[resource] player: &Player,
-    #[resource] player_cam: &PlayerCamera,
+    _: &mut legion::systems::CommandBuffer,
+    command_manager: &CommandManager,
+    input: &InputState,
+    player_cam: &PlayerCamera,
 ) {
     // Should these be a feature of the spherical offset?
     const MINIMUM_PHI: f32 = 0.1 * PI;
@@ -38,12 +50,12 @@ pub fn camera_control(
     let (mut offset_world, mut world) = world.split::<&mut SphericalOffset>();
     let (mut velocity_world, world) = world.split::<&mut Velocity>();
 
-    let mut player_cam_entity = camera_world.entry_mut(player_cam.entity).unwrap();
-    let mut camera = { player_cam_entity.get_component_mut::<Camera>().unwrap() };
+    let mut camera = <&mut Camera>::query()
+        .get_mut(&mut camera_world, player_cam.entity)
+        .unwrap();
 
-    let mut player_cam_entity = offset_world.entry_mut(player_cam.entity).unwrap();
-    let mut cam_offset = player_cam_entity
-        .get_component_mut::<SphericalOffset>()
+    let mut cam_offset = <&mut SphericalOffset>::query()
+        .get_mut(&mut offset_world, player_cam.entity)
         .unwrap();
 
     // Zoom controls
@@ -60,79 +72,92 @@ pub fn camera_control(
         cam_offset.theta += cam_offset.theta_delta * mouse_delta.x;
     }
 
-    let cam_pos = world
-        .entry_ref(player_cam.entity)
-        .unwrap()
-        .get_component::<Position>()
-        .unwrap()
-        .0;
+    if let Ok(cam_target_pos) = <&crate::transform::Transform>::query()
+        .get(
+            &world,
+            <&Target>::query().get(&world, player_cam.entity).unwrap().0,
+        )
+        .map(|trans| trans.absolute.w.truncate())
+    {
+        if let Ok(cam_pos) = <&crate::transform::Transform>::query()
+            .get(&world, player_cam.entity)
+            .map(|trans| trans.absolute.w.truncate())
+        {
+            // let (cam_pos, height): (&Position, &Height) = <(&Position, &Height)>::query()
+            //     .get(&world, player_cam.entity)
+            //     .unwrap();
+            // let cam_pos = cam_pos.0.extend(height.0.x);
 
-    let cam_3d_pos = world
-        .entry_ref(player_cam.entity)
-        .unwrap()
-        .get_component::<Position3D>()
-        .unwrap()
-        .0;
+            let to_center: Vector3<f32> = (cam_target_pos - cam_pos).normalize() * 5.0;
+            let cam_front = to_center.truncate();
+            let cam_right = Vector2::new(to_center.y, -to_center.x);
 
-    let to_center = (cam_pos.extend(0.0) - cam_3d_pos).normalize() * 5.0;
-    let cam_front = Vector2::new(to_center.x, to_center.y);
-    let cam_right = Vector2::new(to_center.y, -to_center.x);
+            let mut new_velocity = Vector2::new(0.0, 0.0);
 
-    let mut new_velocity = Vector2::new(0.0, 0.0);
+            if command_manager.get(Command::PlayerCameraMoveUp) {
+                new_velocity += cam_front.clone();
+                camera.roaming = true;
+            }
+            if command_manager.get(Command::PlayerCameraMoveLeft) {
+                new_velocity -= cam_right.clone();
+                camera.roaming = true;
+            }
+            if command_manager.get(Command::PlayerCameraMoveDown) {
+                new_velocity -= cam_front.clone();
+                camera.roaming = true;
+            }
+            if command_manager.get(Command::PlayerCameraMoveRight) {
+                new_velocity += cam_right.clone();
+                camera.roaming = true;
+            }
 
-    if command_manager.get(Command::PlayerCameraMoveUp) {
-        new_velocity += cam_front.clone();
-        camera.roaming = true;
-    }
-    if command_manager.get(Command::PlayerCameraMoveLeft) {
-        new_velocity -= cam_right.clone();
-        camera.roaming = true;
-    }
-    if command_manager.get(Command::PlayerCameraMoveDown) {
-        new_velocity -= cam_front.clone();
-        camera.roaming = true;
-    }
-    if command_manager.get(Command::PlayerCameraMoveRight) {
-        new_velocity += cam_right.clone();
-        camera.roaming = true;
-    }
-
-    // Need to deal with removing the destination also
-    if camera.roaming {
-        velocity_world
-            .entry_mut(player_cam.entity)
-            .unwrap()
-            .get_component_mut::<Velocity>()
-            .unwrap()
-            .0 = new_velocity;
-        commands.remove_component::<Destination>(player_cam.entity)
-    } else {
-        let player_pos = world
-            .entry_ref(player.entity)
-            .unwrap()
-            .get_component::<Position>()
-            .unwrap()
-            .0;
-
-        commands.add_component::<Destination>(player_cam.entity, Destination::simple(player_pos));
+            // Need to deal with removing the destination also
+            if camera.roaming {
+                velocity_world
+                    .entry_mut(player_cam.entity)
+                    .unwrap()
+                    .get_component_mut::<Velocity>()
+                    .unwrap()
+                    .0 = new_velocity;
+            }
+        }
     }
 }
 
-#[system]
-#[write_component(Rotation)]
-#[write_component(Destination)]
-#[write_component(Camera)]
-#[read_component(Position)]
-#[read_component(Position3D)]
-#[read_component(Faction)]
-#[read_component(HitPoints)]
+pub(crate) fn player_system() -> impl ParallelRunnable {
+    SystemBuilder::new("player_system")
+        .write_component::<Rotation>()
+        .write_component::<Destination>()
+        .write_component::<Camera>()
+        .read_component::<Position>()
+        .read_component::<Transform>()
+        .read_component::<Position3D>()
+        .read_component::<Target>()
+        .read_component::<Faction>()
+        .read_component::<HitPoints>()
+        .read_resource::<InputState>()
+        .read_resource::<graphics::Context>()
+        .read_resource::<Player>()
+        .read_resource::<PlayerCamera>()
+        .build(move |cmd, world, resources, _| {
+            player(
+                world,
+                cmd,
+                &resources.0,
+                &resources.1,
+                &resources.2,
+                &resources.3,
+            )
+        })
+}
+
 pub fn player(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
-    #[resource] input: &InputState,
-    #[resource] context: &graphics::Context,
-    #[resource] player: &Player,
-    #[resource] player_cam: &PlayerCamera,
+    input: &InputState,
+    context: &graphics::Context,
+    player: &Player,
+    player_cam: &PlayerCamera,
 ) {
     // We need to do this to get mutable accesses to multiple components at once.
     // It is possible that we can fix this by creating more systems
@@ -146,18 +171,29 @@ pub fn player(
     if input.mouse.left.down {
         // TODO: Clean up
 
-        let mut player_cam_entry = camera_world.entry_mut(player_cam.entity).unwrap();
-        let mut camera = player_cam_entry.get_component_mut::<Camera>().unwrap();
+        let mut camera: &mut Camera = <&mut Camera>::query()
+            .get_mut(&mut camera_world, player_cam.entity)
+            .unwrap_or_else(|_| (unreachable!()));
 
-        let player_cam_entry = world.entry_ref(player_cam.entity).unwrap();
-        let camera_position = player_cam_entry.get_component::<Position3D>().unwrap().0;
-        let camera_target = player_cam_entry.get_component::<Position>().unwrap().0;
+        let camera_position = <&crate::transform::Transform>::query()
+            .get(&world, player_cam.entity)
+            .map(|trans| trans.absolute.w.truncate())
+            .unwrap_or_else(|_| (unreachable!()));
+
+        let camera_target_pos = <&crate::transform::Transform>::query()
+            .get(
+                &world,
+                <&Target>::query().get(&world, player_cam.entity).unwrap().0,
+            )
+            .map(|trans| trans.absolute.w.truncate())
+            .unwrap();
 
         let aspect_ratio = context.window_size.width as f32 / context.window_size.height as f32;
 
+        // TODO: find a better place for this
         let mx_view = cgmath::Matrix4::look_at_rh(
             Point3::from_vec(camera_position),
-            Point3::from_vec(camera_target.extend(0.)),
+            Point3::from_vec(camera_target_pos),
             Vector3::unit_z(),
         );
         let mx_projection = cgmath::perspective(cgmath::Deg(camera.fov), aspect_ratio, 1.0, 1000.0);
@@ -176,16 +212,15 @@ pub fn player(
             let t: f32 = mouse_world_pos.z / ray_delta.z;
             let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
 
-            commands.add_component(player.entity, Destination::simple(ray_hit));
+            EntitySmith::from_entity(commands, player.player).any(Destination::simple(ray_hit));
             camera.roaming = false;
 
             let difference: Vector2<f32> = {
-                let player_entry = world.entry_ref(player.entity).unwrap();
-                let player_pos = player_entry
-                    .get_component::<Position>()
-                    .expect("I have no place in this world.")
-                    .0;
-                ray_hit - player_pos
+                let player_pos = <&Transform>::query()
+                    .get(&world, player.player)
+                    .map(|trans| trans.absolute.w.truncate())
+                    .expect("I have no place in this world.");
+                ray_hit - player_pos.truncate()
             };
 
             let mut new_rotation = (difference.y / difference.x).atan() / PI * 180.0;
@@ -193,9 +228,8 @@ pub fn player(
                 new_rotation += 180.0;
             }
             {
-                let mut player_entry = orient_world.entry_mut(player.entity).unwrap();
-                let mut player_orient = player_entry
-                    .get_component_mut::<Rotation>()
+                let mut player_orient = <&mut Rotation>::query()
+                    .get_mut(&mut orient_world, player.model)
                     .expect("We have no direction in life.");
                 (player_orient.0).0 = new_rotation;
             }
