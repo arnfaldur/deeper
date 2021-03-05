@@ -14,7 +14,7 @@ pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
 }
 
-const DISPLAY_DEBUG_DEFAULT: bool = true;
+pub const DISPLAY_DEBUG_DEFAULT: bool = false;
 
 pub fn render_system_schedule() -> legion::systems::Schedule {
     legion::systems::Schedule::builder()
@@ -22,7 +22,7 @@ pub fn render_system_schedule() -> legion::systems::Schedule {
         .add_thread_local(render_draw_static_models_system())
         .add_thread_local(render_draw_models_system())
         .add_thread_local(SnakeSystem::new())
-        .add_thread_local(render_system(DISPLAY_DEBUG_DEFAULT))
+        .add_thread_local(render_system())
         .build()
 }
 
@@ -162,7 +162,7 @@ fn render_draw_static_models(model: &StaticModel, context: &mut graphics::Contex
     context.draw_static_model(model.clone());
 }
 
-fn render_system(mut state_0: bool) -> impl Runnable {
+fn render_system() -> impl Runnable {
     SystemBuilder::new("render_system")
         .read_resource::<AssetManager>()
         .read_resource::<winit::window::Window>()
@@ -170,17 +170,21 @@ fn render_system(mut state_0: bool) -> impl Runnable {
         .write_resource::<graphics::gui::GuiContext>()
         .write_resource::<graphics::Context>()
         .write_resource::<crate::debug::DebugTimer>()
-        .build(move |_, _, resources, _| {
-            render(
-                &mut *resources.3,
-                &mut *resources.4,
-                &*resources.0,
-                &*resources.1,
-                &mut *resources.5,
-                &*resources.2,
-                &mut state_0,
-            );
-        })
+        .build(
+            move |_,
+                  _,
+                  (ass_man, window, command_manager, gui_context, context, debug_timer),
+                  _| {
+                render(
+                    gui_context,
+                    context,
+                    ass_man,
+                    window,
+                    debug_timer,
+                    command_manager,
+                );
+            },
+        )
 }
 
 fn render(
@@ -190,12 +194,14 @@ fn render(
     window: &winit::window::Window,
     debug_timer: &mut crate::debug::DebugTimer,
     input_state: &crate::input::CommandManager,
-    toggle: &mut bool,
 ) {
     use crate::input::Command;
-    if input_state.get(Command::DebugToggleInfo) {
-        *toggle = !*toggle;
-    }
 
-    context.render(ass_man, gui_context, window, debug_timer, *toggle);
+    context.render(
+        ass_man,
+        gui_context,
+        window,
+        debug_timer,
+        input_state.get(Command::DebugToggleInfo),
+    );
 }

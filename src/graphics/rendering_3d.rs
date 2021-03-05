@@ -317,7 +317,7 @@ impl ModelRenderContext {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
                 attachment: &self.depth_view,
                 depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
+                    load: wgpu::LoadOp::Load,
                     store: true,
                 }),
                 stencil_ops: None,

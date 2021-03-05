@@ -186,7 +186,7 @@ impl Context {
     ) {
         let current_frame = self.swap_chain.get_current_frame().unwrap();
 
-        debug_timer.push("Dynamic Models");
+        debug_timer.push("Model Rendering");
 
         self.model_render_ctx.render(
             &self.device,
@@ -200,7 +200,7 @@ impl Context {
         self.model_queue.clear();
 
         debug_timer.pop();
-        debug_timer.push("Canvas");
+        debug_timer.push("Canvas Rendering");
 
         self.canvas_render_ctx.render(
             &self.device,

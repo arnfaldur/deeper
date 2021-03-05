@@ -263,7 +263,12 @@ impl CommandManager {
     pub fn default_bindings() -> Self {
         let mut ret = Self::new();
 
-        ret.simple_key_bind(Command::DebugToggleInfo, Key::F12, ButtonStatus::Pressed);
+        ret.key_toggle(
+            Command::DebugToggleInfo,
+            Key::F12,
+            ButtonStatus::Pressed,
+            crate::systems::rendering::DISPLAY_DEBUG_DEFAULT,
+        );
         ret.simple_key_bind(Command::DebugStepLogic, Key::F10, ButtonStatus::Pressed);
 
         ret.key_toggle(

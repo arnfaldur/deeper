@@ -14,8 +14,8 @@ use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
-use crate::transform::components::Position3D;
 use crate::systems::physics::PhysicsBuilderExtender;
+use crate::transform::components::Position3D;
 use crate::transform::TransformBuilderExtender;
 
 mod components;
@@ -96,13 +96,11 @@ async fn run_async() {
 
     command_buffer.flush(&mut ecs.world, &mut ecs.resources);
 
-    ecs.resources.insert(Player { entity: player });
-    ecs.resources.insert(ActiveCamera {
-    resources.insert(Player {
+    ecs.resources.insert(Player {
         player,
         model: player_model,
     });
-    resources.insert(ActiveCamera {
+    ecs.resources.insert(ActiveCamera {
         entity: player_camera,
     });
     ecs.resources.insert(PlayerCamera {
@@ -119,7 +117,7 @@ async fn run_async() {
     ecs.resources.insert(InputState::new());
     ecs.resources.insert(CommandManager::default_bindings());
 
-    resources.insert(0 as i64);
+    ecs.resources.insert(0 as i64);
 
     event_loop.run(move |event, _, control_flow| {
         let imgui_wants_input = {
