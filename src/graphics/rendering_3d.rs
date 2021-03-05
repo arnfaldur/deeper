@@ -2,7 +2,6 @@ use std::mem::MaybeUninit;
 
 use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
-use zerocopy::AsBytes;
 
 use super::data::{GlobalUniforms, Lights};
 use crate::graphics::data::LocalUniforms;
@@ -93,7 +92,7 @@ impl ModelRenderContext {
 
         let global_uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Global Shader Uniforms"),
-            contents: global_uniforms.as_bytes(),
+            contents: bytemuck::bytes_of(&global_uniforms),
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
@@ -133,7 +132,7 @@ impl ModelRenderContext {
 
         let lights_uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Lights"),
-            contents: lights.as_bytes(),
+            contents: bytemuck::bytes_of(&lights),
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
@@ -366,11 +365,10 @@ impl ModelRenderContext {
         queue.write_buffer(
             &self.global_uniform_buf,
             0,
-            GlobalUniforms {
+            bytemuck::bytes_of(&GlobalUniforms {
                 projection_view_matrix: proj_view_matrix.into(),
                 eye_position: [position.x, position.y, position.z, 0.0],
-            }
-            .as_bytes(),
+            }),
         );
     }
 

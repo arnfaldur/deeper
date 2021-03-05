@@ -1,12 +1,11 @@
 #![allow(unused)]
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Vector3, Vector4};
-use zerocopy::{AsBytes, FromBytes};
 
 use crate::graphics::MAX_NR_OF_POINT_LIGHTS;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub normal: [f32; 3],
@@ -14,14 +13,14 @@ pub struct Vertex {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+#[derive(Clone, Copy, Default, Pod, Zeroable)]
 pub struct GlobalUniforms {
     pub projection_view_matrix: [[f32; 4]; 4],
     pub eye_position: [f32; 4],
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Pod, AsBytes, FromBytes, Zeroable, Default)]
+#[derive(Clone, Copy, Pod, Zeroable, Default)]
 pub struct Material {
     pub albedo: [f32; 4],
     pub metallic: f32,
@@ -101,7 +100,7 @@ impl LocalUniforms {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+#[derive(Clone, Copy, Pod, Zeroable, Default)]
 pub struct DirectionalLight {
     pub direction: [f32; 4],
     pub ambient: [f32; 4],
@@ -109,7 +108,7 @@ pub struct DirectionalLight {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes, Default)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, Default)]
 pub struct PointLight {
     pub radius: f32,
     pub pad: [f32; 3],
@@ -118,7 +117,7 @@ pub struct PointLight {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+#[derive(Clone, Copy, Pod, Zeroable, Default)]
 pub struct Lights {
     pub directional_light: DirectionalLight,
     pub point_lights: [PointLight; MAX_NR_OF_POINT_LIGHTS],

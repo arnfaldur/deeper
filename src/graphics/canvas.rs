@@ -1,11 +1,10 @@
 #![allow(unused)]
 use std::mem::MaybeUninit;
 
-use bytemuck::bytes_of;
+use bytemuck::{bytes_of, Pod, Zeroable};
 use cgmath::{vec2, Vector2};
 use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
-use zerocopy::{AsBytes, FromBytes};
 
 use super::data::{GlobalUniforms, LocalUniforms};
 use crate::graphics::data::Material;
@@ -88,7 +87,7 @@ impl ScreenVector {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct CanvasVertex {
     pub position: [f32; 2],
     pub tex_coord: [f32; 2],
@@ -338,7 +337,7 @@ impl CanvasRenderContext {
 
         let global_uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Global Shader Uniforms"),
-            contents: global_uniforms.as_bytes(),
+            contents: bytemuck::bytes_of(&global_uniforms),
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
@@ -432,7 +431,7 @@ impl CanvasRenderContext {
 
         let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: Self::QUAD_VERTEX_LIST.as_bytes(),
+            contents: bytemuck::cast_slice(&Self::QUAD_VERTEX_LIST[..]),
             usage: wgpu::BufferUsage::VERTEX,
         });
 
@@ -531,7 +530,11 @@ impl CanvasRenderContext {
             eye_position: [0.0, 0.0, 1.0, 0.0],
         };
 
-        queue.write_buffer(&self.global_uniform_buf, 0, global_uniforms.as_bytes());
+        queue.write_buffer(
+            &self.global_uniform_buf,
+            0,
+            bytemuck::bytes_of(&global_uniforms),
+        );
     }
 
     fn compile_pipeline(

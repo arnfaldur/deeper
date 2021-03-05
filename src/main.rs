@@ -14,9 +14,7 @@ use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
-use crate::systems::physics::PhysicsBuilderExtender;
 use crate::transform::components::Position3D;
-use crate::transform::TransformBuilderExtender;
 
 mod components;
 mod debug;

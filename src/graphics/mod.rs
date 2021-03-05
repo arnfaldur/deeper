@@ -1,7 +1,6 @@
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
-use zerocopy::AsBytes;
 
 use crate::components::{Model3D, StaticModel};
 // How dirty of me
@@ -234,7 +233,7 @@ impl Context {
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: None,
-                    contents: vertices.as_bytes(),
+                    contents: bytemuck::cast_slice(vertices.as_slice()),
                     usage: wgpu::BufferUsage::VERTEX,
                 });
 

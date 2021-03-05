@@ -4,7 +4,6 @@ use cgmath::{vec2, Vector2, Vector3};
 use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
-use zerocopy::AsBytes;
 
 use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
@@ -116,7 +115,7 @@ pub fn dung_gen(
                 context.queue.write_buffer(
                     &context.model_render_ctx.lights_uniform_buf,
                     0,
-                    lights.as_bytes(),
+                    bytemuck::bytes_of(&lights),
                 );
 
                 // End graphics shit
