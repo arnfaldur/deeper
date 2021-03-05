@@ -1,11 +1,9 @@
 #![allow(dead_code)]
 
-use cgmath::prelude::*;
-use cgmath::Vector2;
+use cgmath::{InnerSpace, Zero};
 use legion::systems::{Builder, ParallelRunnable};
 use legion::world::Event;
 use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World};
-use nalgebra::Isometry2;
 use ncollide2d::shape::ShapeHandle;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
@@ -92,8 +90,11 @@ fn make_body_handles() -> impl ParallelRunnable {
                     }
                     PhysicsBody::Static => RigidBodyDesc::<f32>::new()
                         .status(BodyStatus::Static)
-                        .position(Isometry2::new(
-                            c2n(position.unwrap_or(&Position(cgmath::vec2(0., 0.))).0),
+                        .position(nalgebra::Isometry2::new(
+                            c2n(position
+                                .unwrap_or(&Position(cgmath::Vector3::zero()))
+                                .0
+                                .truncate()),
                             0.,
                         )),
                     PhysicsBody::Dynamic { mass } => RigidBodyDesc::<f32>::new()
@@ -178,7 +179,10 @@ fn entity_world_to_physics_world() -> impl ParallelRunnable {
             for (han, bod, pos, vel, ori) in query.iter(world) {
                 if let PhysicsBody::Dynamic { .. } = bod {
                     if let Some(body) = physics.bodies.rigid_body_mut(han.0) {
-                        body.set_position(Isometry2::new(c2n(pos.0), cgmath::Rad::from(ori.0).0));
+                        body.set_position(nalgebra::Isometry2::new(
+                            c2n(pos.0.truncate()),
+                            cgmath::Rad::from(ori.0).0,
+                        ));
                         body.set_linear_velocity(c2n(vel.0));
                         // and force?
                     }
@@ -225,7 +229,7 @@ fn physics_world_to_entity_world() -> impl ParallelRunnable {
                 if let PhysicsBody::Dynamic { .. } = body {
                     if let Some(bod) = physics.bodies.rigid_body(handle.0) {
                         if let Some(p) = pos {
-                            p.0 = n2c(&bod.position().translation.vector);
+                            p.0 = n2c(&bod.position().translation.vector).extend(0.);
                         }
                         if let Some(v) = vel {
                             v.0 = n2c(&bod.velocity().linear);
@@ -258,15 +262,16 @@ fn movement(frame_time: &FrameTime, pos: &mut Position, vel: &mut Velocity) {
         } else {
             (vel.0 * frame_time.0).normalize() * 0.5
         };
-        pos.0 += v;
+        pos.0 += v.extend(0.);
     } else {
         // TODO: We need to deal with this somehow
-        vel.0 = Vector2::new(0.0, 0.0);
+        vel.0 = cgmath::Vector2::new(0.0, 0.0);
         println!("Velocity Hickup");
     }
 }
 
-fn n2c(input: &nalgebra::Vector2<f32>) -> Vector2<f32> {
+fn n2c(input: &nalgebra::Vector2<f32>) -> cgmath::Vector2<f32> {
     return cgmath::Vector2::new(input.x, input.y);
 }
+
 fn c2n(input: cgmath::Vector2<f32>) -> nalgebra::Vector2<f32> { return [input.x, input.y].into(); }

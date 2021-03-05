@@ -16,7 +16,6 @@ use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
 use crate::systems::physics::PhysicsBuilderExtender;
-use crate::transform::components::Position3D;
 use crate::transform::TransformBuilderExtender;
 
 mod components;
@@ -77,12 +76,18 @@ async fn run_async() {
 
     let player = EntitySmith::from(&mut command_buffer)
         .name("Player")
-        .position(Vector2::unit_x())
+        .position(Vector3::unit_x())
         .orientation(0.0)
         .agent(5., 30.)
         .velocity(Vector2::zero())
         .dynamic_body(1.)
         .circle_collider(0.3)
+        .get_entity();
+
+    let player_model = EntitySmith::from(&mut command_buffer)
+        .name("Player model")
+        .any(Parent(player))
+        .orientation(0.0)
         .model(
             Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
                 .with_scale(0.5),
@@ -91,22 +96,25 @@ async fn run_async() {
 
     let player_camera = EntitySmith::from(&mut command_buffer)
         .name("The camera")
-        //.any(Parent(player))
+        .any(Parent(player))
         .any(Target(player))
-        .position(Vector2::unit_x())
+        .position(Vector3::zero())
         .velocity(Vector2::zero())
         .any(components::Camera {
             up: Vector3::unit_z(),
             fov: 30.0,
             roaming: false,
         })
-        .any(Position3D(Vector3::new(0.0, 0.0, 0.0)))
+        // .any(Position3D(Vector3::new(0.0, 0.0, 0.0)))
         .any(SphericalOffset::camera_offset())
         .get_entity();
 
     command_buffer.flush(&mut world, &mut resources);
 
-    resources.insert(Player { entity: player });
+    resources.insert(Player {
+        player,
+        model: player_model,
+    });
     resources.insert(ActiveCamera {
         entity: player_camera,
     });
@@ -123,6 +131,8 @@ async fn run_async() {
     resources.insert(FloorNumber(7));
     resources.insert(InputState::new());
     resources.insert(CommandManager::default_bindings());
+
+    resources.insert(0 as i64);
 
     event_loop.run(move |event, _, control_flow| {
         let imgui_wants_input = {

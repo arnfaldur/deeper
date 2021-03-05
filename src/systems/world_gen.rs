@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{vec2, Vector2, Vector3};
 use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
@@ -44,7 +44,6 @@ pub fn dung_gen(
     #[resource] context: &graphics::Context,
     #[resource] ass_man: &loader::AssetManager,
     #[resource] player: &Player,
-    #[resource] player_camera: &PlayerCamera,
 ) {
     match *trans {
         MapTransition::Deeper => {
@@ -79,21 +78,18 @@ pub fn dung_gen(
                     .choose(&mut rand::thread_rng())
                     .unwrap()
                     .clone();
-                (x + rng.gen_range(-2..2), y + rng.gen_range(-2..2))
+                vec2(
+                    (x + rng.gen_range(-2..2)) as f32,
+                    (y + rng.gen_range(-2..2)) as f32,
+                )
             };
 
             // Reset player position and stuff
-            commands.add_component(
-                player.entity,
-                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
-            );
-            //updater.insert(player.entity, Orientation(Deg(0.0)));
-            commands.add_component(player.entity, Velocity::new());
-
-            commands.add_component(
-                player_camera.entity,
-                Position(Vector2::new(player_start.0 as f32, player_start.1 as f32)),
-            );
+            EntitySmith::from_entity(commands, player.player)
+                .position(player_start.extend(0.))
+                .velocity_zero();
+            // commands.add_component(player.player, Position(player_start.extend(0.)));
+            // commands.add_component(player.player, Velocity::new());
 
             // TODO: Turn lights into entities
             {
@@ -174,7 +170,7 @@ pub fn dung_gen(
                 match tile_type {
                     TileType::Nothing => {}
                     _ => {
-                        commands.add_component(entity, Position(pos));
+                        commands.add_component(entity, Position(pos.extend(0.)));
                     }
                 }
                 // tile specific behaviors
@@ -203,7 +199,11 @@ pub fn dung_gen(
                     let mut smith = EntitySmith::from_buffer(commands);
                     smith
                         .position(
-                            pos + Vector2::new(rng.gen_range(-0.3..0.3), rng.gen_range(-0.3..0.3)),
+                            (pos + Vector2::new(
+                                rng.gen_range(-0.3..0.3),
+                                rng.gen_range(-0.3..0.3),
+                            ))
+                            .extend(0.),
                         )
                         .agent(
                             rng.gen_range(1.0..4.0) - 1.6 * rad,
@@ -215,7 +215,7 @@ pub fn dung_gen(
                         .circle_collider(rad)
                         .any(Faction::Enemies)
                         .any(AIFollow {
-                            target: player.entity,
+                            target: player.player,
                             minimum_distance: 2.0 + rad,
                         })
                         .any(HitPoints {

@@ -1,12 +1,12 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{InnerSpace, Vector2};
+use cgmath::{InnerSpace, Vector2, Vector3};
 use legion::systems::{CommandBuffer, ParallelRunnable};
 use legion::world::SubWorld;
 use legion::{IntoQuery, *};
 
 use crate::components::*;
-use crate::transform::components::{Position, Position3D, Rotation};
+use crate::transform::components::{Position, Rotation};
 
 pub mod assets;
 pub mod physics;
@@ -23,21 +23,20 @@ pub(crate) fn order_tester(message: &'static str) -> impl ParallelRunnable {
 
 pub fn spherical_offset_system() -> impl ParallelRunnable {
     SystemBuilder::new("spherical_offset")
-        .with_query(<(&Position, &SphericalOffset, &mut Position3D)>::query())
+        .with_query(<(&mut Position, &SphericalOffset)>::query())
         .build(move |_cmd, world, _resources, query| {
             let for_query = world;
             query.for_each_mut(for_query, |components| {
-                spherical_offset(components.0, components.1, components.2);
+                spherical_offset(components.0, components.1);
             });
         })
 }
 
 #[allow(dead_code)]
-pub fn spherical_offset(pos2d: &Position, follow: &SphericalOffset, pos3d: &mut Position3D) {
-    pos3d.0 = pos2d.into();
-    pos3d.0.x += follow.radius * follow.theta.cos() * follow.phi.cos();
-    pos3d.0.y += follow.radius * follow.theta.sin() * follow.phi.cos();
-    pos3d.0.z += follow.radius * follow.phi.sin();
+pub fn spherical_offset(pos: &mut Position, follow: &SphericalOffset) {
+    pos.0.x = follow.radius * follow.theta.cos() * follow.phi.cos();
+    pos.0.y = follow.radius * follow.theta.sin() * follow.phi.cos();
+    pos.0.z = follow.radius * follow.phi.sin();
 }
 
 #[allow(dead_code)]
@@ -93,12 +92,12 @@ fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
             .map(|e| e.into_component::<Position>().ok())
             .flatten()
         {
-            let difference: Vector2<f32> = hunted.0 - hunter.0;
+            let difference: Vector3<f32> = hunted.0 - hunter.0;
             let distance = difference.magnitude();
             if distance > follow.minimum_distance {
-                command.add_component(*ent, Destination::simple(hunted.0));
+                command.add_component(*ent, Destination::simple(hunted.0.truncate()));
                 if let Some(orientation) = orient {
-                    orientation.0 = cgmath::Deg::from(difference.angle(Vector2::unit_y()));
+                    orientation.0 = cgmath::Deg::from(difference.angle(Vector3::unit_y()));
                 }
             }
         }
@@ -114,7 +113,7 @@ pub fn go_to_destination_system() -> impl ParallelRunnable {
         .write_component::<Velocity>()
         .read_resource::<FrameTime>()
         .build(move |cmd, world, resources, _query| {
-            go_to_destination(world, cmd, &*resources);
+            go_to_destination(world, cmd, &resources);
         })
 }
 #[allow(dead_code)]
@@ -133,7 +132,7 @@ pub fn go_to_destination(
         &Acceleration,
     )>::query();
     for (ent, dest, hunter, vel, speed, accel) in query.iter_mut(world) {
-        let to_dest: Vector2<f32> = dest.goal - hunter.0;
+        let to_dest: Vector2<f32> = dest.goal - hunter.0.truncate();
         if to_dest.magnitude() < EPSILON {
             commands.remove_component::<Destination>(*ent);
             vel.0 = Vector2::new(0.0, 0.0);
