@@ -64,16 +64,11 @@ impl GuiContext {
             },
         );
 
-        let mut result = Self {
+        Self {
             imgui_ctx,
             imgui_platform,
             imgui_renderer,
-        };
-
-        result.prep_frame(window);
-        result.new_frame();
-
-        return result;
+        }
     }
 
     pub fn render(
@@ -121,9 +116,6 @@ impl GuiContext {
         drop(render_pass);
 
         queue.submit(std::iter::once(encoder.finish()));
-
-        self.prep_frame(window);
-        self.new_frame();
     }
 
     pub fn debug_render(
@@ -134,24 +126,27 @@ impl GuiContext {
         view: &wgpu::TextureView,
         debug_info: Option<crate::debug::DebugTimerInfo>,
     ) {
-        use imgui::{im_str, CollapsingHeader, Condition, Ui};
+        use imgui::{im_str, CollapsingHeader, Ui};
         if let Some(debug_info) = debug_info {
             Self::with_ui(|ui| {
                 fn foo(info: &crate::debug::TimerInfo, ui: &Ui) {
                     if CollapsingHeader::new(&im_str!("{} : {:?}", info.label, info.duration))
                         .default_open(true)
+                        .leaf(!info.children.is_empty())
                         .build(ui)
                     {
+                        ui.indent();
                         for child in &info.children {
                             foo(child, ui);
                         }
+                        ui.unindent();
                     }
                 }
 
                 let debug_window = imgui::Window::new(im_str!("Debug Information"));
 
                 debug_window
-                    .size([300.0, 100.0], Condition::Appearing)
+                    .always_auto_resize(true)
                     .no_decoration()
                     .build(ui, || {
                         for root in &debug_info.roots {
@@ -173,6 +168,8 @@ impl GuiContext {
         let _ = self
             .imgui_platform
             .prepare_frame(self.imgui_ctx.io_mut(), window);
+
+        self.new_frame();
     }
 
     pub fn new_frame(&mut self) {

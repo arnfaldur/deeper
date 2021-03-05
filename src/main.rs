@@ -3,10 +3,9 @@
 
 extern crate shaderc;
 
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 
 use cgmath::{Vector2, Vector3, Zero};
-use legion::{Resources, Schedule, World};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -15,28 +14,30 @@ use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
-use crate::systems::physics::PhysicsBuilderExtender;
 use crate::transform::components::Position3D;
-use crate::transform::TransformBuilderExtender;
 
 mod components;
 mod debug;
 mod dung_gen;
+mod ecs;
 mod graphics;
 mod input;
 mod loader;
+mod misc;
 mod systems;
 mod transform;
 
 async fn run_async() {
+    // Asset Management Initialization
     let mut ass_man = AssetManager::new();
-    let ds = ass_man.load_display_settings();
+    let display_settings = ass_man.load_display_settings();
 
+    // Window and Event Creation
     let event_loop = EventLoop::new();
 
     let size = PhysicalSize {
-        width: ds.screen_width as u32,
-        height: ds.screen_height as u32,
+        width: display_settings.screen_width as u32,
+        height: display_settings.screen_height as u32,
     };
 
     let builder = winit::window::WindowBuilder::new()
@@ -44,36 +45,20 @@ async fn run_async() {
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
 
-    let context = graphics::Context::new(&window).await;
+    // Graphics Initialization
+    let mut context = graphics::Context::new(&window).await;
 
     let gui_context = graphics::gui::GuiContext::new(&window, &context);
 
-    ass_man.load_models(&context);
+    ass_man.load_models(&mut context);
 
-    let mut world = World::default();
-    let mut resources = Resources::default();
+    // ECS Initialization
 
-    let mut logic_schedule = Schedule::builder()
-        .add_system(systems::assets::hot_loading_system(
-            SystemTime::now(),
-            false,
-        ))
-        .add_system(systems::player::player_system())
-        .add_system(systems::player::camera_control_system())
-        .add_system(systems::world_gen::dung_gen_system())
-        .add_system(systems::go_to_destination_system())
-        .add_physics_systems(&mut world, &mut resources)
-        .add_system(systems::spherical_offset_system())
-        .add_transform_systems()
-        .add_system(systems::assets::hot_loading_system(
-            SystemTime::now(),
-            false,
-        ))
-        .build();
+    let mut ecs = ecs::ECS::new();
 
-    let mut render_schedule = systems::rendering::render_system_schedule();
+    ecs.create_schedules();
 
-    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
+    let mut command_buffer = legion::systems::CommandBuffer::new(&ecs.world);
 
     let player = EntitySmith::from(&mut command_buffer)
         .name("Player")
@@ -83,15 +68,11 @@ async fn run_async() {
         .velocity(Vector2::zero())
         .dynamic_body(1.)
         .circle_collider(0.3)
-        .model(
-            Model3D::from_index(&context, ass_man.get_model_index("arissa.obj").unwrap())
-                .with_scale(0.5),
-        )
+        .model(Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
         .get_entity();
 
     let player_camera = EntitySmith::from(&mut command_buffer)
         .name("The camera")
-        //.any(Parent(player))
         .any(Target(player))
         .position(Vector2::unit_x())
         .velocity(Vector2::zero())
@@ -104,32 +85,35 @@ async fn run_async() {
         .any(SphericalOffset::camera_offset())
         .get_entity();
 
-    command_buffer.flush(&mut world, &mut resources);
+    command_buffer.flush(&mut ecs.world, &mut ecs.resources);
 
-    resources.insert(Player { entity: player });
-    resources.insert(ActiveCamera {
+    ecs.resources.insert(Player { entity: player });
+    ecs.resources.insert(ActiveCamera {
         entity: player_camera,
     });
-    resources.insert(PlayerCamera {
+    ecs.resources.insert(PlayerCamera {
         entity: player_camera,
     });
-    resources.insert(context);
-    resources.insert(gui_context);
-    resources.insert(window);
-    resources.insert(ass_man);
-    resources.insert(Instant::now());
-    resources.insert(FrameTime(f32::EPSILON));
-    resources.insert(MapTransition::Deeper);
-    resources.insert(FloorNumber(7));
-    resources.insert(InputState::new());
-    resources.insert(CommandManager::default_bindings());
+    ecs.resources.insert(context);
+    ecs.resources.insert(gui_context);
+    ecs.resources.insert(window);
+    ecs.resources.insert(ass_man);
+    ecs.resources.insert(Instant::now());
+    ecs.resources.insert(FrameTime(f32::EPSILON));
+    ecs.resources.insert(MapTransition::Deeper);
+    ecs.resources.insert(FloorNumber(7));
+    ecs.resources.insert(InputState::new());
+    ecs.resources.insert(CommandManager::default_bindings());
 
     event_loop.run(move |event, _, control_flow| {
         let imgui_wants_input = {
-            let mut gui_context = resources.get_mut::<graphics::gui::GuiContext>().unwrap();
+            let mut gui_context = ecs
+                .resources
+                .get_mut::<graphics::gui::GuiContext>()
+                .unwrap();
 
             gui_context.handle_event(
-                &mut *resources.get_mut::<winit::window::Window>().unwrap(),
+                &mut *ecs.resources.get_mut::<winit::window::Window>().unwrap(),
                 &event,
             );
 
@@ -138,39 +122,13 @@ async fn run_async() {
 
         match event {
             Event::MainEventsCleared => {
-                let frame_time = resources.get::<Instant>().unwrap().elapsed();
-                resources.insert(FrameTime(frame_time.as_secs_f32()));
-                resources.insert(Instant::now());
-                let mut debug_timer = debug::DebugTimer::new();
-                debug_timer.push("Frame");
-                resources.insert(debug_timer);
-
-                resources
-                    .get_mut::<CommandManager>()
-                    .unwrap()
-                    .update(&resources.get::<InputState>().unwrap());
-
-                if resources
-                    .get::<CommandManager>()
-                    .unwrap()
-                    .get(input::Command::DebugToggleLogic)
-                    || resources
-                        .get::<CommandManager>()
-                        .unwrap()
-                        .get(input::Command::DebugStepLogic)
-                {
-                    logic_schedule.execute(&mut world, &mut resources);
-                }
-
-                render_schedule.execute(&mut world, &mut resources);
-
-                resources.get_mut::<InputState>().unwrap().new_frame();
+                ecs.execute_schedules();
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                resources
+                ecs.resources
                     .get_mut::<graphics::Context>()
                     .unwrap()
                     .resize(size);
@@ -195,7 +153,7 @@ async fn run_async() {
             } => *control_flow = ControlFlow::Exit,
             Event::WindowEvent { ref event, .. } => {
                 if !imgui_wants_input {
-                    resources
+                    ecs.resources
                         .get_mut::<InputState>()
                         .unwrap()
                         .update_from_event(&event);

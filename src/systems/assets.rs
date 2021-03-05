@@ -28,7 +28,7 @@ pub fn hot_loading(
 
     if input.get(Command::DevHotLoadModels) {
         println!("Hotloading models...");
-        ass_man.load_models(&context);
+        ass_man.load_models(context);
     }
 
     if *hotload_shaders_turned_on {

@@ -178,12 +178,9 @@ impl StaticModel {
         matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
         matrix = Matrix4::from_translation(offset) * matrix;
 
-        let local_uniforms = graphics::data::LocalUniforms {
-            model_matrix: matrix.into(),
-            material,
-        };
+        let local_uniforms = graphics::data::LocalUniforms::new(matrix.into(), material);
 
-        let (_uniform_buf, bind_group) = context.model_bind_group_from_uniform_data(local_uniforms);
+        let bind_group = context.model_bind_group_from_uniform_data(local_uniforms);
 
         Self {
             idx,
@@ -197,30 +194,20 @@ pub struct Model3D {
     pub idx: usize,
     pub scale: f32,
     pub material: graphics::data::Material,
-
-    pub bind_group: Arc<wgpu::BindGroup>,
-    pub uniform_buffer: Arc<wgpu::Buffer>,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
-    pub fn new(context: &graphics::Context) -> Self {
-        let _uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
-
-        let (uniform_buffer, bind_group) =
-            context.model_bind_group_from_uniform_data(graphics::data::LocalUniforms::new());
-
+    pub fn new() -> Self {
         Self {
             idx: 0,
             material: graphics::data::Material::default(),
-            bind_group: Arc::new(bind_group),
-            uniform_buffer: Arc::new(uniform_buffer),
             scale: 1.0,
         }
     }
 
-    pub fn from_index(context: &graphics::Context, index: usize) -> Self {
-        let mut m = Self::new(context);
+    pub fn from_index(index: usize) -> Self {
+        let mut m = Self::new();
         m.idx = index;
         return m;
     }

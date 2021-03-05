@@ -1,16 +1,23 @@
+use std::mem::MaybeUninit;
+
 use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
 use zerocopy::AsBytes;
 
 use super::data::{GlobalUniforms, Lights};
+use crate::graphics::data::LocalUniforms;
 
 // TODO: Have ass_man auto-load all shaders
 const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
 const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
 
+const MAXIMUM_NUMBER_OF_DYNAMIC_MODELS: usize = 1024;
+
 pub struct ModelRenderContext {
     depth_view: wgpu::TextureView,
     global_uniform_buf: wgpu::Buffer,
+    local_uniform_buf: wgpu::Buffer,
+    bind_groups: [wgpu::BindGroup; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS],
     pub lights_uniform_buf: wgpu::Buffer,
     pub local_bind_group_layout: wgpu::BindGroupLayout,
     global_bind_group: wgpu::BindGroup,
@@ -89,6 +96,38 @@ impl ModelRenderContext {
             contents: global_uniforms.as_bytes(),
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
+
+        let local_uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Model Local Shader Uniform"),
+            size: (MAXIMUM_NUMBER_OF_DYNAMIC_MODELS * std::mem::size_of::<LocalUniforms>()) as u64,
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let bind_groups: [wgpu::BindGroup; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS] = unsafe {
+            let mut arr: [MaybeUninit<wgpu::BindGroup>; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS] =
+                MaybeUninit::uninit().assume_init();
+
+            for (i, elem) in arr.iter_mut().enumerate() {
+                *elem =
+                    MaybeUninit::new(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &local_bind_group_layout,
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::Buffer {
+                                buffer: &local_uniform_buf,
+                                offset: (i * std::mem::size_of::<LocalUniforms>()) as u64,
+                                size: wgpu::BufferSize::new(
+                                    std::mem::size_of::<LocalUniforms>() as u64
+                                ),
+                            },
+                        }],
+                    }));
+            }
+
+            std::mem::transmute::<_, [wgpu::BindGroup; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS]>(arr)
+        };
 
         let lights: Lights = Default::default();
 
@@ -170,6 +209,8 @@ impl ModelRenderContext {
         Self {
             depth_view,
             global_uniform_buf,
+            local_uniform_buf,
+            bind_groups,
             lights_uniform_buf,
             local_bind_group_layout,
             global_bind_group,
@@ -185,66 +226,122 @@ impl ModelRenderContext {
         ass_man: &crate::loader::AssetManager,
         model_queue: &super::ModelQueue,
         view: &wgpu::TextureView,
+        debug_info: &mut crate::debug::DebugTimer,
     ) {
+        assert!(model_queue.model_desc.len() < MAXIMUM_NUMBER_OF_DYNAMIC_MODELS);
+        assert!(model_queue.local_uniforms.len() < MAXIMUM_NUMBER_OF_DYNAMIC_MODELS);
+        assert_eq!(
+            model_queue.model_desc.len(),
+            model_queue.local_uniforms.len()
+        );
+
+        debug_info.push("Copy Uniforms");
+
+        let uniforms = unsafe {
+            let mut arr: [MaybeUninit<LocalUniforms>; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS] =
+                MaybeUninit::uninit().assume_init();
+
+            for (i, elem) in model_queue.local_uniforms.iter().enumerate() {
+                arr[i] = MaybeUninit::new(*elem);
+            }
+
+            std::mem::transmute::<_, [LocalUniforms; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS]>(arr)
+        };
+
+        debug_info.pop();
+        debug_info.push("Write Uniform Buffer");
+
+        queue.write_buffer(&self.local_uniform_buf, 0, bytemuck::bytes_of(&uniforms));
+
+        debug_info.pop();
+        debug_info.push("Render Pass");
+
+        debug_info.push("Static Meshes");
         let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("Model Render"),
         });
 
-        for (i, model) in model_queue.model_desc.iter().enumerate() {
-            queue.write_buffer(
-                &model.uniform_buffer,
-                0,
-                model_queue.local_uniforms.get(i).unwrap().as_bytes(),
-            );
-        }
-
-        // Do big boi render pass
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                    attachment: &self.depth_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(0),
-                        store: true,
-                    }),
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                attachment: view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &self.depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: true,
                 }),
-            });
+                stencil_ops: None,
+            }),
+        });
 
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
-            // render static meshes
-            for model in &model_queue.static_models {
-                render_pass.set_bind_group(1, &model.bind_group, &[]);
-                for mesh in &ass_man.models[model.idx].meshes {
-                    render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    render_pass.draw(0..mesh.num_vertices as u32, 0..1)
-                }
-            }
-            // render dynamic meshes
-            for model_desc in &model_queue.model_desc {
-                render_pass.set_bind_group(1, &model_desc.bind_group, &[]);
-                for mesh in &ass_man.models[model_desc.idx].meshes {
-                    render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    render_pass.draw(0..mesh.num_vertices as u32, 0..1)
-                }
+        // render static meshes
+        for model in &model_queue.static_models {
+            render_pass.set_bind_group(1, &model.bind_group, &[]);
+            for mesh in &ass_man.models[model.idx].meshes {
+                render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                render_pass.draw(0..mesh.num_vertices as u32, 0..1)
             }
         }
+
+        drop(render_pass);
 
         queue.submit(std::iter::once(encoder.finish()));
+
+        debug_info.pop();
+        debug_info.push("Dynamic Meshes");
+
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Model Render"),
+        });
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                attachment: view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &self.depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        });
+
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+
+        // render dynamic meshes
+        for (i, model_desc) in model_queue.model_desc.iter().enumerate() {
+            render_pass.set_bind_group(1, &self.bind_groups[i], &[]);
+            for mesh in &ass_man.models[model_desc.idx].meshes {
+                render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                render_pass.draw(0..mesh.num_vertices as u32, 0..1)
+            }
+        }
+        drop(render_pass);
+
+        queue.submit(std::iter::once(encoder.finish()));
+
+        debug_info.pop();
+
+        debug_info.pop();
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, size: winit::dpi::PhysicalSize<u32>) {

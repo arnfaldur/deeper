@@ -157,10 +157,7 @@ impl Context {
 
         self.model_queue.push_model(
             model.clone(),
-            LocalUniforms {
-                model_matrix: matrix.into(),
-                material: model.material,
-            },
+            LocalUniforms::new(matrix.into(), model.material),
         );
     }
 
@@ -197,6 +194,7 @@ impl Context {
             ass_man,
             &self.model_queue,
             &current_frame.output.view,
+            debug_timer,
         );
 
         self.model_queue.clear();
@@ -228,18 +226,38 @@ impl Context {
         );
     }
 
+    pub fn model_from_vertex_list(&mut self, vertex_lists: &Vec<Vec<Vertex>>) -> data::Model {
+        let mut meshes = vec![];
+
+        for vertices in vertex_lists {
+            let vertex_buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: vertices.as_bytes(),
+                    usage: wgpu::BufferUsage::VERTEX,
+                });
+
+            meshes.push(data::Mesh {
+                num_vertices: vertices.len(),
+                vertex_buffer: vertex_buf,
+                offset: [0.0, 0.0, 0.0],
+            });
+        }
+
+        data::Model { meshes }
+    }
+
     // Note(Jökull): A step in the right direction, but a bit heavy-handed
     pub fn model_bind_group_from_uniform_data(
         &self,
         local_uniforms: LocalUniforms,
-    ) -> (wgpu::Buffer, wgpu::BindGroup) {
-        let _uniforms_size = std::mem::size_of::<LocalUniforms>() as u64;
-
+    ) -> wgpu::BindGroup {
         let uniform_buf = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: None,
-                contents: local_uniforms.as_bytes(),
+                contents: bytemuck::bytes_of(&local_uniforms),
                 usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
             });
 
@@ -256,7 +274,7 @@ impl Context {
             }],
         });
 
-        (uniform_buf, bind_group)
+        bind_group
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {

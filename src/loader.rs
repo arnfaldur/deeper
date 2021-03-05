@@ -8,8 +8,6 @@ use std::time::SystemTime;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use wavefront_obj::obj;
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use zerocopy::AsBytes;
 
 use crate::graphics;
 use crate::graphics::data::Vertex;
@@ -127,11 +125,11 @@ impl AssetManager {
         }
     }
 
-    pub fn load_models(&mut self, context: &graphics::Context) {
+    pub fn load_models(&mut self, context: &mut graphics::Context) {
         self.load_models_recursive(self.paths.models_path.clone().as_ref(), context);
     }
 
-    fn load_models_recursive(&mut self, path: &Path, context: &graphics::Context) {
+    fn load_models_recursive(&mut self, path: &Path, context: &mut graphics::Context) {
         let model_extensions = self.extensions.models.clone();
         for dir_entry in fs::read_dir(path).unwrap() {
             if let Ok(entry) = dir_entry {
@@ -153,7 +151,7 @@ impl AssetManager {
     }
 
     // Assumes is a valid model
-    fn load_model(&mut self, path: &Path, ext: &String, context: &graphics::Context) {
+    fn load_model(&mut self, path: &Path, ext: &String, context: &mut graphics::Context) {
         if let Some(Asset {
             loaded_at_time: time_loaded,
             asset_kind: AssetKind::Model(idx),
@@ -178,7 +176,7 @@ impl AssetManager {
     fn get_graphics_model(
         path: &Path,
         ext: &String,
-        context: &graphics::Context,
+        context: &mut graphics::Context,
     ) -> graphics::data::Model {
         // TODO: Generalize this
         match ext.as_str() {
@@ -235,45 +233,14 @@ impl AssetManager {
 // Note(Jökull): We really only need the device, so...
 // TODO: Grab only the device from context, not the whole context
 
-fn load_model_from_gltf(context: &graphics::Context, path: &Path) -> graphics::data::Model {
+fn load_model_from_gltf(context: &mut graphics::Context, path: &Path) -> graphics::data::Model {
     let vertex_lists = vertex_lists_from_gltf(path).unwrap();
-    return load_model_from_vertex_lists(context, &vertex_lists);
+    context.model_from_vertex_list(&vertex_lists)
 }
 
-fn load_model_from_obj(context: &graphics::Context, path: &Path) -> graphics::data::Model {
+fn load_model_from_obj(context: &mut graphics::Context, path: &Path) -> graphics::data::Model {
     let vertex_lists = vertex_lists_from_obj(path).unwrap();
-    return load_model_from_vertex_lists(context, &vertex_lists);
-}
-
-fn load_model_from_vertex_lists(
-    context: &graphics::Context,
-    vertex_lists: &Vec<Vec<Vertex>>,
-) -> graphics::data::Model {
-    let mut meshes = vec![];
-
-    for vertices in vertex_lists {
-        let _vertex_buf = context.device.create_buffer_init(&BufferInitDescriptor {
-            label: None,
-            contents: vertices.as_bytes(),
-            usage: wgpu::BufferUsage::VERTEX,
-        });
-
-        let vertex_buf = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: vertices.as_bytes(),
-                usage: wgpu::BufferUsage::VERTEX,
-            });
-
-        meshes.push(graphics::data::Mesh {
-            num_vertices: vertices.len(),
-            vertex_buffer: vertex_buf,
-            offset: [0.0, 0.0, 0.0],
-        });
-    }
-
-    graphics::data::Model { meshes }
+    context.model_from_vertex_list(&vertex_lists)
 }
 
 // TODO: Handle transforms

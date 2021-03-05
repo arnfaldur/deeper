@@ -1,6 +1,7 @@
 #![allow(unused)]
 use std::mem::MaybeUninit;
 
+use bytemuck::bytes_of;
 use cgmath::{vec2, Vector2};
 use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
@@ -93,44 +94,6 @@ struct CanvasVertex {
     pub tex_coord: [f32; 2],
 }
 
-struct ImmediateElement {
-    pub uniform_buf: wgpu::Buffer,
-    pub bind_group: wgpu::BindGroup,
-}
-
-impl ImmediateElement {
-    fn new(device: &wgpu::Device) -> Self {
-        let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: LocalUniforms::new().as_bytes(),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
-
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[CanvasRenderContext::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: &uniform_buf,
-                    offset: 0,
-                    size: None,
-                },
-            }],
-        });
-
-        Self {
-            uniform_buf,
-            bind_group,
-        }
-    }
-}
-
 pub enum RectangleDescriptor {
     CornerRect {
         corner1: ScreenVector,
@@ -144,18 +107,72 @@ pub enum RectangleDescriptor {
     },
 }
 
+impl RectangleDescriptor {
+    /// Returns the rectangle as a tuple (position, dimensions), where position is the screen
+    /// coordinate of the top-left corner and the dimensions are the width and height.
+    fn as_screen_coordinates(
+        &self,
+        screen_size: &winit::dpi::PhysicalSize<u32>,
+    ) -> (Vector2<f32>, Vector2<f32>) {
+        let size = cgmath::vec2(screen_size.width as f32, screen_size.height as f32);
+
+        match self {
+            RectangleDescriptor::CornerRect { corner1, corner2 } => (
+                corner1.as_screen_coordinates(size),
+                corner2.as_screen_coordinates(size) - corner1.as_screen_coordinates(size),
+            ),
+            RectangleDescriptor::AnchorRect {
+                anchor,
+                position,
+                dimensions,
+                offset,
+            } => {
+                let pos = position.as_screen_coordinates(size);
+                let off = offset.as_screen_coordinates(size);
+                let dim = dimensions.as_screen_coordinates(size);
+                match anchor {
+                    AnchorPoint::TopLeft => (pos + off, dim),
+                    AnchorPoint::TopCenter => (pos - vec2(dim.x / 2.0, 0.0) + off, dim),
+                    AnchorPoint::TopRight => (pos - vec2(dim.x, 0.0) + off, dim),
+                    AnchorPoint::CenterLeft => (pos - vec2(0.0, dim.y / 2.0) + off, dim),
+                    AnchorPoint::Center => (pos - vec2(dim.x / 2.0, dim.y / 2.0) + off, dim),
+                    AnchorPoint::CenterRight => (pos - vec2(0.0, dim.y / 2.0) + off, dim),
+                    AnchorPoint::BottomLeft => (pos - vec2(0.0, dim.y) + off, dim),
+                    AnchorPoint::BottomCenter => (pos - vec2(dim.x / 2.0, dim.y) + off, dim),
+                    AnchorPoint::BottomRight => (pos - vec2(dim.x, dim.y) + off, dim),
+                }
+            }
+        }
+    }
+}
+
+enum CanvasStep {
+    DrawRect {
+        num: usize,
+        local_uniforms: super::data::LocalUniforms,
+    },
+    BindTexture {
+        idx: usize,
+    },
+}
+
 pub struct CanvasQueue {
-    local_uniforms: Vec<super::data::LocalUniforms>,
+    num: usize,
+    steps: Vec<CanvasStep>,
 }
 
 impl CanvasQueue {
     pub fn new() -> Self {
         Self {
-            local_uniforms: vec![],
+            num: 0,
+            steps: vec![],
         }
     }
 
-    pub fn clear(&mut self) { self.local_uniforms.clear(); }
+    pub fn clear(&mut self) {
+        self.steps.clear();
+        self.num = 0;
+    }
 
     pub fn draw_rect(
         &mut self,
@@ -163,54 +180,65 @@ impl CanvasQueue {
         color: cgmath::Vector4<f32>,
         size: winit::dpi::PhysicalSize<u32>,
     ) {
-        let size = cgmath::vec2(size.width as f32, size.height as f32);
+        self.steps.push(CanvasStep::DrawRect {
+            num: self.num,
+            local_uniforms: {
+                let (position, dimensions) = desc.as_screen_coordinates(&size);
 
-        self.local_uniforms.push({
-            let (position, dimensions) = match desc {
-                RectangleDescriptor::CornerRect { corner1, corner2 } => (
-                    corner1.as_screen_coordinates(size),
-                    corner2.as_screen_coordinates(size) - corner1.as_screen_coordinates(size),
-                ),
-                RectangleDescriptor::AnchorRect {
-                    anchor,
-                    position,
-                    dimensions,
-                    offset,
-                } => {
-                    let pos = position.as_screen_coordinates(size);
-                    let off = offset.as_screen_coordinates(size);
-                    let dim = dimensions.as_screen_coordinates(size);
-                    match anchor {
-                        AnchorPoint::TopLeft => (pos + off, dim),
-                        AnchorPoint::TopCenter => (pos - vec2(dim.x / 2.0, 0.0) + off, dim),
-                        AnchorPoint::TopRight => (pos - vec2(dim.x, 0.0) + off, dim),
-                        AnchorPoint::CenterLeft => (pos - vec2(0.0, dim.y / 2.0) + off, dim),
-                        AnchorPoint::Center => (pos - vec2(dim.x / 2.0, dim.y / 2.0) + off, dim),
-                        AnchorPoint::CenterRight => (pos - vec2(0.0, dim.y / 2.0) + off, dim),
-                        AnchorPoint::BottomLeft => (pos - Vector2::new(0.0, dim.y) + off, dim),
-                        AnchorPoint::BottomCenter => (pos - vec2(dim.x / 2.0, dim.y) + off, dim),
-                        AnchorPoint::BottomRight => (pos - Vector2::new(dim.x, dim.y) + off, dim),
-                    }
-                }
-            };
-
-            LocalUniforms {
-                model_matrix: (cgmath::Matrix4::from_translation(position.extend(0.0))
-                    * cgmath::Matrix4::from_nonuniform_scale(dimensions.x, dimensions.y, 1.0))
-                .into(),
-                material: Material::color(color),
-            }
+                LocalUniforms::new(
+                    (cgmath::Matrix4::from_translation(position.extend(0.0))
+                        * cgmath::Matrix4::from_nonuniform_scale(dimensions.x, dimensions.y, 1.0))
+                    .into(),
+                    Material::color(color),
+                )
+            },
         });
+
+        self.num += 1;
+    }
+}
+
+struct ImmediateElement {
+    pub bind_group: wgpu::BindGroup,
+}
+
+impl ImmediateElement {
+    fn new(
+        device: &wgpu::Device,
+        buffer: &wgpu::Buffer,
+        offset: wgpu::BufferAddress,
+        size: wgpu::BufferSize,
+    ) -> Self {
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[CanvasRenderContext::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer {
+                    buffer,
+                    offset,
+                    size: Some(size),
+                },
+            }],
+        });
+
+        Self { bind_group }
     }
 }
 
 const CANVAS_FRAG_SRC: &str = include_str!("../../shaders/canvas.frag");
 const CANVAS_VERT_SRC: &str = include_str!("../../shaders/canvas.vert");
 
-const MAXIMUM_NUMBER_OF_QUADS: usize = 1000;
+const MAXIMUM_NUMBER_OF_QUADS: usize = 1024;
 
 pub struct CanvasRenderContext {
     global_uniform_buf: wgpu::Buffer,
+    local_uniform_buf: wgpu::Buffer,
 
     global_bind_group: wgpu::BindGroup,
 
@@ -260,6 +288,32 @@ impl CanvasRenderContext {
             count: None,
         };
 
+    const TEXTURE_UNIFORM_BIND_GROUP_LAYOUT_DESCRIPTOR: wgpu::BindGroupLayoutDescriptor<'static> =
+        wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler {
+                        comparison: false,
+                        filtering: true,
+                    },
+                    count: None,
+                },
+            ],
+        };
+
     pub fn new(device: &wgpu::Device, window_size: winit::dpi::PhysicalSize<u32>) -> Self {
         // This describes the layout of bindings to buffers in the shader program
         let global_bind_group_layout =
@@ -273,6 +327,9 @@ impl CanvasRenderContext {
                 label: None,
                 entries: &[Self::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
             });
+
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&Self::TEXTURE_UNIFORM_BIND_GROUP_LAYOUT_DESCRIPTOR);
 
         let global_uniforms = GlobalUniforms {
             projection_view_matrix: super::util::generate_ortho_matrix(window_size.cast()).into(),
@@ -344,13 +401,30 @@ impl CanvasRenderContext {
 
         let pipeline = Self::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
 
+        assert_eq!(
+            std::mem::size_of::<LocalUniforms>(),
+            wgpu::BIND_BUFFER_ALIGNMENT as usize
+        );
+
+        let local_uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: (MAXIMUM_NUMBER_OF_QUADS * std::mem::size_of::<LocalUniforms>()) as u64,
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         // Maybe use the array crate that automates this?
         let immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS] = unsafe {
             let mut arr: [MaybeUninit<ImmediateElement>; MAXIMUM_NUMBER_OF_QUADS] =
                 MaybeUninit::uninit().assume_init();
 
-            for elem in &mut arr[..] {
-                *elem = MaybeUninit::new(ImmediateElement::new(device));
+            for (i, elem) in arr.iter_mut().enumerate() {
+                *elem = MaybeUninit::new(ImmediateElement::new(
+                    device,
+                    &local_uniform_buf,
+                    i as u64 * std::mem::size_of::<LocalUniforms>() as u64,
+                    wgpu::BufferSize::new_unchecked(std::mem::size_of::<LocalUniforms>() as u64),
+                ));
             }
 
             std::mem::transmute::<_, [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS]>(arr)
@@ -370,6 +444,7 @@ impl CanvasRenderContext {
 
         Self {
             global_uniform_buf,
+            local_uniform_buf,
             global_bind_group,
             pipeline,
             quad_mesh,
@@ -388,18 +463,26 @@ impl CanvasRenderContext {
             label: Some("Canvas Render"),
         });
 
-        // Todo: Fail more gracefully, maybe try to expand or re-use buffers?
-        if canvas_queue.local_uniforms.len() > MAXIMUM_NUMBER_OF_QUADS {
-            panic!("Number of Canvas Elements in frame exceeds available immediate quads.");
-        }
+        let uniforms = unsafe {
+            let mut arr: [MaybeUninit<LocalUniforms>; MAXIMUM_NUMBER_OF_QUADS] =
+                MaybeUninit::uninit().assume_init();
 
-        for (i, local_uniforms) in canvas_queue.local_uniforms.iter().enumerate() {
-            queue.write_buffer(
-                &self.immediate_elements.get(i).unwrap().uniform_buf,
-                0,
-                local_uniforms.as_bytes(),
-            );
-        }
+            for step in canvas_queue.steps.iter() {
+                match step {
+                    CanvasStep::DrawRect {
+                        num,
+                        local_uniforms,
+                    } if *num < MAXIMUM_NUMBER_OF_QUADS => {
+                        arr[*num] = MaybeUninit::new(*local_uniforms);
+                    }
+                    _ => (),
+                }
+            }
+
+            std::mem::transmute::<_, [LocalUniforms; MAXIMUM_NUMBER_OF_QUADS]>(arr)
+        };
+
+        queue.write_buffer(&self.local_uniform_buf, 0, bytes_of(&uniforms));
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -419,14 +502,23 @@ impl CanvasRenderContext {
             render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
             // render dynamic meshes
-            for (_, elem) in canvas_queue
-                .local_uniforms
-                .iter()
-                .zip(self.immediate_elements.iter())
-            {
-                render_pass.set_bind_group(1, &elem.bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
-                render_pass.draw(0..self.quad_mesh.num_vertices as u32, 0..1)
+            for step in canvas_queue.steps.iter() {
+                match step {
+                    CanvasStep::DrawRect {
+                        num,
+                        local_uniforms,
+                    } if *num < MAXIMUM_NUMBER_OF_QUADS => {
+                        render_pass.set_bind_group(
+                            1,
+                            &self.immediate_elements[*num].bind_group,
+                            &[],
+                        );
+                        render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
+                        render_pass.draw(0..self.quad_mesh.num_vertices as u32, 0..1)
+                    }
+                    CanvasStep::BindTexture { .. } => {}
+                    _ => (),
+                }
             }
         }
 

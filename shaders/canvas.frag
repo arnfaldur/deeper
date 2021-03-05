@@ -22,6 +22,10 @@ layout(set = 1, binding = 0) uniform Locals {
     Material material;
 };
 
+//layout(set = 2, binding = 0) uniform texture2D t_Diffuse;
+//layout(set = 2, binding = 1) uniform sampler s_Diffuse;
+
 void main() {
+    //o_Target = texture(sampler2D(t_Diffuse, s_Diffuse), v_TexCoord);
     o_Target = vec4(v_Color, 1.0);
 }

@@ -223,16 +223,11 @@ pub fn dung_gen(
                             health: rng.gen_range(0.0..2.0) + 8. * rad,
                         })
                         .any(
-                            Model3D::from_index(
-                                &context,
-                                ass_man.get_model_index("monstroman.obj").unwrap(),
-                            )
-                            .with_material(graphics::data::Material::glossy(Vector3::<f32>::new(
-                                rng.gen(),
-                                rng.gen(),
-                                rng.gen(),
-                            )))
-                            .with_scale(rad * 1.7),
+                            Model3D::from_index(ass_man.get_model_index("monstroman.obj").unwrap())
+                                .with_material(graphics::data::Material::glossy(
+                                    Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen()),
+                                ))
+                                .with_scale(rad * 1.7),
                         )
                         .done();
                 }

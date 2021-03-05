@@ -1,9 +1,10 @@
+#![allow(unused)]
+use bytemuck::{Pod, Zeroable};
 use cgmath::{Vector3, Vector4};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::graphics::MAX_NR_OF_POINT_LIGHTS;
 
-#[allow(unused)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes, FromBytes)]
 pub struct Vertex {
@@ -20,7 +21,7 @@ pub struct GlobalUniforms {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes, Default)]
+#[derive(Clone, Copy, Pod, AsBytes, FromBytes, Zeroable, Default)]
 pub struct Material {
     pub albedo: [f32; 4],
     pub metallic: f32,
@@ -69,19 +70,32 @@ impl Material {
     }
 }
 
+const LU_BYTES: usize = std::mem::size_of::<[[f32; 4]; 4]>() + std::mem::size_of::<Material>();
+const LU_ALIGN: usize = wgpu::BIND_BUFFER_ALIGNMENT as usize - LU_BYTES;
+
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes)]
+#[derive(Clone, Copy, Pod, Zeroable, Default)]
 pub struct LocalUniforms {
     pub model_matrix: [[f32; 4]; 4],
     pub material: Material,
+    _align: [f64; LU_ALIGN / 8],
 }
 
 impl LocalUniforms {
-    pub fn new() -> Self {
+    pub fn new(model_matrix: [[f32; 4]; 4], material: Material) -> Self {
+        Self {
+            model_matrix,
+            material,
+            _align: [0.0; LU_ALIGN / 8],
+        }
+    }
+
+    pub fn init() -> Self {
         use cgmath::SquareMatrix;
         Self {
             model_matrix: cgmath::Matrix4::identity().into(),
             material: Material::default(),
+            _align: [0.0; LU_ALIGN / 8],
         }
     }
 }

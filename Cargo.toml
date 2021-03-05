@@ -27,11 +27,13 @@ winit = "0.24.0"
 futures = "0.3.13"
 env_logger = "0.8.3"
 shaderc = "0.7.1"
-zerocopy = "0.3.0"
 lazy_static = "1.4.0"
 imgui = "0.7.0"
 imgui-wgpu = "0.14.0"
 imgui-winit-support = "0.7.0"
+
+zerocopy = "0.3.0"
+bytemuck = { version = "1.5.1", features = ["derive"] }
 
 wavefront_obj = "9.0.0"
 gltf = "0.15.2"
