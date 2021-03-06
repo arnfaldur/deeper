@@ -22,11 +22,11 @@ layout(set = 1, binding = 0) uniform Locals {
 void main() {
     vec4 position = vec4(a_Pos, 1.0);
 
-    v_FragPos = u_ModelMatrix * position;
-    v_Normal = normalize(u_ModelMatrix * vec4(a_Normal, 0.0));
+    v_FragPos = position;
+    v_Normal = vec4(a_Normal, 0.0);
 
     v_Color = u_Color;
     v_TexCoord = a_TexCoord;
 
-    gl_Position = u_ViewProj * u_ModelMatrix * position;
+    gl_Position = u_ViewProj * position;
 }

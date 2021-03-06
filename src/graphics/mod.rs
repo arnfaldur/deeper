@@ -125,8 +125,8 @@ impl Context {
 
     pub fn recompile_model_pipeline(
         &mut self,
-        vs_module: wgpu::ShaderModule,
-        fs_module: wgpu::ShaderModule,
+        vs_module: &wgpu::ShaderModule,
+        fs_module: &wgpu::ShaderModule,
     ) {
         self.model_render_ctx
             .recompile_pipeline(&self.device, vs_module, fs_module);

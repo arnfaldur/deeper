@@ -95,7 +95,7 @@ pub fn hot_loading(
 
             if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
                 println!("Recompiling shaders...");
-                context.recompile_model_pipeline(vsm, fsm);
+                context.recompile_model_pipeline(&vsm, &fsm);
                 *shaders_loaded_at = SystemTime::now();
             }
         }

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use cgmath::{vec2, SquareMatrix, Vector2, Vector3};
 use legion::world::SubWorld;
 use legion::*;

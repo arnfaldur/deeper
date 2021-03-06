@@ -8,7 +8,8 @@ use crate::graphics::data::LocalUniforms;
 
 // TODO: Have ass_man auto-load all shaders
 const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
-const VERT_SRC: &str = include_str!("../../shaders/forward.vert");
+const DYNAMIC_VERT_SRC: &str = include_str!("../../shaders/forward.vert");
+const STATIC_VERT_SRC: &str = include_str!("../../shaders/static.vert");
 
 const MAXIMUM_NUMBER_OF_DYNAMIC_MODELS: usize = 1024;
 
@@ -20,7 +21,8 @@ pub struct ModelRenderContext {
     pub lights_uniform_buf: wgpu::Buffer,
     pub local_bind_group_layout: wgpu::BindGroupLayout,
     global_bind_group: wgpu::BindGroup,
-    pipeline: wgpu::RenderPipeline,
+    static_pipeline: wgpu::RenderPipeline,
+    dynamic_pipeline: wgpu::RenderPipeline,
     pipeline_layout: wgpu::PipelineLayout,
 }
 
@@ -159,19 +161,30 @@ impl ModelRenderContext {
             ],
         });
 
-        let (vs_module, fs_module) = {
+        let (static_vs_module, dynamic_vs_module, fs_module) = {
             //Todo: Move shader compilation to ass_man
             let mut shader_compiler = shaderc::Compiler::new().unwrap();
 
-            let vs_spirv = shader_compiler
+            let svs_spirv = shader_compiler
                 .compile_into_spirv(
-                    VERT_SRC,
+                    STATIC_VERT_SRC,
+                    shaderc::ShaderKind::Vertex,
+                    "static.vert",
+                    "main",
+                    None,
+                )
+                .unwrap();
+
+            let dvs_spirv = shader_compiler
+                .compile_into_spirv(
+                    DYNAMIC_VERT_SRC,
                     shaderc::ShaderKind::Vertex,
                     "forward.vert",
                     "main",
                     None,
                 )
                 .unwrap();
+
             let fs_spirv = shader_compiler
                 .compile_into_spirv(
                     FRAG_SRC,
@@ -182,9 +195,15 @@ impl ModelRenderContext {
                 )
                 .unwrap();
 
-            let vs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: Some("Vertex Shader"),
-                source: wgpu::util::make_spirv(&vs_spirv.as_binary_u8()),
+            let svs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                label: Some("Static Vertex Shader"),
+                source: wgpu::util::make_spirv(&svs_spirv.as_binary_u8()),
+                flags: wgpu::ShaderFlags::default(),
+            });
+
+            let dvs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                label: Some("Dynamic Vertex Shader"),
+                source: wgpu::util::make_spirv(&dvs_spirv.as_binary_u8()),
                 flags: wgpu::ShaderFlags::default(),
             });
 
@@ -194,7 +213,7 @@ impl ModelRenderContext {
                 flags: wgpu::ShaderFlags::default(),
             });
 
-            (vs, fs)
+            (svs, dvs, fs)
         };
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -203,7 +222,10 @@ impl ModelRenderContext {
             push_constant_ranges: &[],
         });
 
-        let pipeline = Self::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
+        let static_pipeline =
+            Self::compile_pipeline(&device, &pipeline_layout, &static_vs_module, &fs_module);
+        let dynamic_pipeline =
+            Self::compile_pipeline(&device, &pipeline_layout, &dynamic_vs_module, &fs_module);
 
         Self {
             depth_view,
@@ -213,7 +235,8 @@ impl ModelRenderContext {
             lights_uniform_buf,
             local_bind_group_layout,
             global_bind_group,
-            pipeline,
+            static_pipeline,
+            dynamic_pipeline,
             pipeline_layout,
         }
     }
@@ -280,7 +303,7 @@ impl ModelRenderContext {
             }),
         });
 
-        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_pipeline(&self.static_pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
         // render static meshes
@@ -323,7 +346,7 @@ impl ModelRenderContext {
             }),
         });
 
-        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_pipeline(&self.dynamic_pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
         // render dynamic meshes
@@ -375,23 +398,24 @@ impl ModelRenderContext {
     pub fn recompile_pipeline(
         &mut self,
         device: &wgpu::Device,
-        vs_module: wgpu::ShaderModule,
-        fs_module: wgpu::ShaderModule,
+        vs_module: &wgpu::ShaderModule,
+        fs_module: &wgpu::ShaderModule,
     ) {
-        self.pipeline = Self::compile_pipeline(device, &self.pipeline_layout, vs_module, fs_module);
+        self.dynamic_pipeline =
+            Self::compile_pipeline(device, &self.pipeline_layout, vs_module, fs_module);
     }
 
     fn compile_pipeline(
         device: &wgpu::Device,
         pipeline_layout: &wgpu::PipelineLayout,
-        vs_module: wgpu::ShaderModule,
-        fs_module: wgpu::ShaderModule,
+        vs_module: &wgpu::ShaderModule,
+        fs_module: &wgpu::ShaderModule,
     ) -> wgpu::RenderPipeline {
         return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Option::from(pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &vs_module,
+                module: vs_module,
                 entry_point: "main",
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<super::data::Vertex>() as u64,
@@ -413,7 +437,7 @@ impl ModelRenderContext {
                 clamp_depth: false,
             }),
             fragment: Some(wgpu::FragmentState {
-                module: &fs_module,
+                module: fs_module,
                 entry_point: "main",
                 targets: &[wgpu::ColorTargetState {
                     format: super::COLOR_FORMAT,
