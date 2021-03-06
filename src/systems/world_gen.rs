@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cgmath::{vec2, Vector2, Vector3};
+use cgmath::{vec2, SquareMatrix, Vector2, Vector3};
 use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
@@ -40,8 +40,8 @@ pub fn dung_gen(
     commands: &mut legion::systems::CommandBuffer,
     #[resource] trans: &mut MapTransition,
     #[resource] floor: &mut FloorNumber,
-    #[resource] context: &graphics::Context,
-    #[resource] ass_man: &loader::AssetManager,
+    #[resource] context: &mut graphics::Context,
+    #[resource] ass_man: &mut loader::AssetManager,
     #[resource] player: &Player,
 ) {
     match *trans {
@@ -132,11 +132,12 @@ pub fn dung_gen(
             };
             let _pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
 
+            let mut optimizer = StaticMeshOptimizer::new();
+
             for (&(x, y), &tile_type) in dungeon.world.iter() {
                 let pos = Vector2::new(x as f32, y as f32);
 
-                let model = StaticModel::new(
-                    &context,
+                optimizer.insert(
                     match tile_type {
                         TileType::Nothing => plane_idx,
                         TileType::Wall(None) => cube_idx,
@@ -145,27 +146,62 @@ pub fn dung_gen(
                         TileType::Path => floor_idx,
                         TileType::LadderDown => stairs_down_idx,
                     },
-                    pos.extend(match tile_type {
-                        TileType::Nothing => 1.,
-                        _ => 0.,
-                    }),
-                    1.0,
-                    match tile_type {
-                        TileType::Wall(Some(WallDirection::North)) => 0.,
-                        TileType::Wall(Some(WallDirection::West)) => 90.,
-                        TileType::Wall(Some(WallDirection::South)) => 180.,
-                        TileType::Wall(Some(WallDirection::East)) => 270.,
-                        _ => 0.,
-                    },
-                    match tile_type {
-                        TileType::Nothing => graphics::data::Material::dark_stone(),
-                        TileType::Path => {
-                            graphics::data::Material::glossy(Vector3::new(0.1, 0.1, 0.1))
-                        }
-                        _ => graphics::data::Material::darkest_stone(),
-                    },
+                    LocalUniforms::simple(
+                        pos.extend(match tile_type {
+                            TileType::Nothing => 1.,
+                            _ => 0.,
+                        })
+                        .into(),
+                        1.0,
+                        match tile_type {
+                            TileType::Wall(Some(WallDirection::North)) => 0.,
+                            TileType::Wall(Some(WallDirection::West)) => 90.,
+                            TileType::Wall(Some(WallDirection::South)) => 180.,
+                            TileType::Wall(Some(WallDirection::East)) => 270.,
+                            _ => 0.,
+                        },
+                        match tile_type {
+                            TileType::Nothing => graphics::data::Material::dark_stone(),
+                            TileType::Path => {
+                                graphics::data::Material::glossy(Vector3::new(0.1, 0.1, 0.1))
+                            }
+                            _ => graphics::data::Material::darkest_stone(),
+                        },
+                    ),
                 );
-                let entity = commands.push((model, tile_type));
+
+                //let model = StaticModel::new(
+                //    &context,
+                //    match tile_type {
+                //        TileType::Nothing => plane_idx,
+                //        TileType::Wall(None) => cube_idx,
+                //        TileType::Wall(Some(_)) => wall_idx,
+                //        TileType::Floor => floor_idx,
+                //        TileType::Path => floor_idx,
+                //        TileType::LadderDown => stairs_down_idx,
+                //    },
+                //    pos.extend(match tile_type {
+                //        TileType::Nothing => 1.,
+                //        _ => 0.,
+                //    }),
+                //    1.0,
+                //    match tile_type {
+                //        TileType::Wall(Some(WallDirection::North)) => 0.,
+                //        TileType::Wall(Some(WallDirection::West)) => 90.,
+                //        TileType::Wall(Some(WallDirection::South)) => 180.,
+                //        TileType::Wall(Some(WallDirection::East)) => 270.,
+                //        _ => 0.,
+                //    },
+                //    match tile_type {
+                //        TileType::Nothing => graphics::data::Material::dark_stone(),
+                //        TileType::Path => {
+                //            graphics::data::Material::glossy(Vector3::new(0.1, 0.1, 0.1))
+                //        }
+                //        _ => graphics::data::Material::darkest_stone(),
+                //    },
+                //);
+
+                let entity = commands.push((tile_type,));
                 match tile_type {
                     TileType::Nothing => {}
                     _ => {
@@ -231,18 +267,91 @@ pub fn dung_gen(
                         .done();
                 }
             }
-            // TODO: use this or delete for a pathfinding system
-            // mark pathable neighbours
-            //for (&(x, y), &ent) in pathability_map.iter() {
-            //    updater.insert(ent, TileNeighbours {
-            //        n: pathability_map.get(&(x + 0, y + 1)).cloned(),
-            //        w: pathability_map.get(&(x + 1, y + 0)).cloned(),
-            //        s: pathability_map.get(&(x + 0, y - 1)).cloned(),
-            //        e: pathability_map.get(&(x - 1, y + 0)).cloned(),
-            //    });
-            //}
+
+            let optimized_models = optimizer
+                .finish(ass_man)
+                .iter()
+                .map(|(uniforms, vertex_lists)| {
+                    (
+                        *uniforms,
+                        ass_man.allocate_graphics_model_from_vertex_lists(
+                            context,
+                            vertex_lists.clone(),
+                        ),
+                    )
+                })
+                .collect_vec();
+
+            for (uniforms, idx) in optimized_models.iter() {
+                commands.push((StaticModel::from_uniforms(context, *idx, *uniforms),));
+            }
         }
         _ => {}
     }
     *trans = MapTransition::None;
+}
+
+// TODO: Find a place for this
+
+use graphics::data::LocalUniforms;
+use itertools::Itertools;
+
+struct StaticMeshOptimizationEntry {
+    archetype: LocalUniforms,
+    instances: Vec<(usize, LocalUniforms)>,
+}
+
+struct StaticMeshOptimizer {
+    entries: Vec<StaticMeshOptimizationEntry>,
+}
+
+impl StaticMeshOptimizer {
+    fn new() -> Self { Self { entries: vec![] } }
+
+    fn insert(&mut self, idx: usize, local_uniforms: LocalUniforms) {
+        for entry in self.entries.iter_mut() {
+            if entry.archetype.similar_to(&local_uniforms) {
+                entry.instances.push((idx, local_uniforms));
+                return;
+            }
+        }
+        self.entries.push(StaticMeshOptimizationEntry {
+            archetype: local_uniforms.with_model_matrix(cgmath::Matrix4::identity().into()),
+            instances: vec![(idx, local_uniforms)],
+        })
+    }
+
+    fn finish(
+        &self,
+        ass_man: &loader::AssetManager,
+    ) -> Vec<(LocalUniforms, graphics::data::VertexLists)> {
+        self.entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.archetype,
+                    entry
+                        .instances
+                        .iter()
+                        .map(|(idx, uniforms)| {
+                            ass_man
+                                .models
+                                .get(*idx)
+                                .unwrap()
+                                .vertex_lists
+                                .iter()
+                                .map(|vertex_list| {
+                                    vertex_list
+                                        .iter()
+                                        .map(|vertex| vertex.transformed(uniforms.model_matrix))
+                                        .collect_vec()
+                                })
+                                .collect_vec()
+                        })
+                        .collect_vec()
+                        .concat(),
+                )
+            })
+            .collect_vec()
+    }
 }

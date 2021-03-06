@@ -188,6 +188,19 @@ impl StaticModel {
             bind_group: Arc::new(bind_group),
         }
     }
+
+    pub fn from_uniforms(
+        context: &graphics::Context,
+        idx: usize,
+        local_uniforms: graphics::data::LocalUniforms,
+    ) -> Self {
+        let bind_group = context.model_bind_group_from_uniform_data(local_uniforms);
+
+        Self {
+            idx,
+            bind_group: Arc::new(bind_group),
+        }
+    }
 }
 
 #[derive(Clone)]

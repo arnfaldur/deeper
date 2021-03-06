@@ -225,10 +225,10 @@ impl Context {
         );
     }
 
-    pub fn model_from_vertex_list(&mut self, vertex_lists: &Vec<Vec<Vertex>>) -> data::Model {
+    pub fn model_from_vertex_list(&self, vertex_lists: Vec<Vec<Vertex>>) -> data::Model {
         let mut meshes = vec![];
 
-        for vertices in vertex_lists {
+        for vertices in vertex_lists.iter() {
             let vertex_buf = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -244,7 +244,10 @@ impl Context {
             });
         }
 
-        data::Model { meshes }
+        data::Model {
+            meshes,
+            vertex_lists,
+        }
     }
 
     // Note(Jökull): A step in the right direction, but a bit heavy-handed

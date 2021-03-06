@@ -198,7 +198,6 @@ fn calculate_relative_transforms() -> impl ParallelRunnable {
         .read_component::<Rotation>()
         .read_component::<Rotation3D>()
         .read_component::<Scale>()
-        .read_component::<NonUniformScale>()
         .with_query(<(&mut Transform, &Position)>::query())
         .with_query(<(&mut Transform, &Rotation)>::query())
         .with_query(<(&mut Transform, &Rotation3D)>::query())
@@ -260,6 +259,7 @@ fn scale() -> impl ParallelRunnable {
             });
         })
 }
+
 // fn non_uniform_scale() -> impl ParallelRunnable {
 //     SystemBuilder::new("transforms_non_uniform_scale")
 //         .write_component::<Transform>()

@@ -108,8 +108,6 @@ impl AssetManager {
         return ass_man;
     }
 
-    // TODO: implement mark_changed_files(...)
-
     pub fn get_model_index(&self, name: &str) -> Option<usize> {
         if let Some(asset) = self
             .assets
@@ -156,38 +154,48 @@ impl AssetManager {
             loaded_at_time: time_loaded,
             asset_kind: AssetKind::Model(idx),
             ..
-        }) = self.assets.get(path)
+        }) = self.assets.get_mut(path)
         {
             let modified = fs::metadata(path).unwrap().modified().unwrap();
             if modified.gt(time_loaded) {
+                *time_loaded = SystemTime::now();
                 self.models[*idx] = AssetManager::get_graphics_model(path, ext, context);
                 println!("[loader] Hotloaded: {:?}", path.file_name().unwrap());
-                self.assets.get_mut(path).unwrap().loaded_at_time = SystemTime::now();
             }
         } else {
+            self.register_asset(path, AssetKind::Model(self.models.len()));
             self.models
                 .push(AssetManager::get_graphics_model(path, ext, context));
             println!("[loader] Loaded: {:?}", path.file_name().unwrap());
-            self.register_asset(path, AssetKind::Model(self.models.len() - 1));
         }
     }
 
-    // Note(Jökull): The graphics layer should possibly deal with this :shrug:
+    pub fn allocate_graphics_model_from_vertex_lists(
+        &mut self,
+        context: &mut graphics::Context,
+        vertex_lists: graphics::data::VertexLists,
+    ) -> usize {
+        let idx = self.models.len();
+        self.models
+            .push(context.model_from_vertex_list(vertex_lists));
+        idx
+    }
+
     fn get_graphics_model(
         path: &Path,
         ext: &String,
         context: &mut graphics::Context,
     ) -> graphics::data::Model {
         // TODO: Generalize this
-        match ext.as_str() {
-            "obj" => load_model_from_obj(context, path),
-            "glb" | "gltf" => load_model_from_gltf(context, path),
+        context.model_from_vertex_list(match ext.as_str() {
+            "obj" => vertex_lists_from_obj(path).unwrap(),
+            "glb" | "gltf" => vertex_lists_from_gltf(path).unwrap(),
             _ => {
                 // Should not happen
-                println!("[loader] (error): Extension {} not recognized.", ext);
-                graphics::data::Model { meshes: vec![] }
+                eprintln!("[loader] (error): Extension {} not recognized.", ext);
+                vec![]
             }
-        }
+        })
     }
 
     fn register_asset(&mut self, path: &Path, asset_kind: AssetKind) {
@@ -227,20 +235,6 @@ impl AssetManager {
         }
         return DisplaySettings::new();
     }
-}
-
-// Model file format handling
-// Note(Jökull): We really only need the device, so...
-// TODO: Grab only the device from context, not the whole context
-
-fn load_model_from_gltf(context: &mut graphics::Context, path: &Path) -> graphics::data::Model {
-    let vertex_lists = vertex_lists_from_gltf(path).unwrap();
-    context.model_from_vertex_list(&vertex_lists)
-}
-
-fn load_model_from_obj(context: &mut graphics::Context, path: &Path) -> graphics::data::Model {
-    let vertex_lists = vertex_lists_from_obj(path).unwrap();
-    context.model_from_vertex_list(&vertex_lists)
 }
 
 // TODO: Handle transforms
