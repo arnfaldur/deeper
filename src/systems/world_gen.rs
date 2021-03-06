@@ -11,27 +11,6 @@ use crate::dung_gen::DungGen;
 use crate::transform::components::Position;
 use crate::{graphics, loader};
 
-//pub struct MapSwitchingSystem;
-//
-//impl<'a> System<'a> for MapSwitchingSystem {
-//    type SystemData = (
-//        ReadExpect<'a, Player>,
-//        WriteExpect<'a, MapTransition>,
-//        ReadStorage<'a, Position>,
-//        ReadStorage<'a, MapSwitcher>,
-//    );
-//
-//    fn run(&mut self, (player, mut trans, pos, switcher): Self::SystemData) {
-//        let player_pos = pos.get(player.entity).expect("The player has no position, can't run MapSwitchingSystem");
-//        for (pos, switcher) in (&pos, &switcher).join() {
-//            if pos.0.distance(player_pos.0) < 0.5 {
-//                *trans = switcher.0;
-//            }
-//        }
-//    }
-//}
-//
-
 #[system]
 #[read_component(TileType)]
 #[read_component(Faction)]
@@ -87,8 +66,6 @@ pub fn dung_gen(
             EntitySmith::from_entity(commands, player.player)
                 .position(player_start.extend(0.))
                 .velocity_zero();
-            // commands.add_component(player.player, Position(player_start.extend(0.)));
-            // commands.add_component(player.player, Velocity::new());
 
             // TODO: Turn lights into entities
             {
@@ -130,7 +107,6 @@ pub fn dung_gen(
                     ass_man.get_model_index("floortile.obj").unwrap(),
                 )
             };
-            let _pathability_map: HashMap<(i32, i32), Entity> = HashMap::new();
 
             let mut optimizer = StaticMeshOptimizer::new();
 
@@ -170,37 +146,6 @@ pub fn dung_gen(
                     ),
                 );
 
-                //let model = StaticModel::new(
-                //    &context,
-                //    match tile_type {
-                //        TileType::Nothing => plane_idx,
-                //        TileType::Wall(None) => cube_idx,
-                //        TileType::Wall(Some(_)) => wall_idx,
-                //        TileType::Floor => floor_idx,
-                //        TileType::Path => floor_idx,
-                //        TileType::LadderDown => stairs_down_idx,
-                //    },
-                //    pos.extend(match tile_type {
-                //        TileType::Nothing => 1.,
-                //        _ => 0.,
-                //    }),
-                //    1.0,
-                //    match tile_type {
-                //        TileType::Wall(Some(WallDirection::North)) => 0.,
-                //        TileType::Wall(Some(WallDirection::West)) => 90.,
-                //        TileType::Wall(Some(WallDirection::South)) => 180.,
-                //        TileType::Wall(Some(WallDirection::East)) => 270.,
-                //        _ => 0.,
-                //    },
-                //    match tile_type {
-                //        TileType::Nothing => graphics::data::Material::dark_stone(),
-                //        TileType::Path => {
-                //            graphics::data::Material::glossy(Vector3::new(0.1, 0.1, 0.1))
-                //        }
-                //        _ => graphics::data::Material::darkest_stone(),
-                //    },
-                //);
-
                 let entity = commands.push((tile_type,));
                 match tile_type {
                     TileType::Nothing => {}
@@ -208,6 +153,7 @@ pub fn dung_gen(
                         commands.add_component(entity, Position(pos.extend(0.)));
                     }
                 }
+
                 // tile specific behaviors
                 match tile_type {
                     TileType::Wall(_) => {
@@ -219,13 +165,7 @@ pub fn dung_gen(
                     }
                     _ => {}
                 }
-                // TODO: use or delete for pathfinding
-                //match tile_type {
-                //    TileType::Floor | TileType::Path | TileType::LadderDown => {
-                //        pathability_map.insert((x, y), entity);
-                //    }
-                //    _ => {}
-                //}
+
                 // Add enemies to floor
                 if TileType::Floor == tile_type
                     && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
