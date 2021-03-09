@@ -1,5 +1,7 @@
 // Welcome to crazy-land
 
+use imgui::{Condition, TreeNode};
+
 /// Did not want to go this way, but basically feel obligated to do so
 /// Based on the way that Amethyst integrates imgui into their engine
 /// This solves a problem where we must keep a reference to the current
@@ -9,6 +11,7 @@
 /// heavily by amethyst is to just bypass the borrow checker entirely
 /// and manage a reference to the memory manually.
 pub static mut CURRENT_UI: Option<imgui::Ui<'static>> = None;
+
 pub unsafe fn current_ui<'a>() -> Option<&'a imgui::Ui<'a>> { CURRENT_UI.as_ref() }
 
 /// Contains everything necessary to render GUI elements.
@@ -126,31 +129,26 @@ impl GuiContext {
         view: &wgpu::TextureView,
         debug_info: Option<crate::debug::DebugTimerInfo>,
     ) {
-        use imgui::{im_str, CollapsingHeader, Ui};
+        use imgui::{im_str, Ui};
         if let Some(debug_info) = debug_info {
             Self::with_ui(|ui| {
-                fn foo(info: &crate::debug::TimerInfo, ui: &Ui) {
-                    if CollapsingHeader::new(&im_str!("{} : {:?}", info.label, info.duration))
-                        .default_open(true)
-                        .leaf(!info.children.is_empty())
-                        .build(ui)
-                    {
-                        ui.indent();
-                        for child in &info.children {
-                            foo(child, ui);
-                        }
-                        ui.unindent();
-                    }
+                fn recur(info: &crate::debug::TimerInfo, ui: &Ui) {
+                    TreeNode::new(&im_str!("{}", info.label))
+                        .label(&im_str!("{} : {:?}", info.label, info.duration))
+                        .leaf(info.children.is_empty())
+                        .build(ui, || {
+                            for child in &info.children {
+                                recur(child, ui);
+                            }
+                        });
                 }
 
-                let debug_window = imgui::Window::new(im_str!("Debug Information"));
-
-                debug_window
+                imgui::Window::new(im_str!("Debug Information"))
                     .always_auto_resize(true)
                     .no_decoration()
                     .build(ui, || {
                         for root in &debug_info.roots {
-                            foo(root, ui);
+                            recur(root, ui);
                         }
                     });
             });
