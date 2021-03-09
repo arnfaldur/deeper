@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
-use cgmath::{EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
+use cgmath::{Deg, EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
 use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
 use legion::*;
@@ -226,10 +226,10 @@ pub fn player(
                 new_rotation += 180.0;
             }
             {
-                let mut player_orient = <&mut Rotation>::query()
+                let player_orient = <&mut Rotation>::query()
                     .get_mut(&mut orient_world, player.model)
                     .expect("We have no direction in life.");
-                (player_orient.0).0 = new_rotation;
+                *player_orient = Deg(new_rotation).into();
             }
         }
     }

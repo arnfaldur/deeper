@@ -97,7 +97,7 @@ fn ai_follow(world: &mut SubWorld, command: &mut CommandBuffer) {
             if distance > follow.minimum_distance {
                 command.add_component(*ent, Destination::simple(hunted.0.truncate()));
                 if let Some(orientation) = orient {
-                    orientation.0 = cgmath::Deg::from(difference.angle(Vector3::unit_y()));
+                    *orientation = Rotation::from(difference.angle(Vector3::unit_y()));
                 }
             }
         }

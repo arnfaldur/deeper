@@ -1,9 +1,9 @@
 use cgmath::Matrix4;
 use imgui::Ui;
 use legion::systems::{Builder, ParallelRunnable, Runnable};
-use legion::{component, Entity, EntityStore, IntoQuery, SystemBuilder};
+use legion::{component, maybe_changed, Entity, EntityStore, IntoQuery, SystemBuilder};
 
-use crate::components::{Children, Name, Parent};
+use crate::components::{Children, Parent};
 use crate::graphics::gui::GuiContext;
 use crate::transform::*;
 
@@ -19,14 +19,16 @@ impl TransformBuilderExtender for Builder {
             .add_system(depopulate_transforms())
             .add_system(adopt_children())
             .flush()
-            .add_system(validate_rotation_transforms())
             .add_system(reset_transforms())
             .add_system(position())
             .add_system(rotation())
-            .add_system(rotation3d())
             .add_system(scale())
-            .add_system(inherit_transforms()) // FIXME: this should not have to be thread local but the scheduling is weird so that seems to be needed
-                                              //.add_thread_local(player_transform_shower())
+            .add_system(position_rotation())
+            .add_system(position_scale())
+            .add_system(rotation_scale())
+            .add_system(position_rotation_scale())
+            .add_system(inherit_transforms())
+        //.add_thread_local(player_transform_shower())
     }
 }
 
@@ -84,10 +86,7 @@ fn populate_transforms() -> impl Runnable {
     SystemBuilder::new("populate_transforms")
         .with_query(<Entity>::query().filter(
             !component::<Transform>()
-                & (component::<Position>()
-                    | component::<Rotation>()
-                    | component::<Rotation3D>()
-                    | component::<Scale>()),
+                & (component::<Position>() | component::<Rotation>() | component::<Scale>()),
         ))
         .build(move |cmd, world, _, query| {
             query.for_each_mut(world, |ent: &Entity| {
@@ -102,7 +101,6 @@ fn depopulate_transforms() -> impl Runnable {
             component::<Transform>()
                 & !component::<Position>()
                 & !component::<Rotation>()
-                & !component::<Rotation3D>()
                 & !component::<Scale>(),
         ))
         .build(move |cmd, world, _, query| {
@@ -115,6 +113,7 @@ fn depopulate_transforms() -> impl Runnable {
 fn adopt_children() -> impl Runnable {
     SystemBuilder::new("adopt_children")
         .with_query(<(Entity, &Parent)>::query())
+        .read_component::<Parent>()
         .write_component::<Children>()
         .build(move |cmd, world, _, query| {
             let (child_world, mut parent_world) = world.split_for_query(query);
@@ -137,36 +136,14 @@ fn adopt_children() -> impl Runnable {
 // when a transform informing component changes, reset the transform such that it can be recalculated
 fn reset_transforms() -> impl Runnable {
     SystemBuilder::new("populate_transforms")
-        .with_query(
-            <&mut Transform>::query(),
-            //     .filter( maybe_changed::<Position>()
-            //         | maybe_changed::<Position3D>()
-            //         | maybe_changed::<Rotation>()
-            //         | maybe_changed::<Rotation3D>()
-            //         | maybe_changed::<Scale>()
-            //         | maybe_changed::<NonUniformScale>(),
-            // )
-        )
+        .write_component::<Transform>()
+        .with_query(<&mut Transform>::query().filter(
+            maybe_changed::<Position>() | maybe_changed::<Rotation>() | maybe_changed::<Scale>(),
+        ))
         .build(move |_, world, _, query| {
             query.for_each_mut(world, |transform: &mut Transform| {
                 *transform = Transform::identity();
             });
-        })
-}
-
-fn validate_rotation_transforms() -> impl Runnable {
-    SystemBuilder::new("validate_rotation_transforms")
-        .with_query(<(Option<&Name>, &Rotation, &Rotation3D)>::query())
-        .build(move |_, world, _, query| {
-            query.for_each(world, |(name, _, _)| {
-                eprint!("Note: ");
-                if let Some(name) = name {
-                    eprint!("The entity {} ", name);
-                } else {
-                    eprint!("an entity ");
-                }
-                eprintln!("has both Rotation and Rotation3D components");
-            })
         })
 }
 
@@ -176,90 +153,123 @@ fn calculate_relative_transforms() -> impl ParallelRunnable {
         .write_component::<Transform>()
         .read_component::<Position>()
         .read_component::<Rotation>()
-        .read_component::<Rotation3D>()
         .read_component::<Scale>()
-        .with_query(<(&mut Transform, &Position)>::query())
-        .with_query(<(&mut Transform, &Rotation)>::query())
-        .with_query(<(&mut Transform, &Rotation3D)>::query())
-        .with_query(<(&mut Transform, &Scale)>::query())
+        .with_query(
+            <(&mut Transform, &Position)>::query()
+                .filter(!component::<Rotation>() & !component::<Scale>()),
+        )
+        .with_query(
+            <(&mut Transform, &Rotation)>::query()
+                .filter(!component::<Position>() & !component::<Scale>()),
+        )
+        .with_query(
+            <(&mut Transform, &Scale)>::query()
+                .filter(!component::<Position>() & !component::<Rotation>()),
+        )
+        .with_query(<(&mut Transform, &Position, &Rotation)>::query().filter(!component::<Scale>()))
+        .with_query(<(&mut Transform, &Position, &Scale)>::query().filter(!component::<Rotation>()))
+        .with_query(<(&mut Transform, &Rotation, &Scale)>::query().filter(!component::<Position>()))
+        .with_query(<(&mut Transform, &Position, &Rotation, &Scale)>::query())
         .build(move |_, world, _, query| {
-            query.0.for_each_mut(world, |(transform, val)| {
+            let (q0, q1, q2, q3, q4, q5, q6) = query;
+
+            q0.for_each_mut(world, |(transform, val)| {
                 transform.relative = transform.relative * Matrix4::from(val);
             });
-            query.1.for_each_mut(world, |(transform, val)| {
+            q1.for_each_mut(world, |(transform, val)| {
                 transform.relative = transform.relative * Matrix4::from(val);
             });
-            query.2.for_each_mut(world, |(transform, val)| {
+            q2.for_each_mut(world, |(transform, val)| {
                 transform.relative = transform.relative * Matrix4::from(val);
             });
-            query.3.for_each_mut(world, |(transform, val)| {
-                transform.relative = transform.relative * Matrix4::from(val);
+            q3.for_each_mut(world, |(transform, val1, val2)| {
+                transform.relative = transform.relative * Matrix4::from(val1) * Matrix4::from(val2);
+            });
+            q4.for_each_mut(world, |(transform, val1, val2)| {
+                transform.relative = transform.relative * Matrix4::from(val1) * Matrix4::from(val2);
+            });
+            q5.for_each_mut(world, |(transform, val1, val2)| {
+                transform.relative = transform.relative * Matrix4::from(val1) * Matrix4::from(val2);
+            });
+            q6.for_each_mut(world, |(transform, val1, val2, val3)| {
+                transform.relative = transform.relative
+                    * Matrix4::from(val1)
+                    * Matrix4::from(val2)
+                    * Matrix4::from(val3);
             });
         })
 }
 
-fn position() -> impl ParallelRunnable {
-    SystemBuilder::new("transforms_position")
-        .write_component::<Transform>()
-        .with_query(<(&mut Transform, &Position)>::query())
-        .build(move |_, world, _, query| {
-            query.for_each_mut(world, |(transform, val)| {
-                transform.relative = transform.relative * Matrix4::from(val);
-            });
-        })
+macro_rules! transform_system_one {
+    ($name:ident, $q:ty, ($a:ty, $b:ty)) => {
+        fn $name() -> impl ParallelRunnable {
+            SystemBuilder::new(String::from("transforms_") + stringify!($name))
+                .read_component::<Transform>() // this isn't technically true but enforces the correct access patterns
+                .with_query(
+                    <(&mut Transform, $q)>::query().filter(
+                        maybe_changed::<Transform>() & !component::<$a>() & !component::<$b>(),
+                    ),
+                )
+                .build(move |_, world, _, query| {
+                    query.for_each_mut(world, |(transform, val)| {
+                        transform.relative = transform.relative * Matrix4::from(val);
+                    });
+                })
+        }
+    };
 }
-fn rotation() -> impl ParallelRunnable {
-    SystemBuilder::new("transforms_rotation")
-        .write_component::<Transform>()
-        .with_query(<(&mut Transform, &Rotation)>::query())
-        .build(move |_, world, _, query| {
-            query.for_each_mut(world, |(transform, val)| {
-                transform.relative = transform.relative * Matrix4::from(val);
-            });
-        })
-}
-fn rotation3d() -> impl ParallelRunnable {
-    SystemBuilder::new("transforms_rotation3d")
-        .write_component::<Transform>()
-        .with_query(<(&mut Transform, &Rotation3D)>::query())
-        .build(move |_, world, _, query| {
-            query.for_each_mut(world, |(transform, val)| {
-                transform.relative = transform.relative * Matrix4::from(val);
-            });
-        })
-}
+transform_system_one!(position, &Position, (Rotation, Scale));
+transform_system_one!(rotation, &Rotation, (Position, Scale));
+transform_system_one!(scale, &Scale, (Position, Rotation));
 
-fn scale() -> impl ParallelRunnable {
-    SystemBuilder::new("transforms_scale")
-        .write_component::<Transform>()
-        .with_query(<(&mut Transform, &Scale)>::query())
+macro_rules! transform_system_two {
+    ($name:ident, ($a:ty, $b:ty), $f:ty) => {
+        fn $name() -> impl ParallelRunnable {
+            SystemBuilder::new(String::from("transforms_") + stringify!($name))
+                .read_component::<Transform>() // this isn't technically true but enforces the correct access patterns
+                .with_query(
+                    <(&mut Transform, $a, $b)>::query()
+                        .filter(maybe_changed::<Transform>() & !component::<$f>()),
+                )
+                .build(move |_, world, _, query| {
+                    query.for_each_mut(world, |(transform, val1, val2)| {
+                        transform.relative =
+                            transform.relative * Matrix4::from(val1) * Matrix4::from(val2);
+                    });
+                })
+        }
+    };
+}
+transform_system_two!(position_rotation, (&Position, &Rotation), Scale);
+transform_system_two!(position_scale, (&Position, &Scale), Rotation);
+transform_system_two!(rotation_scale, (&Rotation, &Scale), Position);
+
+fn position_rotation_scale() -> impl ParallelRunnable {
+    SystemBuilder::new("transforms_rotation_scale")
+        .read_component::<Transform>() // this isn't technically true but enforces the correct access patterns
+        .with_query(
+            <(&mut Transform, &Position, &Rotation, &Scale)>::query()
+                .filter(maybe_changed::<Transform>()),
+        )
         .build(move |_, world, _, query| {
-            query.for_each_mut(world, |(transform, val)| {
-                transform.relative = transform.relative * Matrix4::from(val);
+            query.for_each_mut(world, |(transform, val1, val2, val3)| {
+                transform.relative = transform.relative
+                    * Matrix4::from(val1)
+                    * Matrix4::from(val2)
+                    * Matrix4::from(val3);
             });
         })
 }
-
-// fn non_uniform_scale() -> impl ParallelRunnable {
-//     SystemBuilder::new("transforms_non_uniform_scale")
-//         .write_component::<Transform>()
-//         .with_query(<(&mut Transform, &NonUniformScale)>::query())
-//         .build(move |_, world, _, query| {
-//             query.for_each_mut(world, |(transform, val)| {
-//                 transform.relative = transform.relative * Matrix4::from(val);
-//             });
-//         })
-// }
 
 fn inherit_transforms() -> impl ParallelRunnable {
     SystemBuilder::new("inherit_transforms")
+        .read_component::<Children>()
+        .write_component::<Transform>()
         .with_query(<&mut Transform>::query().filter(!component::<Parent>()))
         .with_query(
             <(Entity, &Transform)>::query()
                 .filter(!component::<Parent>() & component::<Children>()),
         )
-        .read_component::<Children>()
-        .write_component::<Transform>()
         .build(move |_, world, _, (first_generation, parents)| {
             first_generation.for_each_mut(world, |transform: &mut Transform| {
                 transform.absolute = transform.relative;
@@ -280,7 +290,7 @@ fn inherit_transforms() -> impl ParallelRunnable {
                         {
                             child_transform.absolute =
                                 parent_transform.absolute * child_transform.relative;
-                            stack.push((child, *child_transform));
+                            stack.push((child, child_transform.clone()));
                         }
                     }
                 }

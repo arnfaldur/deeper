@@ -1,4 +1,3 @@
-use cgmath::Deg;
 use legion::storage::Component;
 use legion::systems::CommandBuffer;
 
@@ -44,7 +43,9 @@ impl<'a> EntitySmith<'a> {
     pub fn position(&mut self, pos: Vector3<f32>) -> &mut Self { self.add_component(Position(pos)) }
     pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
     pub fn velocity_zero(&mut self) -> &mut Self { self.add_component(Velocity::new()) }
-    pub fn orientation(&mut self, ori: f32) -> &mut Self { self.add_component(Rotation(Deg(ori))) }
+    pub fn orientation(&mut self, ori: f32) -> &mut Self {
+        self.add_component(Rotation::from_deg(ori))
+    }
     pub fn physics_body(&mut self, body: PhysicsBody) -> &mut Self { self.add_component(body) }
     pub fn dynamic_body(&mut self, mass: f32) -> &mut Self {
         self.add_component(PhysicsBody::Dynamic { mass })

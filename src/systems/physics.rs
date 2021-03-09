@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use cgmath::{InnerSpace, Zero};
+use cgmath::{InnerSpace, Rotation3, Zero};
 use legion::systems::{Builder, ParallelRunnable};
 use legion::world::Event;
 use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World};
@@ -181,7 +181,7 @@ fn entity_world_to_physics_world() -> impl ParallelRunnable {
                     if let Some(body) = physics.bodies.rigid_body_mut(han.0) {
                         body.set_position(nalgebra::Isometry2::new(
                             c2n(pos.0.truncate()),
-                            cgmath::Rad::from(ori.0).0,
+                            ori.to_rad().0,
                         ));
                         body.set_linear_velocity(c2n(vel.0));
                         // and force?
@@ -235,7 +235,9 @@ fn physics_world_to_entity_world() -> impl ParallelRunnable {
                             v.0 = n2c(&bod.velocity().linear);
                         }
                         if let Some(o) = ori {
-                            o.0 = cgmath::Deg::from(cgmath::Rad(bod.position().rotation.angle()));
+                            o.0 = cgmath::Quaternion::from_angle_z(cgmath::Rad(
+                                bod.position().rotation.angle(),
+                            ));
                         }
                     }
                 }
