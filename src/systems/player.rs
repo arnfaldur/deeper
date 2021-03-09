@@ -11,7 +11,7 @@ use crate::components::*;
 use crate::graphics;
 use crate::graphics::util::{correction_matrix, project_screen_to_world};
 use crate::input::{Command, CommandManager, InputState};
-use crate::transform::components::{Position, Position3D, Rotation};
+use crate::transform::components::{Position, Rotation};
 use crate::transform::Transform;
 
 pub(crate) fn camera_control_system() -> impl ParallelRunnable {
@@ -20,7 +20,6 @@ pub(crate) fn camera_control_system() -> impl ParallelRunnable {
         .write_component::<SphericalOffset>()
         .write_component::<Destination>()
         .write_component::<Velocity>()
-        .read_component::<Position3D>()
         .read_component::<Position>()
         .read_component::<Target>()
         .read_component::<Transform>()
@@ -131,7 +130,6 @@ pub(crate) fn player_system() -> impl ParallelRunnable {
         .write_component::<Camera>()
         .read_component::<Position>()
         .read_component::<Transform>()
-        .read_component::<Position3D>()
         .read_component::<Target>()
         .read_component::<Faction>()
         .read_component::<HitPoints>()

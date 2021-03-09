@@ -20,7 +20,6 @@ impl TransformBuilderExtender for Builder {
             .add_system(adopt_children())
             .flush()
             .add_system(validate_rotation_transforms())
-            .add_system(validate_scale_transforms())
             .add_system(reset_transforms())
             .add_system(position())
             .add_system(rotation())
@@ -86,11 +85,9 @@ fn populate_transforms() -> impl Runnable {
         .with_query(<Entity>::query().filter(
             !component::<Transform>()
                 & (component::<Position>()
-                    | component::<Position3D>()
                     | component::<Rotation>()
                     | component::<Rotation3D>()
-                    | component::<Scale>()
-                    | component::<NonUniformScale>()),
+                    | component::<Scale>()),
         ))
         .build(move |cmd, world, _, query| {
             query.for_each_mut(world, |ent: &Entity| {
@@ -104,11 +101,9 @@ fn depopulate_transforms() -> impl Runnable {
         .with_query(<Entity>::query().filter(
             component::<Transform>()
                 & !component::<Position>()
-                & !component::<Position3D>()
                 & !component::<Rotation>()
                 & !component::<Rotation3D>()
-                & !component::<Scale>()
-                & !component::<NonUniformScale>(),
+                & !component::<Scale>(),
         ))
         .build(move |cmd, world, _, query| {
             query.for_each_mut(world, |ent: &Entity| {
@@ -171,21 +166,6 @@ fn validate_rotation_transforms() -> impl Runnable {
                     eprint!("an entity ");
                 }
                 eprintln!("has both Rotation and Rotation3D components");
-            })
-        })
-}
-fn validate_scale_transforms() -> impl ParallelRunnable {
-    SystemBuilder::new("validate_scale_transforms")
-        .with_query(<(Option<&Name>, &Scale, &NonUniformScale)>::query())
-        .build(move |_, world, _, query| {
-            query.for_each(world, |(name, _, _)| {
-                eprint!("Note: ");
-                if let Some(name) = name {
-                    eprint!("The entity {} ", name);
-                } else {
-                    eprint!("an entity ");
-                }
-                eprintln!("has both Scale and NonUniformScale components");
             })
         })
 }

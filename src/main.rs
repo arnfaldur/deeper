@@ -14,7 +14,6 @@ use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
-use crate::transform::components::Position3D;
 
 mod components;
 mod debug;
@@ -88,7 +87,6 @@ async fn run_async() {
             fov: 30.0,
             roaming: false,
         })
-        .any(Position3D(Vector3::new(0.0, 0.0, 0.0)))
         .any(SphericalOffset::camera_offset())
         .get_entity();
 

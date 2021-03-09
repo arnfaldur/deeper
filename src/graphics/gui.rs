@@ -1,6 +1,6 @@
 // Welcome to crazy-land
 
-use imgui::{Condition, TreeNode};
+use imgui::TreeNode;
 
 /// Did not want to go this way, but basically feel obligated to do so
 /// Based on the way that Amethyst integrates imgui into their engine

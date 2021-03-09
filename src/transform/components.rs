@@ -1,12 +1,9 @@
 use cgmath::{Deg, Matrix4, Quaternion, Rotation3, SquareMatrix, Vector3};
 
 pub struct Position(pub Vector3<f32>);
-
 impl From<&Position> for Vector3<f32> {
     fn from(pos: &Position) -> Self { pos.0 }
 }
-pub struct Position3D(pub Vector3<f32>);
-
 pub struct Rotation(pub Deg<f32>);
 impl From<&Rotation> for Rotation3D {
     fn from(rot: &Rotation) -> Self { Rotation3D(Quaternion::from_angle_z(rot.0)) }
@@ -14,13 +11,9 @@ impl From<&Rotation> for Rotation3D {
 pub struct Rotation3D(pub Quaternion<f32>);
 
 pub struct Scale(pub f32);
-pub struct NonUniformScale(pub Vector3<f32>);
 
 impl From<&Position> for Matrix4<f32> {
     fn from(pos: &Position) -> Self { Matrix4::from_translation(pos.0) }
-}
-impl From<&Position3D> for Matrix4<f32> {
-    fn from(pos: &Position3D) -> Self { Matrix4::from_translation(pos.0) }
 }
 impl From<&Rotation> for Matrix4<f32> {
     fn from(rot: &Rotation) -> Self { Matrix4::from_angle_z(rot.0) }
@@ -31,14 +24,6 @@ impl From<&Rotation3D> for Matrix4<f32> {
 impl From<&Scale> for Matrix4<f32> {
     fn from(scale: &Scale) -> Self { Matrix4::from_scale(scale.0) }
 }
-impl From<&NonUniformScale> for Matrix4<f32> {
-    fn from(scale: &NonUniformScale) -> Self {
-        Matrix4::from_nonuniform_scale(scale.0.x, scale.0.y, scale.0.z)
-    }
-}
-
-// #[allow(dead_code)]
-// pub struct RelativeTransform(pub Matrix4<f32>);
 
 #[derive(Copy, Clone)]
 pub struct Transform {
