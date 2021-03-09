@@ -2,10 +2,10 @@ use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
+use crate::assets::AssetManager;
 use crate::components::{Model3D, StaticModel};
 // How dirty of me
 use crate::graphics::data::*;
-use crate::loader::AssetManager;
 
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;

@@ -7,7 +7,7 @@ use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::dung_gen::DungGen;
 use crate::transform::components::Position;
-use crate::{graphics, loader};
+use crate::{assets, graphics};
 
 #[system]
 #[read_component(TileType)]
@@ -18,7 +18,7 @@ pub fn dung_gen(
     #[resource] trans: &mut MapTransition,
     #[resource] floor: &mut FloorNumber,
     #[resource] context: &mut graphics::Context,
-    #[resource] ass_man: &mut loader::AssetManager,
+    #[resource] ass_man: &mut assets::AssetManager,
     #[resource] player: &Player,
 ) {
     match *trans {
@@ -261,7 +261,7 @@ impl StaticMeshOptimizer {
 
     fn finish(
         &self,
-        ass_man: &loader::AssetManager,
+        ass_man: &assets::AssetManager,
     ) -> Vec<(LocalUniforms, graphics::data::VertexLists)> {
         self.entries
             .iter()

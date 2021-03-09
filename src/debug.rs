@@ -35,7 +35,11 @@ impl DebugTimer {
             self.pop();
         }
 
-        DebugTimerInfo::new(&self.popped)
+        let ret = DebugTimerInfo::new(&self.popped);
+
+        self.popped.clear();
+
+        ret
     }
 }
 
