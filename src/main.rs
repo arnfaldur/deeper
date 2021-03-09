@@ -10,18 +10,19 @@ use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
+use crate::assets::AssetManager;
 use crate::components::entity_builder::EntitySmith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 use crate::loader::AssetManager;
 
+mod assets;
 mod components;
 mod debug;
 mod dung_gen;
 mod ecs;
 mod graphics;
 mod input;
-mod loader;
 mod misc;
 mod systems;
 mod transform;

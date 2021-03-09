@@ -245,7 +245,7 @@ impl ModelRenderContext {
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        ass_man: &crate::loader::AssetManager,
+        ass_man: &crate::assets::AssetManager,
         model_queue: &super::ModelQueue,
         view: &wgpu::TextureView,
         debug_info: &mut crate::debug::DebugTimer,

@@ -1,3 +1,4 @@
 (
     models : ["obj", "glb", "gltf"],
+    images : ["png", "jpg", "jpeg"],
 )
