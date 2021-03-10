@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use cgmath::{InnerSpace, Rotation3, Zero};
+use cgmath::{InnerSpace, Rotation3};
 use crossbeam_channel::Receiver;
 use legion::storage::Component;
 use legion::systems::{Builder, ParallelRunnable};
-use legion::world::{EntityAccessError, EntryRef, Event};
-use legion::{component, Entity, EntityStore, IntoQuery, Read, Resources, SystemBuilder, World};
+use legion::world::Event;
+use legion::{component, Entity, EntityStore, IntoQuery, Resources, SystemBuilder, World};
 use ncollide2d::shape::ShapeHandle;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
@@ -30,11 +30,6 @@ impl PhysicsBuilderExtender for Builder {
         world.subscribe(sender_collider, component::<ColliderHandle>());
         return self
             // TODO: reimplement .add_system(validate_physics_entities_system())
-            .flush()
-            .add_system(removal_subscriber::<BodyHandle>(_receiver_body))
-            .flush()
-            .add_system(removal_subscriber::<ColliderHandle>(_receiver_collider))
-            .flush()
             .add_system(make_body_handles())
             .add_system(remove_body_handles())
             .flush()
@@ -81,10 +76,11 @@ impl Default for PhysicsResource {
     }
 }
 
+// This is mostly just a proof of concept for subscribers, I left it here for future reference
 fn removal_subscriber<T: Component>(receiver: Receiver<Event>) -> impl ParallelRunnable {
     SystemBuilder::new("subscription_tester")
         .read_component::<T>()
-        .build(move |cmd, world, resources, query| {
+        .build(move |_, world, _, _| {
             while let Ok(boi) = receiver.try_recv() {
                 if let Event::EntityRemoved(ent, _) = boi {
                     if world

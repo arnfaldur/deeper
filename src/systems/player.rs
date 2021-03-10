@@ -6,7 +6,7 @@ use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
 use legion::*;
 
-use crate::components::entity_builder::{EntitySmith, Smith};
+use crate::components::entity_builder::Smith;
 use crate::components::*;
 use crate::graphics;
 use crate::graphics::util::{correction_matrix, project_screen_to_world};

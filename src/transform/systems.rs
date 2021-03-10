@@ -1,8 +1,9 @@
 use cgmath::Matrix4;
 use imgui::Ui;
 use legion::systems::{Builder, ParallelRunnable, Runnable};
-use legion::{component, maybe_changed, Entity, EntityStore, IntoQuery, SystemBuilder};
+use legion::{component, maybe_changed, Entity, IntoQuery, SystemBuilder};
 
+use crate::components::entity_builder::Smith;
 use crate::components::{Children, Parent};
 use crate::graphics::gui::GuiContext;
 use crate::transform::*;
@@ -90,7 +91,7 @@ fn populate_transforms() -> impl Runnable {
         ))
         .build(move |cmd, world, _, query| {
             query.for_each_mut(world, |ent: &Entity| {
-                cmd.add_component(*ent, Transform::identity());
+                cmd.forge(*ent).transform_identity();
             });
         })
 }
@@ -105,7 +106,7 @@ fn depopulate_transforms() -> impl Runnable {
         ))
         .build(move |cmd, world, _, query| {
             query.for_each_mut(world, |ent: &Entity| {
-                cmd.remove_component::<Transform>(*ent);
+                cmd.forge(*ent).remove_component::<Transform>();
             });
         })
 }
@@ -116,19 +117,8 @@ fn adopt_children() -> impl Runnable {
         .read_component::<Parent>()
         .write_component::<Children>()
         .build(move |cmd, world, _, query| {
-            let (child_world, mut parent_world) = world.split_for_query(query);
-            query.for_each(&child_world, |(ent, par): (&Entity, &Parent)| {
-                if let Ok(entry) = parent_world.entry_mut(par.0) {
-                    // FIXME: The entitysmith should probably handle the actual adoption
-                    entry.into_component_mut::<Children>().map_or_else(
-                        |_| {
-                            cmd.add_component(par.0, Children(vec![*ent].into_iter().collect()));
-                        },
-                        |children| {
-                            children.0.insert(*ent);
-                        },
-                    )
-                }
+            query.for_each(world, |(ent, par): (&Entity, &Parent)| {
+                cmd.forge(par.0).adopt_child(*ent);
             });
         })
 }

@@ -1,4 +1,4 @@
-use cgmath::{Deg, Euler, Matrix4, Quaternion, Rad, Rotation3, SquareMatrix, Vector3};
+use cgmath::{Deg, Euler, Matrix4, Quaternion, Rad, Rotation3, SquareMatrix, Vector3, Zero};
 
 pub struct Position(pub Vector3<f32>);
 
@@ -45,5 +45,12 @@ impl Transform {
             absolute: Matrix4::identity(),
             relative: Matrix4::identity(),
         }
+    }
+}
+
+impl Default for Position {
+    fn default() -> Self {
+        println!("Creating a default Position");
+        return Position(Vector3::zero());
     }
 }

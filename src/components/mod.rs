@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Vector2, Vector3, Zero};
 use imgui::__core::fmt::Formatter;
 use legion::Entity;
 use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
@@ -40,8 +40,8 @@ pub struct FrameTime(pub f32);
 #[derive(Debug)]
 pub struct Velocity(pub Vector2<f32>);
 
-impl Velocity {
-    pub fn new() -> Velocity { Velocity(Vector2::new(0.0, 0.0)) }
+impl Default for Velocity {
+    fn default() -> Self { return Velocity(Vector2::zero()); }
 }
 
 pub struct Force(pub nphysics2d::algebra::Force2<f32>);

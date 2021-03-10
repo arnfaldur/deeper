@@ -5,13 +5,13 @@ extern crate shaderc;
 
 use std::time::Instant;
 
-use cgmath::{Vector2, Vector3, Zero};
+use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::assets::AssetManager;
-use crate::components::entity_builder::{EntitySmith, Smith};
+use crate::components::entity_builder::Smith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 
@@ -77,6 +77,21 @@ async fn run_async() {
         .orientation(0.0)
         .model(Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
         .get_entity();
+
+    for &dir in &[
+        Vector3::new(1., 1., 0.),
+        Vector3::new(-1., 1., 0.),
+        Vector3::new(1., -1., 0.),
+        Vector3::new(-1., -1., 0.),
+    ] {
+        command_buffer
+            .smith()
+            .position(dir.normalize())
+            .model(
+                Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.1),
+            )
+            .child_of(player_model);
+    }
 
     let player_camera = command_buffer
         .smith()
