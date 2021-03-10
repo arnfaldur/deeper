@@ -214,9 +214,11 @@ fn entity_world_to_physics_world() -> impl ParallelRunnable {
 
 fn step_physics_world() -> impl ParallelRunnable {
     SystemBuilder::new("step_physics_world")
+        .read_resource::<FrameTime>()
         .write_resource::<PhysicsResource>()
-        .build(move |_, _, physics, _| {
+        .build(move |_, _, (frame_time, physics), _| {
             let physics: &mut PhysicsResource = &mut *physics;
+            physics.mechanical_world.set_timestep(frame_time.0);
             physics.step();
         })
 }
