@@ -3,7 +3,7 @@ use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
 
-use crate::components::entity_builder::{EntitySmith, Forge, Smith};
+use crate::components::entity_builder::{EntitySmith, Smith};
 use crate::components::*;
 use crate::dung_gen::DungGen;
 use crate::transform::components::Position;
