@@ -15,12 +15,14 @@ use nphysics2d::object::{
 };
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
-use crate::components::*;
-use crate::transform::components::{Position, Rotation};
+use crate::components::FrameTime;
+use crate::physics::*;
+use crate::transform::{Position, Rotation};
 
 pub(crate) trait PhysicsBuilderExtender {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self;
 }
+
 impl PhysicsBuilderExtender for Builder {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self {
         resources.insert(PhysicsResource::default());
@@ -42,6 +44,7 @@ impl PhysicsBuilderExtender for Builder {
         //      .add_system(movement_system());
     }
 }
+
 struct PhysicsResource {
     mechanical_world: DefaultMechanicalWorld<f32>,
     geometrical_world: DefaultGeometricalWorld<f32>,
@@ -50,6 +53,7 @@ struct PhysicsResource {
     joint_constraints: DefaultJointConstraintSet<f32>,
     force_generators: DefaultForceGeneratorSet<f32>,
 }
+
 impl PhysicsResource {
     fn step(&mut self) {
         self.mechanical_world.step(
@@ -61,6 +65,7 @@ impl PhysicsResource {
         )
     }
 }
+
 impl Default for PhysicsResource {
     fn default() -> Self {
         PhysicsResource {

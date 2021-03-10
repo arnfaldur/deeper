@@ -23,6 +23,7 @@ mod ecs;
 mod graphics;
 mod input;
 mod misc;
+mod physics;
 mod systems;
 mod transform;
 

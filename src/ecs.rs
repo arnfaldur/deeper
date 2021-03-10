@@ -6,8 +6,8 @@ use crate::components::FrameTime;
 use crate::debug::DebugTimer;
 use crate::graphics::gui::GuiContext;
 use crate::input::{Command, CommandManager, InputState};
+use crate::physics::PhysicsBuilderExtender;
 use crate::systems;
-use crate::systems::physics::PhysicsBuilderExtender;
 use crate::transform::TransformBuilderExtender;
 
 pub struct ECS {

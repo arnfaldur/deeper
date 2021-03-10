@@ -6,7 +6,6 @@ use rand::prelude::*;
 use crate::components::entity_builder::Smith;
 use crate::components::*;
 use crate::dung_gen::DungGen;
-use crate::transform::components::Position;
 use crate::{assets, graphics};
 
 #[system]
@@ -145,22 +144,22 @@ pub fn dung_gen(
                     ),
                 );
 
-                let entity = commands.push((tile_type,));
+                let mut smith = commands.smith();
+                smith.any(tile_type);
                 match tile_type {
                     TileType::Nothing => {}
                     _ => {
-                        commands.add_component(entity, Position(pos.extend(0.)));
+                        smith.pos(pos);
                     }
                 }
 
                 // tile specific behaviors
                 match tile_type {
                     TileType::Wall(_) => {
-                        commands.add_component(entity, PhysicsBody::Static);
-                        commands.add_component(entity, Collider::Square { side_length: 1.0 });
+                        smith.static_square_body(1.0);
                     }
                     TileType::LadderDown => {
-                        commands.add_component(entity, MapSwitcher(MapTransition::Deeper));
+                        smith.any(MapSwitcher(MapTransition::Deeper));
                     }
                     _ => {}
                 }

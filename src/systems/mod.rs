@@ -6,10 +6,10 @@ use legion::world::SubWorld;
 use legion::{IntoQuery, *};
 
 use crate::components::*;
+use crate::physics::Velocity;
 use crate::transform::components::{Position, Rotation};
 
 pub mod assets;
-pub mod physics;
 pub mod player;
 pub mod rendering;
 pub mod world_gen;

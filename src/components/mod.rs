@@ -4,10 +4,9 @@ use std::collections::HashSet;
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3, Zero};
+use cgmath::{Matrix4, Vector2, Vector3};
 use imgui::__core::fmt::Formatter;
 use legion::Entity;
-use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
 use crate::graphics;
 
@@ -37,37 +36,9 @@ pub struct Marker;
 
 pub struct FrameTime(pub f32);
 
-#[derive(Debug)]
-pub struct Velocity(pub Vector2<f32>);
-
-impl Default for Velocity {
-    fn default() -> Self { return Velocity(Vector2::zero()); }
-}
-
-pub struct Force(pub nphysics2d::algebra::Force2<f32>);
-
-impl Default for Force {
-    fn default() -> Self { Force(nphysics2d::algebra::Force2::zero()) }
-}
-
 pub struct Speed(pub f32);
 
 pub struct Acceleration(pub f32);
-
-pub enum Collider {
-    Circle { radius: f32 },
-    Square { side_length: f32 },
-}
-
-pub enum PhysicsBody {
-    Disabled,
-    Static,
-    Dynamic { mass: f32 },
-}
-
-pub struct BodyHandle(pub DefaultBodyHandle);
-
-pub struct ColliderHandle(pub DefaultColliderHandle);
 
 pub struct Agent;
 
@@ -134,17 +105,6 @@ pub struct SphericalOffset {
 }
 
 impl SphericalOffset {
-    pub fn new() -> Self {
-        Self {
-            phi: 0.0,
-            theta: 0.0,
-            radius: 1.0,
-            theta_delta: 0.0,
-            phi_delta: 0.0,
-            radius_delta: 0.0,
-        }
-    }
-
     pub fn camera_offset() -> Self {
         Self {
             phi: 0.2 * PI,

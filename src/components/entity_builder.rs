@@ -2,6 +2,7 @@ use legion::storage::{Component, ComponentTypeId};
 use legion::systems::CommandBuffer;
 
 use crate::components::*;
+use crate::physics::{Collider, PhysicsBody, Velocity};
 use crate::transform::{Position, Rotation, Transform};
 
 pub struct EntitySmith<'a> {
@@ -68,7 +69,7 @@ impl<'a> EntitySmith<'a> {
         self.interface.exec_mut(move |world, _| {
             let mut entry = world.entry(entity).unwrap();
             if entry.get_component::<T>().is_ok() {
-                println!("preventing component {}", ComponentTypeId::of::<T>());
+                //println!("preventing component {}", ComponentTypeId::of::<T>());
                 entry.remove_component::<T>();
             }
         });
@@ -76,6 +77,9 @@ impl<'a> EntitySmith<'a> {
 
     pub fn transform_identity(&mut self) -> &mut Self { self.add_component(Transform::identity()) }
     pub fn position(&mut self, pos: Vector3<f32>) -> &mut Self { self.add_component(Position(pos)) }
+    pub fn pos(&mut self, pos: Vector2<f32>) -> &mut Self {
+        self.add_component(Position(pos.extend(0.)))
+    }
     pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
     pub fn velocity_zero(&mut self) -> &mut Self { self.add_component(Velocity::default()) }
     pub fn orientation(&mut self, ori: f32) -> &mut Self {
@@ -103,13 +107,21 @@ impl<'a> EntitySmith<'a> {
         self.ensure_component::<Velocity>();
         self.add_component(PhysicsBody::Dynamic { mass })
     }
+    pub fn static_body(&mut self) -> &mut Self { self.add_component(PhysicsBody::Static) }
     pub fn circle_collider(&mut self, radius: f32) -> &mut Self {
         self.add_component(Collider::Circle { radius })
     }
+    pub fn square_collider(&mut self, side_length: f32) -> &mut Self {
+        self.add_component(Collider::Square { side_length })
+    }
+    pub fn static_square_body(&mut self, side_length: f32) -> &mut Self {
+        self.add_component(PhysicsBody::Static)
+            .add_component(Collider::Square { side_length })
+    }
     pub fn model(&mut self, model: Model3D) -> &mut Self { self.add_component(model) }
     pub fn agent(&mut self, speed: f32, acceleration: f32) -> &mut Self {
-        self.add_component(Speed(speed));
-        self.add_component(Acceleration(acceleration))
+        self.add_component(Speed(speed))
+            .add_component(Acceleration(acceleration))
     }
 
     pub fn mark(&mut self) -> &mut Self { self.add_component(Marker) }

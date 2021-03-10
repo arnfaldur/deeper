@@ -11,8 +11,8 @@ use crate::components::*;
 use crate::graphics;
 use crate::graphics::util::{correction_matrix, project_screen_to_world};
 use crate::input::{Command, CommandManager, InputState};
-use crate::transform::components::{Position, Rotation};
-use crate::transform::Transform;
+use crate::physics::Velocity;
+use crate::transform::{Position, Rotation, Transform};
 
 pub(crate) fn camera_control_system() -> impl ParallelRunnable {
     SystemBuilder::new("camera_control_system")
