@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 
 use cgmath::{InnerSpace, Rotation3, Zero};
+use crossbeam_channel::Receiver;
+use legion::storage::Component;
 use legion::systems::{Builder, ParallelRunnable};
-use legion::world::Event;
-use legion::{component, Entity, IntoQuery, Resources, SystemBuilder, World};
+use legion::world::{EntityAccessError, EntryRef, Event};
+use legion::{component, Entity, EntityStore, IntoQuery, Read, Resources, SystemBuilder, World};
 use ncollide2d::shape::ShapeHandle;
 use nphysics2d::force_generator::DefaultForceGeneratorSet;
 use nphysics2d::joint::DefaultJointConstraintSet;
@@ -22,19 +24,23 @@ pub(crate) trait PhysicsBuilderExtender {
 impl PhysicsBuilderExtender for Builder {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self {
         resources.insert(PhysicsResource::default());
-        let (sender, _receiver) = crossbeam_channel::unbounded::<Event>();
-        world.subscribe(
-            sender,
-            component::<BodyHandle>() | component::<ColliderHandle>(),
-        );
+        let (sender_body, _receiver_body) = crossbeam_channel::unbounded::<Event>();
+        let (sender_collider, _receiver_collider) = crossbeam_channel::unbounded::<Event>();
+        world.subscribe(sender_body, component::<BodyHandle>());
+        world.subscribe(sender_collider, component::<ColliderHandle>());
         return self
             // TODO: reimplement .add_system(validate_physics_entities_system())
+            .flush()
+            .add_system(removal_subscriber::<BodyHandle>(_receiver_body))
+            .flush()
+            .add_system(removal_subscriber::<ColliderHandle>(_receiver_collider))
+            .flush()
             .add_system(make_body_handles())
             .add_system(remove_body_handles())
-            // .add_system(flush_command_buffer_system())
+            .flush()
             .add_system(make_collider_handles())
             .add_system(remove_collider_handles())
-            // .add_system(flush_command_buffer_system())
+            .flush()
             .add_system(entity_world_to_physics_world())
             .add_system(step_physics_world())
             .add_system(physics_world_to_entity_world());
@@ -75,12 +81,29 @@ impl Default for PhysicsResource {
     }
 }
 
+fn removal_subscriber<T: Component>(receiver: Receiver<Event>) -> impl ParallelRunnable {
+    SystemBuilder::new("subscription_tester")
+        .read_component::<T>()
+        .build(move |cmd, world, resources, query| {
+            while let Ok(boi) = receiver.try_recv() {
+                if let Event::EntityRemoved(ent, _) = boi {
+                    if world
+                        .entry_ref(ent)
+                        .map_or(true, |ent| ent.get_component::<T>().is_err())
+                    {
+                        println!("{:?} has been removed", ent);
+                    }
+                }
+            }
+        })
+}
+
 fn make_body_handles() -> impl ParallelRunnable {
     SystemBuilder::new("make_body_handles")
+        .read_component::<PhysicsBody>()
+        .read_component::<Position>()
         .write_resource::<PhysicsResource>()
-        .with_query(
-            <(Entity, &PhysicsBody, Option<&Position>)>::query().filter(!component::<BodyHandle>()),
-        )
+        .with_query(<(Entity, &PhysicsBody, &Position)>::query().filter(!component::<BodyHandle>()))
         .build(move |commands, world, resources, query| {
             let physics: &mut PhysicsResource = &mut *resources;
             for (entity, physics_body, position) in query.iter_mut(world) {
@@ -90,13 +113,7 @@ fn make_body_handles() -> impl ParallelRunnable {
                     }
                     PhysicsBody::Static => RigidBodyDesc::<f32>::new()
                         .status(BodyStatus::Static)
-                        .position(nalgebra::Isometry2::new(
-                            c2n(position
-                                .unwrap_or(&Position(cgmath::Vector3::zero()))
-                                .0
-                                .truncate()),
-                            0.,
-                        )),
+                        .position(nalgebra::Isometry2::new(c2n(position.0.truncate()), 0.)),
                     PhysicsBody::Dynamic { mass } => RigidBodyDesc::<f32>::new()
                         .status(BodyStatus::Dynamic)
                         .gravity_enabled(false)
@@ -110,6 +127,7 @@ fn make_body_handles() -> impl ParallelRunnable {
 
 fn remove_body_handles() -> impl ParallelRunnable {
     SystemBuilder::new("remove_body_handles")
+        .read_component::<PhysicsBody>()
         .write_resource::<PhysicsResource>()
         .with_query(<(Entity, &BodyHandle)>::query().filter(!component::<PhysicsBody>()))
         .build(move |commands, world, physics, query| {
@@ -122,6 +140,8 @@ fn remove_body_handles() -> impl ParallelRunnable {
 
 fn make_collider_handles() -> impl ParallelRunnable {
     SystemBuilder::new("make_collider_handles")
+        .read_component::<BodyHandle>()
+        .read_component::<Collider>()
         .write_resource::<PhysicsResource>()
         .with_query(
             <(Entity, &BodyHandle, &Collider)>::query().filter(!component::<ColliderHandle>()),
@@ -200,7 +220,6 @@ fn step_physics_world() -> impl ParallelRunnable {
         })
 }
 
-// TODO: See if .read_component and write are neccesary
 fn physics_world_to_entity_world() -> impl ParallelRunnable {
     SystemBuilder::new("physics_world_to_entity_world")
         .read_component::<BodyHandle>()
@@ -212,36 +231,36 @@ fn physics_world_to_entity_world() -> impl ParallelRunnable {
         .with_query(<(
             &BodyHandle,
             &PhysicsBody,
-            Option<&mut Position>,
+            &mut Position,
             Option<&mut Velocity>,
             Option<&mut Rotation>,
         )>::query())
         .build(move |_, world, resources, query| {
             let physics: &PhysicsResource = &*resources;
-            for components in query.iter_mut(world) {
-                let (handle, body, pos, vel, ori): (
+            query.for_each_mut(
+                world,
+                |(handle, body, pos, vel, ori): (
                     &BodyHandle,
                     &PhysicsBody,
-                    Option<&mut Position>,
+                    &mut Position,
                     Option<&mut Velocity>,
                     Option<&mut Rotation>,
-                ) = components;
-                if let PhysicsBody::Dynamic { .. } = body {
-                    if let Some(bod) = physics.bodies.rigid_body(handle.0) {
-                        if let Some(p) = pos {
-                            p.0 = n2c(&bod.position().translation.vector).extend(0.);
-                        }
-                        if let Some(v) = vel {
-                            v.0 = n2c(&bod.velocity().linear);
-                        }
-                        if let Some(o) = ori {
-                            o.0 = cgmath::Quaternion::from_angle_z(cgmath::Rad(
-                                bod.position().rotation.angle(),
-                            ));
+                )| {
+                    if let PhysicsBody::Dynamic { .. } = body {
+                        if let Some(bod) = physics.bodies.rigid_body(handle.0) {
+                            pos.0 = n2c(&bod.position().translation.vector).extend(0.);
+                            if let Some(v) = vel {
+                                v.0 = n2c(&bod.velocity().linear);
+                            }
+                            if let Some(o) = ori {
+                                o.0 = cgmath::Quaternion::from_angle_z(cgmath::Rad(
+                                    bod.position().rotation.angle(),
+                                ));
+                            }
                         }
                     }
-                }
-            }
+                },
+            );
         })
 }
 

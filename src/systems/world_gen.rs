@@ -3,7 +3,7 @@ use legion::world::SubWorld;
 use legion::*;
 use rand::prelude::*;
 
-use crate::components::entity_builder::EntitySmith;
+use crate::components::entity_builder::{EntitySmith, Forge, Smith};
 use crate::components::*;
 use crate::dung_gen::DungGen;
 use crate::transform::components::Position;
@@ -61,7 +61,8 @@ pub fn dung_gen(
             };
 
             // Reset player position and stuff
-            EntitySmith::from_entity(commands, player.player)
+            commands
+                .forge(player.player)
                 .position(player_start.extend(0.))
                 .velocity_zero();
 
@@ -169,7 +170,7 @@ pub fn dung_gen(
                     && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
                 {
                     let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
-                    let mut smith = EntitySmith::from_buffer(commands);
+                    let mut smith = commands.smith();
                     smith
                         .position(
                             (pos + Vector2::new(

@@ -6,7 +6,7 @@ use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
 use legion::*;
 
-use crate::components::entity_builder::EntitySmith;
+use crate::components::entity_builder::{EntitySmith, Forge};
 use crate::components::*;
 use crate::graphics;
 use crate::graphics::util::{correction_matrix, project_screen_to_world};
@@ -210,7 +210,9 @@ pub fn player(
             let t: f32 = mouse_world_pos.z / ray_delta.z;
             let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
 
-            EntitySmith::from_entity(commands, player.player).any(Destination::simple(ray_hit));
+            commands
+                .forge(player.player)
+                .any(Destination::simple(ray_hit));
             camera.roaming = false;
 
             let difference: Vector2<f32> = {

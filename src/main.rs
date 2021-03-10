@@ -11,10 +11,9 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::assets::AssetManager;
-use crate::components::entity_builder::EntitySmith;
+use crate::components::entity_builder::{EntitySmith, Smith};
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
-use crate::loader::AssetManager;
 
 mod assets;
 mod components;
@@ -60,7 +59,8 @@ async fn run_async() {
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&ecs.world);
 
-    let player = EntitySmith::from(&mut command_buffer)
+    let player = command_buffer
+        .smith()
         .name("Player")
         .position(Vector3::unit_x())
         .orientation(0.0)
@@ -70,14 +70,16 @@ async fn run_async() {
         .circle_collider(0.3)
         .get_entity();
 
-    let player_model = EntitySmith::from(&mut command_buffer)
+    let player_model = command_buffer
+        .smith()
         .name("Player model")
         .any(Parent(player))
         .orientation(0.0)
         .model(Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
         .get_entity();
 
-    let player_camera = EntitySmith::from(&mut command_buffer)
+    let player_camera = command_buffer
+        .smith()
         .name("The camera")
         .any(Parent(player))
         .any(Target(player))
@@ -110,7 +112,7 @@ async fn run_async() {
     ecs.resources.insert(Instant::now());
     ecs.resources.insert(FrameTime(f32::EPSILON));
     ecs.resources.insert(MapTransition::Deeper);
-    ecs.resources.insert(FloorNumber(7));
+    ecs.resources.insert(FloorNumber(1));
     ecs.resources.insert(InputState::new());
     ecs.resources.insert(CommandManager::default_bindings());
 

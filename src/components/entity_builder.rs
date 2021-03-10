@@ -1,44 +1,136 @@
 use legion::storage::Component;
 use legion::systems::CommandBuffer;
+use legion::world::SubWorld;
+use legion::{EntityStore, World};
 
 use crate::components::*;
 use crate::transform::{Position, Rotation};
 
-pub struct EntitySmith<'a> {
+pub struct EntitySmith<'a, I> {
     entity: legion::Entity,
-    buffer: &'a mut legion::systems::CommandBuffer,
+    interface: &'a mut I,
+}
+// enum Interface<'a> {
+//     Cmd(&'a mut legion::systems::CommandBuffer),
+//     World(&'a mut legion::World),
+//     SubWorld(&'a mut legion::SubWorld),
+// }
+// impl<Interface: Interfaces> Forge for Interface {
+//     fn forge<'a>(&mut self, entity: Entity) -> EntitySmith<'a, Interface> {
+//         EntitySmith {
+//             entity,
+//             interface: self,
+//         }
+//     }
+// }
+
+pub(crate) trait Forge {
+    fn forge(&mut self, entity: Entity) -> EntitySmith<Self>
+    where
+        Self: Sized;
 }
 
-impl<'a> From<&'a mut legion::systems::CommandBuffer> for EntitySmith<'a> {
-    fn from(buffer: &'a mut CommandBuffer) -> Self {
-        Self {
-            entity: buffer.push(()),
-            buffer,
+impl Forge for CommandBuffer {
+    fn forge<'a>(&'a mut self, entity: Entity) -> EntitySmith<'a, CommandBuffer> {
+        EntitySmith {
+            entity,
+            interface: self,
+        }
+    }
+}
+// impl<'a> Forge for World {
+//     fn forge(&'a mut self, entity: Entity) -> EntitySmith<'a, World> {
+//         EntitySmith {
+//             entity,
+//             interface: self,
+//         }
+//     }
+// }
+// impl<'a> Forge for SubWorld<'_> {
+//     fn forge(&'a mut self, entity: Entity) -> EntitySmith<'a, SubWorld> {
+//         EntitySmith {
+//             entity,
+//             interface: self,
+//         }
+//     }
+// }
+
+pub(crate) trait Smith {
+    fn smith<'a>(&'a mut self) -> EntitySmith<'a, Self>
+    where
+        Self: Sized;
+}
+
+impl Smith for CommandBuffer {
+    fn smith<'a>(&'a mut self) -> EntitySmith<'a, CommandBuffer> {
+        EntitySmith {
+            entity: self.push(()),
+            interface: self,
         }
     }
 }
 
-impl<'a> EntitySmith<'a> {
-    pub fn from_buffer(buffer: &'a mut legion::systems::CommandBuffer) -> Self {
-        Self {
-            entity: buffer.push(()),
-            buffer,
-        }
+// impl<'a> Smith for World {
+//     fn smith(&'a mut self) -> EntitySmith<'a, World> {
+//         EntitySmith {
+//             entity: self.push(()),
+//             interface: self,
+//         }
+//     }
+// }
+pub trait Interfaces {
+    fn inter_add_component<T: Component>(&mut self, entity: Entity, component: T);
+    fn add_entity(&mut self) -> Entity;
+}
+
+impl Interfaces for CommandBuffer {
+    fn inter_add_component<T: Component>(&mut self, entity: Entity, component: T) {
+        self.add_component(entity, component);
     }
-    pub fn from_entity(buffer: &'a mut legion::systems::CommandBuffer, entity: Entity) -> Self {
-        Self { entity, buffer }
+    fn add_entity(&mut self) -> Entity { self.push(()) }
+}
+
+impl Interfaces for World {
+    fn inter_add_component<T: Component>(&mut self, entity: Entity, component: T) {
+        self.entry(entity).unwrap().add_component(component);
     }
+    fn add_entity(&mut self) -> Entity { self.push(()) }
+}
+// impl Interfaces for SubWorld<'_> {
+//     fn inter_add_component<T: Component>(&mut self, entity: Entity, component: T) {
+//         self.entry_mut(entity).unwrap().;
+//     }
+// }
+
+// impl<'a> EntitySmith<'a, CommandBuffer> {
+//     pub fn another(&mut self) -> &mut Self {
+//         self.entity = self.interface.push(());
+//         return self;
+//     }
+// }
+// impl<'a> EntitySmith<'a, World> {
+//     pub fn another(&mut self) -> &mut Self {
+//         self.entity = self.interface.push(());
+//         return self;
+//     }
+// }
+
+impl<'a, I: Interfaces> EntitySmith<'a, I> {
     pub fn another(&mut self) -> &mut Self {
-        self.entity = self.buffer.push(());
+        self.entity = self.interface.add_entity();
         return self;
     }
+    fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
+        self.interface.inter_add_component(self.entity, component);
+        return self;
+    }
+    // pub fn another(&mut self) -> &mut Self {
+    //     self.entity = self.interface.push(());
+    //     return self;
+    // }
     pub fn done(&self) {}
     pub fn get_entity(&self) -> Entity { self.entity }
-    pub fn craft(self) -> EntitySmith<'a> { self }
-    fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
-        self.buffer.add_component(self.entity, component);
-        return self;
-    }
+    pub fn craft(self) -> EntitySmith<'a, I> { self }
 
     pub fn position(&mut self, pos: Vector3<f32>) -> &mut Self { self.add_component(Position(pos)) }
     pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }

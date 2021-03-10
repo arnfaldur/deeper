@@ -112,7 +112,7 @@ fn depopulate_transforms() -> impl Runnable {
 
 fn adopt_children() -> impl Runnable {
     SystemBuilder::new("adopt_children")
-        .with_query(<(Entity, &Parent)>::query())
+        .with_query(<(Entity, &Parent)>::query().filter(maybe_changed::<Parent>()))
         .read_component::<Parent>()
         .write_component::<Children>()
         .build(move |cmd, world, _, query| {
