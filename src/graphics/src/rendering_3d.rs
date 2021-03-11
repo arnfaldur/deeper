@@ -4,12 +4,12 @@ use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
 
 use super::data::{GlobalUniforms, Lights};
-use crate::graphics::data::LocalUniforms;
+use crate::data::LocalUniforms;
 
 // TODO: Have ass_man auto-load all shaders
-const FRAG_SRC: &str = include_str!("../../shaders/forward.frag");
-const DYNAMIC_VERT_SRC: &str = include_str!("../../shaders/forward.vert");
-const STATIC_VERT_SRC: &str = include_str!("../../shaders/static.vert");
+const FRAG_SRC: &str = include_str!("../../../shaders/forward.frag");
+const DYNAMIC_VERT_SRC: &str = include_str!("../../../shaders/forward.vert");
+const STATIC_VERT_SRC: &str = include_str!("../../../shaders/static.vert");
 
 const MAXIMUM_NUMBER_OF_DYNAMIC_MODELS: usize = 1024;
 

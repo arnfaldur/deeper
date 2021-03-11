@@ -1,7 +1,10 @@
 pub use components::*;
-pub(crate) use systems::TransformBuilderExtender;
+pub use systems::TransformBuilderExtender;
+
+pub use crate::entity_smith::TransformEntitySmith;
 
 pub mod components;
+mod entity_smith;
 mod systems;
 
 // #[derive(Default)]

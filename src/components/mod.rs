@@ -1,16 +1,9 @@
 #![allow(dead_code)]
 
-use std::collections::HashSet;
 use std::f32::consts::PI;
-use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
-use imgui::__core::fmt::Formatter;
+use cgmath::Vector2;
 use legion::Entity;
-
-use crate::graphics;
-
-pub(crate) mod entity_builder;
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -26,19 +19,7 @@ pub struct PlayerCamera {
     pub entity: Entity,
 }
 
-pub struct Parent(pub Entity);
-
-pub struct Children(pub HashSet<Entity>);
-
 // end entity pointers
-
-pub struct Marker;
-
-pub struct FrameTime(pub f32);
-
-pub struct Speed(pub f32);
-
-pub struct Acceleration(pub f32);
 
 pub struct Agent;
 
@@ -61,12 +42,6 @@ impl Destination {
     }
 }
 
-pub struct Name(String);
-
-impl std::fmt::Display for Name {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
-}
-
 #[derive(Eq, PartialEq)]
 #[derive(Copy, Clone)]
 pub enum Faction {
@@ -86,12 +61,6 @@ pub enum MapTransition {
 }
 
 pub struct MapSwitcher(pub MapTransition);
-
-pub struct Camera {
-    pub fov: f32,
-    pub up: Vector3<f32>,
-    pub roaming: bool,
-}
 
 pub struct Target(pub Entity);
 
@@ -115,85 +84,6 @@ impl SphericalOffset {
             phi_delta: 0.0025,
             radius_delta: 0.3,
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct StaticModel {
-    pub idx: usize,
-    pub bind_group: Arc<wgpu::BindGroup>,
-}
-
-impl StaticModel {
-    pub fn new(
-        context: &graphics::Context,
-        idx: usize,
-        offset: Vector3<f32>,
-        scale: f32,
-        z_rotation: f32,
-        material: graphics::data::Material,
-    ) -> Self {
-        let _uniforms_size = std::mem::size_of::<graphics::data::LocalUniforms>() as u64;
-
-        let mut matrix = Matrix4::from_scale(scale);
-        matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
-        matrix = Matrix4::from_translation(offset) * matrix;
-
-        let local_uniforms = graphics::data::LocalUniforms::new(matrix.into(), material);
-
-        let bind_group = context.model_bind_group_from_uniform_data(local_uniforms);
-
-        Self {
-            idx,
-            bind_group: Arc::new(bind_group),
-        }
-    }
-
-    pub fn from_uniforms(
-        context: &graphics::Context,
-        idx: usize,
-        local_uniforms: graphics::data::LocalUniforms,
-    ) -> Self {
-        let bind_group = context.model_bind_group_from_uniform_data(local_uniforms);
-
-        Self {
-            idx,
-            bind_group: Arc::new(bind_group),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Model3D {
-    pub idx: usize,
-    pub scale: f32,
-    pub material: graphics::data::Material,
-}
-
-// Note(Jökull): Probably not great to have both constructor and builder patterns
-impl Model3D {
-    pub fn new() -> Self {
-        Self {
-            idx: 0,
-            material: graphics::data::Material::default(),
-            scale: 1.0,
-        }
-    }
-
-    pub fn from_index(index: usize) -> Self {
-        let mut m = Self::new();
-        m.idx = index;
-        return m;
-    }
-
-    pub fn with_scale(mut self, scale: f32) -> Self {
-        self.scale = scale;
-        self
-    }
-
-    pub fn with_material(mut self, material: graphics::data::Material) -> Self {
-        self.material = material;
-        self
     }
 }
 

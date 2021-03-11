@@ -1,14 +1,13 @@
 use std::time::SystemTime;
 
+use graphics;
+use graphics::assets::AssetManager;
+use graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use legion::systems::Runnable;
 use legion::*;
+use transforms::{Position, Transform};
 
-use crate::assets::AssetManager;
 use crate::components::*;
-use crate::graphics;
-use crate::graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
-use crate::transform::components::Position;
-use crate::transform::Transform;
 
 pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
@@ -51,6 +50,8 @@ fn update_camera_system() -> impl Runnable {
 
 struct SnakeSystem;
 
+use graphics::components::{Camera, Model3D, StaticModel};
+
 use crate::misc;
 
 impl SnakeSystem {
@@ -59,7 +60,7 @@ impl SnakeSystem {
     fn system(mut board: misc::SnakeBoard, mut time: SystemTime) -> impl Runnable {
         SystemBuilder::new("snake_game")
             .read_resource::<crate::input::CommandManager>()
-            .write_resource::<crate::graphics::Context>()
+            .write_resource::<graphics::Context>()
             .build(move |_commands, _world, (input, context), _| {
                 snake_game(&mut board, &mut time, input, context);
 
@@ -169,7 +170,7 @@ fn render_system() -> impl Runnable {
         .read_resource::<crate::input::CommandManager>()
         .write_resource::<graphics::gui::GuiContext>()
         .write_resource::<graphics::Context>()
-        .write_resource::<crate::debug::DebugTimer>()
+        .write_resource::<graphics::debug::DebugTimer>()
         .build(
             move |_,
                   _,
@@ -192,7 +193,7 @@ fn render(
     context: &mut graphics::Context,
     ass_man: &AssetManager,
     window: &winit::window::Window,
-    debug_timer: &mut crate::debug::DebugTimer,
+    debug_timer: &mut graphics::debug::DebugTimer,
     input_state: &crate::input::CommandManager,
 ) {
     use crate::input::Command;

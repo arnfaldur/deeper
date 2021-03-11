@@ -5,14 +5,14 @@ use std::time::SystemTime;
 
 use super::data::*;
 use crate::assets::reader;
-use crate::graphics;
+use crate::{data, Context};
 
 pub struct AssetManager {
     assets: HashMap<PathBuf, Asset>,
     paths: PathSettings,
     extensions: Extensions,
 
-    pub models: Vec<graphics::data::Model>,
+    pub models: Vec<crate::data::Model>,
 }
 
 impl AssetManager {
@@ -44,11 +44,11 @@ impl AssetManager {
         }
     }
 
-    pub fn load_models(&mut self, context: &mut graphics::Context) {
+    pub fn load_models(&mut self, context: &mut Context) {
         self.load_models_recursive(self.paths.models_path.clone().as_ref(), context);
     }
 
-    fn load_models_recursive(&mut self, path: &Path, context: &mut graphics::Context) {
+    fn load_models_recursive(&mut self, path: &Path, context: &mut Context) {
         for dir_entry in fs::read_dir(path).unwrap() {
             if let Ok(entry) = dir_entry {
                 let path = entry.path().clone();
@@ -69,7 +69,7 @@ impl AssetManager {
     }
 
     // Assumes is a valid model
-    fn load_model(&mut self, path: &Path, ext: &String, context: &mut graphics::Context) {
+    fn load_model(&mut self, path: &Path, ext: &String, context: &mut Context) {
         if let Some(Asset {
             loaded_at_time: time_loaded,
             asset_kind: AssetKind::Model(idx),
@@ -92,8 +92,8 @@ impl AssetManager {
 
     pub fn allocate_graphics_model_from_vertex_lists(
         &mut self,
-        context: &mut graphics::Context,
-        vertex_lists: graphics::data::VertexLists,
+        context: &mut Context,
+        vertex_lists: data::VertexLists,
     ) -> usize {
         let idx = self.models.len();
         self.models
@@ -101,11 +101,7 @@ impl AssetManager {
         idx
     }
 
-    fn get_graphics_model(
-        path: &Path,
-        ext: &String,
-        context: &mut graphics::Context,
-    ) -> graphics::data::Model {
+    fn get_graphics_model(path: &Path, ext: &String, context: &mut Context) -> data::Model {
         // TODO: Generalize this
         context.model_from_vertex_list(match ext.as_str() {
             "obj" => super::reader::vertex_lists_from_obj(path).unwrap(),
@@ -145,5 +141,75 @@ impl AssetManager {
             );
         }
         return DisplaySettings::new();
+    }
+
+    pub fn load_shaders(&mut self, shaders_loaded_at: &mut SystemTime, context: &mut Context) {
+        let frag_path = Path::new("shaders/forward.frag");
+        let vert_path = Path::new("shaders/forward.vert");
+
+        let frag_modified = std::fs::metadata(frag_path).unwrap().modified().unwrap();
+        let vert_modified = std::fs::metadata(vert_path).unwrap().modified().unwrap();
+
+        let mut compiler = shaderc::Compiler::new().unwrap();
+
+        if frag_modified.gt(shaders_loaded_at) || vert_modified.gt(shaders_loaded_at) {
+            let vs_mod = if let Ok(data) = std::fs::read_to_string(vert_path) {
+                if let Ok(vs_spirv) = compiler.compile_into_spirv(
+                    data.as_str(),
+                    shaderc::ShaderKind::Vertex,
+                    "forward.vert",
+                    "main",
+                    None,
+                ) {
+                    Some(
+                        context
+                            .device
+                            .create_shader_module(&wgpu::ShaderModuleDescriptor {
+                                label: Some("Vertex Shader"),
+                                source: wgpu::util::make_spirv(&vs_spirv.as_binary_u8()),
+                                flags: wgpu::ShaderFlags::VALIDATION,
+                            }),
+                    )
+                } else {
+                    eprintln!("Failed to recompile vertex shader");
+                    None
+                }
+            } else {
+                eprintln!("Failed to read vertex shader");
+                None
+            };
+
+            let fs_mod = if let Ok(data) = std::fs::read_to_string(frag_path) {
+                if let Ok(fs_spirv) = compiler.compile_into_spirv(
+                    data.as_str(),
+                    shaderc::ShaderKind::Fragment,
+                    "forward.frag",
+                    "main",
+                    None,
+                ) {
+                    Some(
+                        context
+                            .device
+                            .create_shader_module(&wgpu::ShaderModuleDescriptor {
+                                label: Some("Fragment Shader"),
+                                source: wgpu::util::make_spirv(&fs_spirv.as_binary_u8()),
+                                flags: wgpu::ShaderFlags::VALIDATION,
+                            }),
+                    )
+                } else {
+                    eprintln!("Failed to recompile fragment shader");
+                    None
+                }
+            } else {
+                eprintln!("Failed to read fragment shader");
+                None
+            };
+
+            if let (Some(vsm), Some(fsm)) = (vs_mod, fs_mod) {
+                println!("Recompiling shaders...");
+                context.recompile_model_pipeline(&vsm, &fsm);
+                *shaders_loaded_at = SystemTime::now();
+            }
+        }
     }
 }

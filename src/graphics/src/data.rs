@@ -2,7 +2,7 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Matrix4, Vector3, Vector4};
 
-use crate::graphics::MAX_NR_OF_POINT_LIGHTS;
+use crate::MAX_NR_OF_POINT_LIGHTS;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]

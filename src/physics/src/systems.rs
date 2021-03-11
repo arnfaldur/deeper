@@ -2,6 +2,7 @@
 
 use cgmath::{InnerSpace, Rotation3};
 use crossbeam_channel::Receiver;
+use entity_smith::FrameTime;
 use legion::storage::Component;
 use legion::systems::{Builder, ParallelRunnable};
 use legion::world::Event;
@@ -14,12 +15,11 @@ use nphysics2d::object::{
     BodyPartHandle, BodyStatus, ColliderDesc, DefaultBodySet, DefaultColliderSet, RigidBodyDesc,
 };
 use nphysics2d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
+use transforms::{Position, Rotation};
 
-use crate::components::FrameTime;
-use crate::physics::*;
-use crate::transform::{Position, Rotation};
+use crate::{BodyHandle, Collider, ColliderHandle, PhysicsBody, Velocity};
 
-pub(crate) trait PhysicsBuilderExtender {
+pub trait PhysicsBuilderExtender {
     fn add_physics_systems(&mut self, world: &mut World, resources: &mut Resources) -> &mut Self;
 }
 

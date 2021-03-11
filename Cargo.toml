@@ -10,7 +10,20 @@ incremental = true
 lto = false
 #lto = "thin"
 
+[workspace]
+members = [
+    "src/physics",
+    "src/entity_smith",
+    "src/transforms",
+]
+
 [dependencies]
+
+# internal
+physics = { path = "src/physics" }
+transforms = { path = "src/transforms" }
+entity-smith = { path = "src/entity_smith" }
+graphics = { path = "src/graphics" }
 
 # misc
 itertools = "0.10.0"
@@ -22,32 +35,25 @@ ena = "0.14.0"
 
 # graphics and input
 # wgpu          = { git = "https://github.com/gfx-rs/wgpu-rs.git", branch = "master" }
-wgpu = "0.7.0"
+#wgpu = "0.7.0"
 cgmath = "0.18.0"
 winit = "0.24.0"
 futures = "0.3.13"
-env_logger = "0.8.3"
-shaderc = "0.7.1"
-lazy_static = "1.4.0"
-imgui = "0.7.0"
-imgui-wgpu = "0.14.0"
-imgui-winit-support = "0.7.0"
-
-bytemuck = { version = "1.5.1", features = ["derive"] }
-
-wavefront_obj = "9.0.0"
-gltf = "0.15.2"
+#shaderc = "0.7.1"
+#lazy_static = "1.4.0"
+#imgui = "0.7.0"
+#imgui-wgpu = "0.14.0"
+#imgui-winit-support = "0.7.0"
+#
+#bytemuck = { version = "1.5.1", features = ["derive"] }
+#
+#wavefront_obj = "9.0.0"
+#gltf = "0.15.2"
 
 # loader
 ron = "0.6.4"
 serde = { version = "1.0.123", features = ["derive"] }
-notify = "4.0.15"
 
 # ECS
 legion = "0.4"
 crossbeam-channel = "0.5.0"
-
-# physics
-nalgebra = "0.24.1"
-ncollide2d = "0.27.0"
-nphysics2d = "0.19.0"

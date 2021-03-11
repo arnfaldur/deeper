@@ -1,5 +1,6 @@
+pub use loader::*;
+
 pub mod data;
 mod loader;
 mod reader;
-
-pub use loader::*;
+pub mod utils;

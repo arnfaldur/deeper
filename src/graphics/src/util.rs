@@ -7,7 +7,7 @@ use cgmath::EuclideanSpace;
 pub fn sc_desc_from_size(size: winit::dpi::PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
     wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-        format: crate::graphics::COLOR_FORMAT,
+        format: crate::COLOR_FORMAT,
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Mailbox,

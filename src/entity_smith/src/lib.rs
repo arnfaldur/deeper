@@ -1,16 +1,25 @@
+use std::fmt::Formatter;
+
 use legion::storage::{Component, ComponentTypeId};
 use legion::systems::CommandBuffer;
+use legion::Entity;
 
-use crate::components::*;
-use crate::physics::{Collider, PhysicsBody, Velocity};
-use crate::transform::{Position, Rotation, Transform};
+pub struct FrameTime(pub f32);
 
-pub struct EntitySmith<'a> {
-    entity: legion::Entity,
-    interface: &'a mut CommandBuffer,
+pub struct Marker;
+
+pub struct Name(String);
+
+impl std::fmt::Display for Name {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
 }
 
-pub(crate) trait Smith {
+pub struct EntitySmith<'a> {
+    pub entity: legion::Entity,
+    pub interface: &'a mut CommandBuffer,
+}
+
+pub trait Smith {
     fn smith(&mut self) -> EntitySmith;
     fn forge(&mut self, entity: Entity) -> EntitySmith;
     fn scrap(&mut self, entity: Entity);
@@ -41,7 +50,7 @@ impl<'a> EntitySmith<'a> {
         self.entity = self.interface.push(());
         return self;
     }
-    fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
+    pub fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
         self.interface.add_component(self.entity, component);
         return self;
     }
@@ -54,7 +63,7 @@ impl<'a> EntitySmith<'a> {
     pub fn craft(self) -> Self { self }
     pub fn scrap(&mut self) { self.interface.scrap(self.entity); }
 
-    fn ensure_component<T: Component + Default>(&mut self) {
+    pub fn ensure_component<T: Component + Default>(&mut self) {
         let entity = self.entity;
         self.interface.exec_mut(move |world, _| {
             let mut entry = world.entry(entity).unwrap();
@@ -64,6 +73,7 @@ impl<'a> EntitySmith<'a> {
             }
         });
     }
+    #[allow(dead_code)]
     fn prevent_component<T: Component + Default>(&mut self) {
         let entity = self.entity;
         self.interface.exec_mut(move |world, _| {
@@ -75,50 +85,6 @@ impl<'a> EntitySmith<'a> {
         });
     }
 
-    pub fn transform_identity(&mut self) -> &mut Self { self.add_component(Transform::identity()) }
-    pub fn position(&mut self, pos: Vector3<f32>) -> &mut Self { self.add_component(Position(pos)) }
-    pub fn pos(&mut self, pos: Vector2<f32>) -> &mut Self {
-        self.add_component(Position(pos.extend(0.)))
-    }
-    pub fn velocity(&mut self, vel: Vector2<f32>) -> &mut Self { self.add_component(Velocity(vel)) }
-    pub fn velocity_zero(&mut self) -> &mut Self { self.add_component(Velocity::default()) }
-    pub fn orientation(&mut self, ori: f32) -> &mut Self {
-        self.add_component(Rotation::from_deg(ori))
-    }
-
-    pub fn adopt_child(&mut self, child: Entity) -> &mut Self {
-        let me = self.entity;
-        self.interface.exec_mut(move |world, _| {
-            if let Some(mut entry) = world.entry(me) {
-                if let Ok(children) = entry.get_component_mut::<Children>() {
-                    children.0.insert(child);
-                } else {
-                    entry.add_component(Children([child].iter().cloned().collect()));
-                }
-            }
-        });
-        return self;
-    }
-    pub fn child_of(&mut self, parent: Entity) -> &mut Self { self.add_component(Parent(parent)) }
-
-    pub fn physics_body(&mut self, body: PhysicsBody) -> &mut Self { self.add_component(body) }
-    pub fn dynamic_body(&mut self, mass: f32) -> &mut Self {
-        self.ensure_component::<Position>();
-        self.ensure_component::<Velocity>();
-        self.add_component(PhysicsBody::Dynamic { mass })
-    }
-    pub fn static_body(&mut self) -> &mut Self { self.add_component(PhysicsBody::Static) }
-    pub fn circle_collider(&mut self, radius: f32) -> &mut Self {
-        self.add_component(Collider::Circle { radius })
-    }
-    pub fn square_collider(&mut self, side_length: f32) -> &mut Self {
-        self.add_component(Collider::Square { side_length })
-    }
-    pub fn static_square_body(&mut self, side_length: f32) -> &mut Self {
-        self.add_component(PhysicsBody::Static)
-            .add_component(Collider::Square { side_length })
-    }
-    pub fn model(&mut self, model: Model3D) -> &mut Self { self.add_component(model) }
     pub fn agent(&mut self, speed: f32, acceleration: f32) -> &mut Self {
         self.add_component(Speed(speed))
             .add_component(Acceleration(acceleration))
@@ -129,3 +95,9 @@ impl<'a> EntitySmith<'a> {
     #[deprecated(note = "builder method not implemented for a component class.")]
     pub fn any<T: Component>(&mut self, component: T) -> &mut Self { self.add_component(component) }
 }
+
+// TODO: move these to a better place
+
+pub struct Speed(pub f32);
+
+pub struct Acceleration(pub f32);

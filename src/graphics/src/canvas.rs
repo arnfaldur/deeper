@@ -6,8 +6,7 @@ use cgmath::{vec2, Vector2};
 use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
 
-use super::data::{GlobalUniforms, LocalUniforms};
-use crate::graphics::data::Material;
+use crate::data::{GlobalUniforms, LocalUniforms, Material};
 
 /*
     This module's goal is to describe an appropriate way to interpret 2D elements
@@ -230,8 +229,8 @@ impl ImmediateElement {
     }
 }
 
-const CANVAS_FRAG_SRC: &str = include_str!("../../shaders/canvas.frag");
-const CANVAS_VERT_SRC: &str = include_str!("../../shaders/canvas.vert");
+const CANVAS_FRAG_SRC: &str = include_str!("../../../shaders/canvas.frag");
+const CANVAS_VERT_SRC: &str = include_str!("../../../shaders/canvas.vert");
 
 const MAXIMUM_NUMBER_OF_QUADS: usize = 1024;
 

@@ -1,24 +1,28 @@
+#![feature(slice_group_by)]
+
+// How dirty of me
+use rendering_3d::*;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use crate::assets::AssetManager;
 use crate::components::{Model3D, StaticModel};
-// How dirty of me
-use crate::graphics::data::*;
+use crate::data::*;
 
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 
+pub mod assets;
 pub mod canvas;
+pub mod components;
 pub mod data;
+pub mod debug;
 pub mod gui;
 pub mod rendering_3d;
 pub mod util;
-
-use rendering_3d::*;
 
 pub struct ModelQueue {
     pub local_uniforms: Vec<LocalUniforms>,

@@ -1,4 +1,11 @@
+use std::collections::HashSet;
+
 use cgmath::{Deg, Euler, Matrix4, Quaternion, Rad, Rotation3, SquareMatrix, Vector3, Zero};
+use legion::Entity;
+
+pub struct Parent(pub Entity);
+
+pub struct Children(pub HashSet<Entity>);
 
 pub struct Position(pub Vector3<f32>);
 

@@ -1,31 +1,26 @@
 #![allow(deprecated)]
-#![feature(slice_group_by)]
-
-extern crate shaderc;
 
 use std::time::Instant;
 
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
+use entity_smith::{FrameTime, Smith};
+use graphics::assets::AssetManager;
+use graphics::components::{Camera, Model3D, TemporaryModel3DEntitySmith};
+use physics::PhysicsEntitySmith;
+use transforms::{Parent, TransformEntitySmith};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::assets::AssetManager;
-use crate::components::entity_builder::Smith;
 use crate::components::*;
 use crate::input::{CommandManager, InputState};
 
-mod assets;
 mod components;
-mod debug;
 mod dung_gen;
 mod ecs;
-mod graphics;
 mod input;
 mod misc;
-mod physics;
 mod systems;
-mod transform;
 
 async fn run_async() {
     // Asset Management Initialization
@@ -75,7 +70,7 @@ async fn run_async() {
         .smith()
         .name("Player model")
         .any(Parent(player))
-        .orientation(0.0)
+        .orientation(1.0)
         .model(Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
         .get_entity();
 
@@ -101,7 +96,7 @@ async fn run_async() {
         .any(Target(player))
         .position(Vector3::zero())
         .velocity(Vector2::zero())
-        .any(components::Camera {
+        .any(Camera {
             up: Vector3::unit_z(),
             fov: 30.0,
             roaming: false,

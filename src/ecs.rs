@@ -1,14 +1,14 @@
 use std::time::{Instant, SystemTime};
 
+use entity_smith::FrameTime;
+use graphics::debug::DebugTimer;
+use graphics::gui::GuiContext;
 use legion::{Resources, Schedule, World};
+use physics::PhysicsBuilderExtender;
+use transforms::TransformBuilderExtender;
 
-use crate::components::FrameTime;
-use crate::debug::DebugTimer;
-use crate::graphics::gui::GuiContext;
 use crate::input::{Command, CommandManager, InputState};
-use crate::physics::PhysicsBuilderExtender;
 use crate::systems;
-use crate::transform::TransformBuilderExtender;
 
 pub struct ECS {
     pub world: World,

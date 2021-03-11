@@ -2,17 +2,17 @@ use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
 use cgmath::{Deg, EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
+use entity_smith::Smith;
+use graphics::components::Camera;
+use graphics::util::{correction_matrix, project_screen_to_world};
 use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
 use legion::*;
+use physics::Velocity;
+use transforms::{Position, Rotation, Transform};
 
-use crate::components::entity_builder::Smith;
 use crate::components::*;
-use crate::graphics;
-use crate::graphics::util::{correction_matrix, project_screen_to_world};
 use crate::input::{Command, CommandManager, InputState};
-use crate::physics::Velocity;
-use crate::transform::{Position, Rotation, Transform};
 
 pub(crate) fn camera_control_system() -> impl ParallelRunnable {
     SystemBuilder::new("camera_control_system")
@@ -71,14 +71,14 @@ pub fn camera_control(
         cam_offset.theta += cam_offset.theta_delta * mouse_delta.x;
     }
 
-    if let Ok(cam_target_pos) = <&crate::transform::Transform>::query()
+    if let Ok(cam_target_pos) = <&transforms::Transform>::query()
         .get(
             &world,
             <&Target>::query().get(&world, player_cam.entity).unwrap().0,
         )
         .map(|trans| trans.absolute.w.truncate())
     {
-        if let Ok(cam_pos) = <&crate::transform::Transform>::query()
+        if let Ok(cam_pos) = <&transforms::Transform>::query()
             .get(&world, player_cam.entity)
             .map(|trans| trans.absolute.w.truncate())
         {
@@ -173,12 +173,12 @@ pub fn player(
             .get_mut(&mut camera_world, player_cam.entity)
             .unwrap_or_else(|_| (unreachable!()));
 
-        let camera_position = <&crate::transform::Transform>::query()
+        let camera_position = <&transforms::Transform>::query()
             .get(&world, player_cam.entity)
             .map(|trans| trans.absolute.w.truncate())
             .unwrap_or_else(|_| (unreachable!()));
 
-        let camera_target_pos = <&crate::transform::Transform>::query()
+        let camera_target_pos = <&transforms::Transform>::query()
             .get(
                 &world,
                 <&Target>::query().get(&world, player_cam.entity).unwrap().0,

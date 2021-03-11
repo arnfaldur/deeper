@@ -1,14 +1,14 @@
 use cgmath::Matrix4;
-use imgui::Ui;
+use entity_smith::Smith;
+//use imgui::Ui;
 use legion::systems::{Builder, ParallelRunnable, Runnable};
 use legion::{component, maybe_changed, Entity, IntoQuery, SystemBuilder};
 
-use crate::components::entity_builder::Smith;
 use crate::components::{Children, Parent};
-use crate::graphics::gui::GuiContext;
-use crate::transform::*;
+use crate::{Position, Rotation, Scale, Transform, TransformEntitySmith};
+//use crate::graphics::gui::GuiContext;
 
-pub(crate) trait TransformBuilderExtender {
+pub trait TransformBuilderExtender {
     //fn add_transform_systems(&mut self, resources: &mut Resources) -> &mut Self;
     fn add_transform_systems(&mut self) -> &mut Self;
 }
@@ -33,55 +33,55 @@ impl TransformBuilderExtender for Builder {
     }
 }
 
-#[allow(dead_code)]
-fn player_transform_shower() -> impl Runnable {
-    SystemBuilder::new("player_transform_shower")
-        .read_component::<Transform>()
-        .with_query(<&Transform>::query())
-        .read_resource::<crate::components::Player>()
-        .read_resource::<crate::components::PlayerCamera>()
-        .write_resource::<GuiContext>()
-        .build(move |_cmd, world, resources, queries| {
-            let (player, player_camera, _) = resources;
-
-            fn display_table(ui: &Ui, table: [[f32; 4]; 4]) {
-                ui.columns(4, im_str!("a table"), true);
-                for i in 0..4 {
-                    ui.separator();
-                    for col in table.iter() {
-                        ui.text(format!("{:.2}", col[i]));
-                        ui.next_column();
-                    }
-                }
-                ui.columns(1, im_str!("this is dumb"), false);
-                ui.separator();
-            }
-
-            use imgui::{im_str, Condition};
-            let names = [
-                im_str!("player"),
-                im_str!("player model"),
-                im_str!("camera"),
-            ];
-
-            for i in 0..3 {
-                let entity = [player.player, player.model, player_camera.entity][i];
-                GuiContext::with_ui(|ui| {
-                    imgui::Window::new(names[i])
-                        .position([400.0 + i as f32 * 200.0, 50.0], Condition::FirstUseEver)
-                        .size([200.0, 280.0], Condition::FirstUseEver)
-                        .build(ui, || {
-                            if let Ok(trans) = queries.get(world, entity) {
-                                ui.text("Absolute transform:");
-                                display_table(ui, trans.absolute.into());
-                                ui.text("Relative transform:");
-                                display_table(ui, trans.relative.into());
-                            }
-                        });
-                });
-            }
-        })
-}
+// #[allow(dead_code)]
+// fn player_transform_shower() -> impl Runnable {
+//     SystemBuilder::new("player_transform_shower")
+//         .read_component::<Transform>()
+//         .with_query(<&Transform>::query())
+//         .read_resource::<crate::components::Player>()
+//         .read_resource::<crate::components::PlayerCamera>()
+//         .write_resource::<GuiContext>()
+//         .build(move |_cmd, world, resources, queries| {
+//             let (player, player_camera, _) = resources;
+//
+//             fn display_table(ui: &Ui, table: [[f32; 4]; 4]) {
+//                 ui.columns(4, im_str!("a table"), true);
+//                 for i in 0..4 {
+//                     ui.separator();
+//                     for col in table.iter() {
+//                         ui.text(format!("{:.2}", col[i]));
+//                         ui.next_column();
+//                     }
+//                 }
+//                 ui.columns(1, im_str!("this is dumb"), false);
+//                 ui.separator();
+//             }
+//
+//             use imgui::{im_str, Condition};
+//             let names = [
+//                 im_str!("player"),
+//                 im_str!("player model"),
+//                 im_str!("camera"),
+//             ];
+//
+//             for i in 0..3 {
+//                 let entity = [player.player, player.model, player_camera.entity][i];
+//                 GuiContext::with_ui(|ui| {
+//                     imgui::Window::new(names[i])
+//                         .position([400.0 + i as f32 * 200.0, 50.0], Condition::FirstUseEver)
+//                         .size([200.0, 280.0], Condition::FirstUseEver)
+//                         .build(ui, || {
+//                             if let Ok(trans) = queries.get(world, entity) {
+//                                 ui.text("Absolute transform:");
+//                                 display_table(ui, trans.absolute.into());
+//                                 ui.text("Relative transform:");
+//                                 display_table(ui, trans.relative.into());
+//                             }
+//                         });
+//                 });
+//             }
+//         })
+// }
 
 fn populate_transforms() -> impl Runnable {
     SystemBuilder::new("populate_transforms")

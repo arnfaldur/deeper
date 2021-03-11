@@ -29,7 +29,7 @@ pub struct GuiContext {
 }
 
 impl GuiContext {
-    pub fn new(window: &winit::window::Window, context: &crate::graphics::Context) -> Self {
+    pub fn new(window: &winit::window::Window, context: &crate::Context) -> Self {
         let mut imgui_ctx = imgui::Context::create();
         let mut imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui_ctx);
 
@@ -62,7 +62,7 @@ impl GuiContext {
             &context.device,
             &context.queue,
             imgui_wgpu::RendererConfig {
-                texture_format: crate::graphics::COLOR_FORMAT,
+                texture_format: crate::COLOR_FORMAT,
                 ..Default::default()
             },
         );
