@@ -17,7 +17,8 @@ members = [
     "src/transforms",
     "src/world_gen",
     "src/graphics",
-    "src/components"
+    "src/components",
+    "src/input",
 ]
 
 [dependencies]
@@ -29,6 +30,7 @@ entity-smith = { path = "src/entity_smith" }
 graphics = { path = "src/graphics" }
 world_gen = { path = "src/world_gen" }
 components = { path = "src/components" }
+input = { path = "src/input" }
 
 # misc
 itertools = "0.10.0"

@@ -12,11 +12,10 @@ use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::input::{CommandManager, InputState};
+use input::{CommandManager, InputState};
 use components::{MapTransition, FloorNumber, Player, ActiveCamera, PlayerCamera, Target};
 
 mod ecs;
-mod input;
 mod misc;
 mod systems;
 

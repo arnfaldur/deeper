@@ -1,18 +1,17 @@
 use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{InnerSpace, Vector2, Vector3};
-use entity_smith::{Acceleration, FrameTime, Speed};
+use legion::{*, IntoQuery};
 use legion::systems::{CommandBuffer, ParallelRunnable};
 use legion::world::SubWorld;
-use legion::{IntoQuery, *};
+
+use components::{AIFollow, Destination, HitPoints};
+use entity_smith::{Acceleration, FrameTime, Speed};
 use physics::Velocity;
 use transforms::{Position, Rotation};
 
-use components::{HitPoints, AIFollow, Destination};
-
 pub mod assets;
 pub mod player;
-pub mod rendering;
 
 #[allow(dead_code)]
 pub(crate) fn order_tester(message: &'static str) -> impl ParallelRunnable {

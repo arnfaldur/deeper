@@ -1,10 +1,11 @@
 #![feature(slice_group_by)]
 
-// How dirty of me
-use rendering_3d::*;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
+
+// How dirty of me
+use models::*;
 
 use crate::assets::AssetManager;
 use crate::components::{Model3D, StaticModel};
@@ -21,8 +22,9 @@ pub mod components;
 pub mod data;
 pub mod debug;
 pub mod gui;
-pub mod rendering_3d;
+pub mod models;
 pub mod util;
+pub mod systems;
 
 pub struct ModelQueue {
     pub local_uniforms: Vec<LocalUniforms>,

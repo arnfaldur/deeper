@@ -7,7 +7,7 @@ use legion::{Resources, Schedule, World};
 use physics::PhysicsBuilderExtender;
 use transforms::TransformBuilderExtender;
 
-use crate::input::{Command, CommandManager, InputState};
+use input::{Command, CommandManager, InputState};
 use crate::systems;
 
 pub struct ECS {
@@ -53,7 +53,7 @@ impl ECS {
 
         self.schedules.push((
             "Render Schedule".into(),
-            systems::rendering::render_system_schedule(),
+            graphics::systems::render_system_schedule(),
             Box::new(|_| true),
         ));
     }

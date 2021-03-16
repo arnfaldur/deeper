@@ -4,7 +4,7 @@ use graphics;
 use graphics::assets;
 use legion::*;
 
-use crate::input::{Command, CommandManager};
+use input::{Command, CommandManager};
 
 #[system]
 pub fn hot_loading(

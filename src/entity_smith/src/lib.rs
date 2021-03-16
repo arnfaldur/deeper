@@ -92,7 +92,8 @@ impl<'a> EntitySmith<'a> {
 
     pub fn mark(&mut self) -> &mut Self { self.add_component(Marker) }
     pub fn name(&mut self, name: &str) -> &mut Self { self.add_component(Name(String::from(name))) }
-    #[deprecated(note = "builder method not implemented for a component class.")]
+    // #[deprecated(note = "builder method not implemented for a component class.")]
+    // TODO: find more elegant solution for thim
     pub fn any<T: Component>(&mut self, component: T) -> &mut Self { self.add_component(component) }
 }
 

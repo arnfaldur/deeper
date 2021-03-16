@@ -1,3 +1,11 @@
+#![allow(dead_code)]
+
+use legion::systems::Runnable;
+use std::time::SystemTime;
+use legion::SystemBuilder;
+use graphics::canvas::{RectangleDescriptor, AnchorPoint, ScreenVector};
+use input::Command;
+
 #[derive(Clone, Copy)]
 pub(crate) enum BoardState {
     Empty,
@@ -151,5 +159,69 @@ impl SnakeBoard {
             }
             println!();
         }
+    }
+}
+
+struct SnakeSystem;
+
+impl SnakeSystem {
+    fn new() -> impl Runnable { Self::system(SnakeBoard::new(), SystemTime::now()) }
+
+    fn system(mut board: SnakeBoard, mut time: SystemTime) -> impl Runnable {
+        SystemBuilder::new("snake_game")
+            .read_resource::<input::CommandManager>()
+            .write_resource::<graphics::Context>()
+            .build(move |_commands, _world, (input, context), _| {
+                snake_game(&mut board, &mut time, input, context);
+
+                fn snake_game(
+                    board: &mut SnakeBoard,
+                    time: &mut SystemTime,
+                    input: &input::CommandManager,
+                    context: &mut graphics::Context,
+                ) {
+                    if !input.get(Command::DebugToggleSnake) {
+                        return;
+                    }
+
+                    if input.get(Command::SnakeMoveUp) {
+                        board.new_dir = Direction::Up;
+                    } else if input.get(Command::SnakeMoveDown) {
+                        board.new_dir = Direction::Down;
+                    } else if input.get(Command::SnakeMoveLeft) {
+                        board.new_dir = Direction::Left;
+                    } else if input.get(Command::SnakeMoveRight) {
+                        board.new_dir = Direction::Right;
+                    }
+
+                    if SystemTime::now().duration_since(*time).unwrap().as_millis() > 200 {
+                        *time = SystemTime::now();
+                        board.advance();
+                    }
+
+                    for (i, row) in board.board.iter().enumerate() {
+                        for (j, square) in row.iter().enumerate() {
+                            context.canvas_queue.draw_rect(
+                                RectangleDescriptor::AnchorRect {
+                                    anchor: AnchorPoint::TopLeft,
+                                    position: ScreenVector::new_relative(0.5, 0.5),
+                                    dimensions: ScreenVector::new_relative_to_width(0.025, 0.025),
+                                    offset: ScreenVector::new_relative_to_width(
+                                        (j as f32 - 8.0) / 16.0 / 2.0,
+                                        (i as f32 - 8.0) / 16.0 / 2.0,
+                                    ),
+                                },
+                                match square {
+                                    BoardState::Empty => cgmath::Vector4::new(0.1, 0.1, 0.1, 1.0),
+                                    BoardState::Snake => cgmath::Vector4::new(0.8, 0.2, 0.2, 1.0),
+                                    BoardState::Food => cgmath::Vector4::new(0.8, 0.8, 0.2, 1.0),
+                                    BoardState::Wall => cgmath::Vector4::new(0.2, 0.2, 0.2, 1.0),
+                                },
+                                context.window_size,
+                            );
+                        }
+                    }
+                }
+            })
     }
 }

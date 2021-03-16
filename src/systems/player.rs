@@ -11,7 +11,7 @@ use legion::*;
 use physics::Velocity;
 use transforms::{Position, Rotation, Transform, SphericalOffset};
 
-use crate::input::{Command, CommandManager, InputState};
+use input::{Command, CommandManager, InputState};
 use components::{Destination, Target, PlayerCamera, Faction, HitPoints, Player};
 
 pub(crate) fn camera_control_system() -> impl ParallelRunnable {
