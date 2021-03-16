@@ -8,36 +8,17 @@ use legion::{IntoQuery, *};
 use physics::Velocity;
 use transforms::{Position, Rotation};
 
-use crate::components::*;
+use components::{HitPoints, AIFollow, Destination};
 
 pub mod assets;
 pub mod player;
 pub mod rendering;
-pub mod world_gen;
 
 #[allow(dead_code)]
 pub(crate) fn order_tester(message: &'static str) -> impl ParallelRunnable {
     SystemBuilder::new("order_tester: \"".to_owned() + message + "\"").build(move |_, _, _, _| {
         eprintln!("{}", message);
     })
-}
-
-pub fn spherical_offset_system() -> impl ParallelRunnable {
-    SystemBuilder::new("spherical_offset")
-        .with_query(<(&mut Position, &SphericalOffset)>::query())
-        .build(move |_cmd, world, _resources, query| {
-            let for_query = world;
-            query.for_each_mut(for_query, |components| {
-                spherical_offset(components.0, components.1);
-            });
-        })
-}
-
-#[allow(dead_code)]
-pub fn spherical_offset(pos: &mut Position, follow: &SphericalOffset) {
-    pos.0.x = follow.radius * follow.theta.cos() * follow.phi.cos();
-    pos.0.y = follow.radius * follow.theta.sin() * follow.phi.cos();
-    pos.0.z = follow.radius * follow.phi.sin();
 }
 
 #[allow(dead_code)]

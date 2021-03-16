@@ -6,37 +6,59 @@ use graphics::components::{Model3D, StaticModel};
 use graphics::data::LocalUniforms;
 use itertools::Itertools;
 use legion::world::SubWorld;
-use legion::*;
 use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::TransformEntitySmith;
+use components::*;
+use legion::{Entity, IntoQuery, SystemBuilder};
 
-use crate::components::*;
 use crate::dung_gen::DungGen;
+use crate::components::{TileType, WallDirection};
+use legion::systems::Runnable;
 
-#[system]
-#[read_component(TileType)]
-#[read_component(Faction)]
+
+pub fn dung_gen_system() -> impl Runnable {
+    SystemBuilder::new("DungGen System")
+        .read_component::<TileType>()
+        .read_component::<Faction>()
+        .write_resource::<MapTransition>()
+        .write_resource::<FloorNumber>()
+        .write_resource::<graphics::Context>()
+        .write_resource::<assets::AssetManager>()
+        .read_resource::<Player>()
+        .build(move |command_buffer, world, resources, _| {
+            dung_gen(
+                command_buffer,
+                world,
+                &mut resources.0,
+                &mut resources.1,
+                &mut resources.2,
+                &mut resources.3,
+                &resources.4
+            );
+        })
+}
+
 pub fn dung_gen(
+    command_buffer: &mut legion::systems::CommandBuffer,
     world: &mut SubWorld,
-    commands: &mut legion::systems::CommandBuffer,
-    #[resource] trans: &mut MapTransition,
-    #[resource] floor: &mut FloorNumber,
-    #[resource] context: &mut graphics::Context,
-    #[resource] ass_man: &mut assets::AssetManager,
-    #[resource] player: &Player,
+    transition : &mut MapTransition,
+    floor: &mut FloorNumber,
+    context: &mut graphics::Context,
+    ass_man: &mut assets::AssetManager,
+    player: &Player,
 ) {
-    match *trans {
+    match *transition {
         MapTransition::Deeper => {
             // TODO(Arnaldur): bruh
             for (entity, _) in <(Entity, &TileType)>::query().iter(world) {
-                commands.remove(*entity);
+                command_buffer.remove(*entity);
             }
 
             for chunk in <&Faction>::query().iter_chunks_mut(world) {
                 for (entity, faction) in chunk.into_iter_entities() {
                     if let Faction::Enemies = faction {
-                        commands.remove(entity);
+                        command_buffer.remove(entity);
                     }
                 }
             }
@@ -66,7 +88,7 @@ pub fn dung_gen(
             };
 
             // Reset player position and stuff
-            commands
+            command_buffer
                 .forge(player.player)
                 .position(player_start.extend(0.))
                 .velocity_zero();
@@ -123,7 +145,7 @@ pub fn dung_gen(
                     ),
                 );
 
-                let mut smith = commands.smith();
+                let mut smith = command_buffer.smith();
                 smith.any(tile_type);
                 match tile_type {
                     TileType::Nothing => {}
@@ -148,7 +170,7 @@ pub fn dung_gen(
                     && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
                 {
                     let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
-                    let mut smith = commands.smith();
+                    let mut smith = command_buffer.smith();
                     smith
                         .position(
                             (pos + Vector2::new(
@@ -200,12 +222,12 @@ pub fn dung_gen(
                 .collect_vec();
 
             for (uniforms, idx) in optimized_models.iter() {
-                commands.push((StaticModel::from_uniforms(context, *idx, *uniforms),));
+                command_buffer.push((StaticModel::from_uniforms(context, *idx, *uniforms),));
             }
         }
         _ => {}
     }
-    *trans = MapTransition::None;
+    *transition = MapTransition::None;
 }
 
 struct StaticMeshOptimizationEntry {

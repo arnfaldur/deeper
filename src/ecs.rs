@@ -36,10 +36,9 @@ impl ECS {
                 ))
                 .add_system(systems::player::player_system())
                 .add_system(systems::player::camera_control_system())
-                .add_system(systems::world_gen::dung_gen_system())
+                .add_system(world_gen::systems::dung_gen_system())
                 .add_system(systems::go_to_destination_system())
                 .add_physics_systems(&mut self.world, &mut self.resources)
-                .add_system(systems::spherical_offset_system())
                 .add_transform_systems()
                 .add_system(systems::assets::hot_loading_system(
                     SystemTime::now(),

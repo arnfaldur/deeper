@@ -267,7 +267,8 @@ impl CommandManager {
             Command::DebugToggleInfo,
             Key::F12,
             ButtonStatus::Pressed,
-            crate::systems::rendering::DISPLAY_DEBUG_DEFAULT,
+            true,
+            //crate::systems::rendering::DISPLAY_DEBUG_DEFAULT,
         );
         ret.simple_key_bind(Command::DebugStepLogic, Key::F10, ButtonStatus::Pressed);
 

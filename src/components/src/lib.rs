@@ -1,9 +1,13 @@
 #![allow(dead_code)]
 
-use std::f32::consts::PI;
-
 use cgmath::Vector2;
 use legion::Entity;
+
+/*
+    Welcome to Ms. Deeper's home for orphan components.
+
+    Please take pity on these poor components and give them a proper home.
+ */
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {
@@ -47,6 +51,7 @@ impl Destination {
 pub enum Faction {
     Enemies,
     Friends,
+    Frenemies,
 }
 
 pub struct HitPoints {
@@ -63,45 +68,5 @@ pub enum MapTransition {
 pub struct MapSwitcher(pub MapTransition);
 
 pub struct Target(pub Entity);
-
-pub struct SphericalOffset {
-    pub phi: f32,
-    pub theta: f32,
-    pub radius: f32,
-    pub theta_delta: f32,
-    pub phi_delta: f32,
-    pub radius_delta: f32,
-}
-
-impl SphericalOffset {
-    pub fn camera_offset() -> Self {
-        Self {
-            phi: 0.2 * PI,
-            theta: PI / 3.0,
-            radius: 15.0,
-            // TODO: Not satisfactory, but need to limit untraceable magic constants
-            theta_delta: -0.005,
-            phi_delta: 0.0025,
-            radius_delta: 0.3,
-        }
-    }
-}
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-pub enum TileType {
-    Wall(Option<WallDirection>),
-    Floor,
-    Path,
-    Nothing,
-    LadderDown,
-}
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-pub enum WallDirection {
-    North,
-    West,
-    South,
-    East,
-}
 
 pub struct FloorNumber(pub i32);

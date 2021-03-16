@@ -6,14 +6,14 @@ use graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use legion::systems::Runnable;
 use legion::*;
 use transforms::{Position, Transform};
+use graphics::components::{Camera, Model3D, StaticModel};
+use components::{Target, ActiveCamera};
 
-use crate::components::*;
+use crate::misc;
 
 pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
 }
-
-pub const DISPLAY_DEBUG_DEFAULT: bool = false;
 
 pub fn render_system_schedule() -> legion::systems::Schedule {
     legion::systems::Schedule::builder()
@@ -50,9 +50,7 @@ fn update_camera_system() -> impl Runnable {
 
 struct SnakeSystem;
 
-use graphics::components::{Camera, Model3D, StaticModel};
 
-use crate::misc;
 
 impl SnakeSystem {
     fn new() -> impl Runnable { Self::system(misc::SnakeBoard::new(), SystemTime::now()) }

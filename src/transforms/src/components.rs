@@ -61,3 +61,27 @@ impl Default for Position {
         return Position(Vector3::zero());
     }
 }
+
+pub struct SphericalOffset {
+    pub phi: f32,
+    pub theta: f32,
+    pub radius: f32,
+    pub theta_delta: f32,
+    pub phi_delta: f32,
+    pub radius_delta: f32,
+}
+
+impl SphericalOffset {
+    pub fn camera_offset() -> Self {
+        use std::f32::consts::PI;
+        Self {
+            phi: 0.2 * PI,
+            theta: PI / 3.0,
+            radius: 15.0,
+            // TODO: Not satisfactory, but need to limit untraceable magic constants
+            theta_delta: -0.005,
+            phi_delta: 0.0025,
+            radius_delta: 0.3,
+        }
+    }
+}

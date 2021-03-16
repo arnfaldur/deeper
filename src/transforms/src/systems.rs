@@ -5,8 +5,27 @@ use legion::systems::{Builder, ParallelRunnable, Runnable};
 use legion::{component, maybe_changed, Entity, IntoQuery, SystemBuilder};
 
 use crate::components::{Children, Parent};
-use crate::{Position, Rotation, Scale, Transform, TransformEntitySmith};
+use crate::{Position, Rotation, Scale, Transform, TransformEntitySmith, SphericalOffset};
 //use crate::graphics::gui::GuiContext;
+
+// note(Jökull): This belongs here if anywhere
+pub fn spherical_offset_system() -> impl ParallelRunnable {
+    SystemBuilder::new("spherical_offset")
+        .with_query(<(&mut Position, &SphericalOffset)>::query())
+        .build(move |_cmd, world, _resources, query| {
+            let for_query = world;
+            query.for_each_mut(for_query, |components| {
+                spherical_offset(components.0, components.1);
+            });
+        })
+}
+
+#[allow(dead_code)]
+pub fn spherical_offset(pos: &mut Position, follow: &SphericalOffset) {
+    pos.0.x = follow.radius * follow.theta.cos() * follow.phi.cos();
+    pos.0.y = follow.radius * follow.theta.sin() * follow.phi.cos();
+    pos.0.z = follow.radius * follow.phi.sin();
+}
 
 pub trait TransformBuilderExtender {
     //fn add_transform_systems(&mut self, resources: &mut Resources) -> &mut Self;
@@ -16,7 +35,8 @@ pub trait TransformBuilderExtender {
 impl TransformBuilderExtender for Builder {
     //fn add_transform_systems(&mut self, resources: &mut Resources) -> &mut Self {
     fn add_transform_systems(&mut self) -> &mut Self {
-        self.add_system(populate_transforms())
+        self.add_system(spherical_offset_system())
+            .add_system(populate_transforms())
             .add_system(depopulate_transforms())
             .add_system(adopt_children())
             .flush()

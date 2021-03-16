@@ -1,5 +1,5 @@
 [package]
-name = "physics"
+name = "world_gen"
 version = "0.1.0"
 authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
 edition = "2018"
@@ -9,16 +9,14 @@ edition = "2018"
 [dependencies]
 
 # internal
-entity-smith = { path = "../entity_smith" }
-transforms = { path = "../transforms" }
+components = { path = "../components"}
+transforms = { path = "../transforms"}
+graphics = { path = "../graphics"}
+entity-smith = { path = "../entity_smith"}
+physics = { path = "../physics"}
 
-# physics
-nalgebra = "0.24.1"
-ncollide2d = "0.27.0"
-nphysics2d = "0.19.0"
-
-# ECS
-legion = "0.4"
-crossbeam-channel = "0.5.0"
-
+rand = "0.8.3"
+ena = "0.14.0"
 cgmath = "0.18.0"
+legion = "0.4.0"
+itertools = "0.10.0"
