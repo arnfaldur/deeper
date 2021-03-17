@@ -9,7 +9,6 @@ use legion::{IntoQuery, *};
 use physics::Velocity;
 use transforms::{Position, Rotation};
 
-pub mod assets;
 pub mod player;
 
 #[allow(dead_code)]

@@ -28,10 +28,6 @@ impl Application {
         self.schedules.push((
             "Engine Logic Schedule".into(),
             Schedule::builder()
-                .add_system(systems::assets::hot_loading_system(
-                    //SystemTime::now(),
-                    false,
-                ))
                 .add_system(systems::player::player_system())
                 .add_system(systems::player::camera_control_system())
                 .add_system(world_gen::systems::dung_gen_system())

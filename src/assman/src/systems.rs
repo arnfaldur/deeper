@@ -1,6 +1,7 @@
 use entity_smith::Smith;
 use graphics::components::{Model3D, StaticModel};
 use graphics::{GraphicsContext, GraphicsResources};
+use input::{Command, CommandManager};
 use itertools::Itertools;
 use legion::systems::{ParallelRunnable, Schedule};
 use legion::{Entity, IntoQuery, SystemBuilder};
@@ -13,6 +14,7 @@ pub fn assman_system_schedule() -> Schedule {
     Schedule::builder()
         .add_system(assman_process_dynamic_model_requests())
         .add_system(assman_process_static_model_requests())
+        .add_system(hot_loading_system())
         .build()
 }
 
@@ -90,6 +92,27 @@ fn assman_process_static_model_requests() -> impl ParallelRunnable {
                             idx,
                             *local_uniforms,
                         ));
+                }
+            },
+        )
+}
+
+pub fn hot_loading_system() -> impl ParallelRunnable {
+    SystemBuilder::new("hot_loading_system")
+        .write_resource::<AssetStore>()
+        .write_resource::<GraphicsResources>()
+        .write_resource::<GraphicsContext>()
+        .read_resource::<CommandManager>()
+        .build(
+            move |_, _, (asset_store, graphics_resources, graphics_context, command_manager), _| {
+                if command_manager.get(Command::DevToggleHotLoading) {
+                    //asset_store.load_shaders(shaders_loaded_at, context)
+                }
+
+                if command_manager.get(Command::DevHotLoadModels) {
+                    println!("Hotloading models...");
+                    GraphicsAssetManager::new(asset_store, graphics_resources, graphics_context)
+                        .load_models();
                 }
             },
         )

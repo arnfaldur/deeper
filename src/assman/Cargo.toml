@@ -12,6 +12,7 @@ edition = "2018"
 graphics = { path = "../graphics"}
 world_gen = { path = "../world_gen"}
 entity_smith = { path = "../entity_smith"}
+input = { path = "../input"}
 
 ron = "0.6.4"
 serde = { version = "1.0.123", features = ["derive"] }

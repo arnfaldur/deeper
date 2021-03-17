@@ -279,7 +279,18 @@ impl CommandManager {
             true,
         );
 
-        ret.simple_key_bind(Command::DevToggleHotLoading, Key::H, ButtonStatus::Pressed);
+        ret.advanced_bind(
+            Command::DevToggleHotLoading,
+            Box::new(|input_state, prev_state| {
+                let input = input_state.key_state(Key::H, ButtonStatus::Pressed);
+                let result = input ^ prev_state;
+                if input {
+                    println!("Debug shaders turned {}", if result { "ON" } else { "OFF" });
+                }
+                result
+            }),
+        );
+
         ret.simple_key_bind(Command::DevHotLoadModels, Key::L, ButtonStatus::Pressed);
 
         ret.simple_key_bind(Command::PlayerCameraMoveUp, Key::E, ButtonStatus::Pressed);
