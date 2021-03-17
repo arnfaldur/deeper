@@ -1,21 +1,17 @@
-use cgmath::{vec2, SquareMatrix, Vector2, Vector3};
+use cgmath::{vec2, Vector2, Vector3};
+use components::*;
 use entity_smith::Smith;
 use graphics;
-use graphics::assets;
-use graphics::components::{Model3D, StaticModel};
 use graphics::data::LocalUniforms;
-use itertools::Itertools;
+use legion::systems::Runnable;
 use legion::world::SubWorld;
+use legion::{Entity, IntoQuery, SystemBuilder};
 use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::TransformEntitySmith;
-use components::*;
-use legion::{Entity, IntoQuery, SystemBuilder};
 
+use crate::components::{DynamicModelRequest, StaticModelRequest, TileType, WallDirection};
 use crate::dung_gen::DungGen;
-use crate::components::{TileType, WallDirection};
-use legion::systems::Runnable;
-
 
 pub fn dung_gen_system() -> impl Runnable {
     SystemBuilder::new("DungGen System")
@@ -23,8 +19,7 @@ pub fn dung_gen_system() -> impl Runnable {
         .read_component::<Faction>()
         .write_resource::<MapTransition>()
         .write_resource::<FloorNumber>()
-        .write_resource::<graphics::Context>()
-        .write_resource::<assets::AssetManager>()
+        .write_resource::<graphics::GraphicsContext>()
         .read_resource::<Player>()
         .build(move |command_buffer, world, resources, _| {
             dung_gen(
@@ -33,8 +28,7 @@ pub fn dung_gen_system() -> impl Runnable {
                 &mut resources.0,
                 &mut resources.1,
                 &mut resources.2,
-                &mut resources.3,
-                &resources.4
+                &resources.3,
             );
         })
 }
@@ -42,10 +36,9 @@ pub fn dung_gen_system() -> impl Runnable {
 pub fn dung_gen(
     command_buffer: &mut legion::systems::CommandBuffer,
     world: &mut SubWorld,
-    transition : &mut MapTransition,
+    transition: &mut MapTransition,
     floor: &mut FloorNumber,
-    context: &mut graphics::Context,
-    ass_man: &mut assets::AssetManager,
+    context: &mut graphics::GraphicsContext,
     player: &Player,
 ) {
     match *transition {
@@ -95,33 +88,24 @@ pub fn dung_gen(
 
             let room_centers = &dungeon.room_centers;
             // TODO: Turn lights into entities
-            graphics::assets::utils::make_lights(&context, room_centers);
-
-            let (cube_idx, plane_idx, wall_idx, stairs_down_idx, floor_idx) = {
-                (
-                    ass_man.get_model_index("cube.obj").unwrap(),
-                    ass_man.get_model_index("plane.obj").unwrap(),
-                    ass_man.get_model_index("Wall.obj").unwrap(),
-                    ass_man.get_model_index("StairsDown.obj").unwrap(),
-                    ass_man.get_model_index("floortile.obj").unwrap(),
-                )
-            };
-
-            let mut optimizer = StaticMeshOptimizer::new();
+            graphics::util::make_lights(&context, room_centers);
 
             for (&(x, y), &tile_type) in dungeon.world.iter() {
                 let pos = Vector2::new(x as f32, y as f32);
 
-                optimizer.insert(
-                    match tile_type {
-                        TileType::Nothing => plane_idx,
-                        TileType::Wall(None) => cube_idx,
-                        TileType::Wall(Some(_)) => wall_idx,
-                        TileType::Floor => floor_idx,
-                        TileType::Path => floor_idx,
-                        TileType::LadderDown => stairs_down_idx,
-                    },
-                    LocalUniforms::simple(
+                let mut smith = command_buffer.smith();
+
+                smith.any(StaticModelRequest {
+                    label: match tile_type {
+                        TileType::Nothing => "plane.obj",
+                        TileType::Wall(None) => "cube.obj",
+                        TileType::Wall(Some(_)) => "Wall.obj",
+                        TileType::Floor => "floortile.obj",
+                        TileType::Path => "floortile.obj",
+                        TileType::LadderDown => "StairsDown.obj",
+                    }
+                    .to_string(),
+                    uniforms: LocalUniforms::simple(
                         pos.extend(match tile_type {
                             TileType::Nothing => 1.,
                             _ => 0.,
@@ -143,9 +127,8 @@ pub fn dung_gen(
                             _ => graphics::data::Material::darkest_stone(),
                         },
                     ),
-                );
+                });
 
-                let mut smith = command_buffer.smith();
                 smith.any(tile_type);
                 match tile_type {
                     TileType::Nothing => {}
@@ -196,96 +179,20 @@ pub fn dung_gen(
                             max: rng.gen_range(0.0..2.0) + 8. * rad,
                             health: rng.gen_range(0.0..2.0) + 8. * rad,
                         })
-                        .any(
-                            Model3D::from_index(ass_man.get_model_index("monstroman.obj").unwrap())
-                                .with_material(graphics::data::Material::glossy(
-                                    Vector3::<f32>::new(rng.gen(), rng.gen(), rng.gen()),
-                                ))
-                                .with_scale(rad * 1.7),
-                        )
+                        .any(DynamicModelRequest {
+                            label: "monstroman.obj".to_string(),
+                            material: graphics::data::Material::glossy(Vector3::<f32>::new(
+                                rng.gen(),
+                                rng.gen(),
+                                rng.gen(),
+                            )),
+                            scale: rad * 1.7,
+                        })
                         .done();
                 }
-            }
-
-            let optimized_models = optimizer
-                .finish(ass_man)
-                .iter()
-                .map(|(uniforms, vertex_lists)| {
-                    (
-                        *uniforms,
-                        ass_man.allocate_graphics_model_from_vertex_lists(
-                            context,
-                            vertex_lists.clone(),
-                        ),
-                    )
-                })
-                .collect_vec();
-
-            for (uniforms, idx) in optimized_models.iter() {
-                command_buffer.push((StaticModel::from_uniforms(context, *idx, *uniforms),));
             }
         }
         _ => {}
     }
     *transition = MapTransition::None;
-}
-
-struct StaticMeshOptimizationEntry {
-    archetype: LocalUniforms,
-    instances: Vec<(usize, LocalUniforms)>,
-}
-
-struct StaticMeshOptimizer {
-    entries: Vec<StaticMeshOptimizationEntry>,
-}
-
-impl StaticMeshOptimizer {
-    fn new() -> Self { Self { entries: vec![] } }
-
-    fn insert(&mut self, idx: usize, local_uniforms: LocalUniforms) {
-        for entry in self.entries.iter_mut() {
-            if entry.archetype.similar_to(&local_uniforms) {
-                entry.instances.push((idx, local_uniforms));
-                return;
-            }
-        }
-        self.entries.push(StaticMeshOptimizationEntry {
-            archetype: local_uniforms.with_model_matrix(cgmath::Matrix4::identity().into()),
-            instances: vec![(idx, local_uniforms)],
-        })
-    }
-
-    fn finish(
-        &self,
-        ass_man: &assets::AssetManager,
-    ) -> Vec<(LocalUniforms, graphics::data::VertexLists)> {
-        self.entries
-            .iter()
-            .map(|entry| {
-                (
-                    entry.archetype,
-                    entry
-                        .instances
-                        .iter()
-                        .map(|(idx, uniforms)| {
-                            ass_man
-                                .models
-                                .get(*idx)
-                                .unwrap()
-                                .vertex_lists
-                                .iter()
-                                .map(|vertex_list| {
-                                    vertex_list
-                                        .iter()
-                                        .map(|vertex| vertex.transformed(uniforms.model_matrix))
-                                        .collect_vec()
-                                })
-                                .collect_vec()
-                        })
-                        .collect_vec()
-                        .concat(),
-                )
-            })
-            .collect_vec()
-    }
 }

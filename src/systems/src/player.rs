@@ -2,19 +2,18 @@ use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
 use cgmath::{Deg, EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
+use components::{Destination, Faction, HitPoints, Player, PlayerCamera, Target};
 use entity_smith::Smith;
 use graphics::components::Camera;
 use graphics::util::{correction_matrix, project_screen_to_world};
+use input::{Command, CommandManager, InputState};
 use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
 use legion::*;
 use physics::Velocity;
-use transforms::{Position, Rotation, Transform, SphericalOffset};
+use transforms::{Position, Rotation, SphericalOffset, Transform};
 
-use input::{Command, CommandManager, InputState};
-use components::{Destination, Target, PlayerCamera, Faction, HitPoints, Player};
-
-pub(crate) fn camera_control_system() -> impl ParallelRunnable {
+pub fn camera_control_system() -> impl ParallelRunnable {
     SystemBuilder::new("camera_control_system")
         .write_component::<Camera>()
         .write_component::<SphericalOffset>()
@@ -123,7 +122,7 @@ pub fn camera_control(
     }
 }
 
-pub(crate) fn player_system() -> impl ParallelRunnable {
+pub fn player_system() -> impl ParallelRunnable {
     SystemBuilder::new("player_system")
         .write_component::<Rotation>()
         .write_component::<Destination>()
@@ -134,7 +133,7 @@ pub(crate) fn player_system() -> impl ParallelRunnable {
         .read_component::<Faction>()
         .read_component::<HitPoints>()
         .read_resource::<InputState>()
-        .read_resource::<graphics::Context>()
+        .read_resource::<graphics::GraphicsContext>()
         .read_resource::<Player>()
         .read_resource::<PlayerCamera>()
         .build(move |cmd, world, resources, _| {
@@ -153,7 +152,7 @@ pub fn player(
     world: &mut SubWorld,
     commands: &mut legion::systems::CommandBuffer,
     input: &InputState,
-    context: &graphics::Context,
+    context: &graphics::GraphicsContext,
     player: &Player,
     player_cam: &PlayerCamera,
 ) {

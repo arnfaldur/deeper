@@ -1,5 +1,5 @@
 [package]
-name = "transforms"
+name = "systems"
 version = "0.1.0"
 authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
 edition = "2018"
@@ -7,9 +7,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# internal
-entity_smith = { path = "../entity_smith" }
 
-legion = "0.4"
+# internal
+components = { path = "../components" }
+entity_smith = { path = "../entity_smith" }
+physics = { path = "../physics" }
+transforms = { path = "../transforms" }
+graphics = { path = "../graphics" }
+input = { path = "../input" }
+assman = { path = "../assman" }
+
+legion = "0.4.0"
 cgmath = "0.18.0"
-winit = "0.24.0"

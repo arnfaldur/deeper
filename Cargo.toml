@@ -17,8 +17,11 @@ members = [
     "src/transforms",
     "src/world_gen",
     "src/graphics",
-    "src/components",
     "src/input",
+    "src/application",
+    "src/components",
+    "src/systems",
+    "src/assman",
 ]
 
 [dependencies]
@@ -26,11 +29,14 @@ members = [
 # internal
 physics = { path = "src/physics" }
 transforms = { path = "src/transforms" }
-entity-smith = { path = "src/entity_smith" }
+entity_smith = { path = "src/entity_smith" }
 graphics = { path = "src/graphics" }
 world_gen = { path = "src/world_gen" }
 components = { path = "src/components" }
 input = { path = "src/input" }
+application = { path = "src/application" }
+systems = { path = "src/systems" }
+assman = { path = "src/assman" }
 
 # misc
 itertools = "0.10.0"

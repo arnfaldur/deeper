@@ -1,13 +1,11 @@
 #![feature(slice_group_by)]
 
+// How dirty of me
+use models::*;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-// How dirty of me
-use models::*;
-
-use crate::assets::AssetManager;
 use crate::components::{Model3D, StaticModel};
 use crate::data::*;
 
@@ -16,15 +14,20 @@ pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 
-pub mod assets;
 pub mod canvas;
 pub mod components;
 pub mod data;
 pub mod debug;
 pub mod gui;
 pub mod models;
-pub mod util;
 pub mod systems;
+pub mod util;
+
+pub type ModelID = usize;
+
+pub struct GraphicsResources {
+    pub models: Vec<Model>,
+}
 
 pub struct ModelQueue {
     pub local_uniforms: Vec<LocalUniforms>,
@@ -57,7 +60,7 @@ impl ModelQueue {
     Currently just a grab-bag of all the state and functionality
     needed to power all graphics. Needs simplification.
 */
-pub struct Context {
+pub struct GraphicsContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
 
@@ -74,7 +77,7 @@ pub struct Context {
     pub canvas_queue: canvas::CanvasQueue,
 }
 
-impl Context {
+impl GraphicsContext {
     pub async fn new(window: &Window) -> Self {
         let window_size = window.inner_size();
 
@@ -113,7 +116,7 @@ impl Context {
         let model_render_ctx = ModelRenderContext::new(&device, window_size);
         let canvas_render_ctx = canvas::CanvasRenderContext::new(&device, window_size);
 
-        let context = Context {
+        let context = GraphicsContext {
             device,
             queue,
             surface,
@@ -183,7 +186,7 @@ impl Context {
 
     pub fn render(
         &mut self,
-        ass_man: &AssetManager,
+        graphics_resources: &GraphicsResources,
         gui_context: &mut gui::GuiContext,
         window: &winit::window::Window,
         debug_timer: &mut crate::debug::DebugTimer, // TODO: Revisit
@@ -196,7 +199,7 @@ impl Context {
         self.model_render_ctx.render(
             &self.device,
             &self.queue,
-            ass_man,
+            graphics_resources,
             &self.model_queue,
             &current_frame.output.view,
             debug_timer,

@@ -11,27 +11,15 @@ pub struct PathSettings {
     pub extensions_settings_path: PathBuf,
     pub assets_path: PathBuf,
     pub models_path: PathBuf,
-    pub entities_path: PathBuf,
-    pub shaders_path: PathBuf,
-}
-
-impl PathSettings {
-    pub fn new() -> Self {
-        Self {
-            display_settings_path: Path::new("settings/display.settings").to_path_buf(),
-            extensions_settings_path: Path::new("settings/extensions.settings").to_path_buf(),
-            assets_path: Path::new("assets/").to_path_buf(),
-            models_path: Path::new("assets/Models/").to_path_buf(),
-            entities_path: Path::new("entities/").to_path_buf(),
-            shaders_path: Path::new("shaders/").to_path_buf(),
-        }
-    }
+    //pub textures_path: PathBuf,
+    //pub shader_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Extensions {
     pub models: Vec<String>,
-    pub images: Vec<String>,
+    //pub textures: Vec<String>,
+    //pub shaders: Vec<String>,
 }
 
 impl Extensions {
@@ -45,8 +33,8 @@ pub struct DisplaySettings {
     pub fps: u32,
 }
 
-impl DisplaySettings {
-    pub fn new() -> Self {
+impl Default for DisplaySettings {
+    fn default() -> Self {
         Self {
             screen_width: 1024,
             screen_height: 768,
@@ -55,14 +43,32 @@ impl DisplaySettings {
     }
 }
 
-pub enum AssetKind {
-    Settings,
-    Model(usize),
+#[derive(Clone, Debug)]
+pub struct StorageInfo<T> {
+    pub id: T,
+    pub loaded_at_time: SystemTime,
 }
 
+impl<T> StorageInfo<T> {
+    pub fn now(id: T) -> Option<Self> {
+        Some(Self {
+            id,
+            loaded_at_time: SystemTime::now(),
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AssetStorageInfo {
+    Model(Option<StorageInfo<graphics::ModelID>>),
+    //Texture(Option<StorageInfo<graphics::TextureID>>),
+    //Shader(Option<StorageInfo<graphics::ShaderID>>),
+    Unrecognized,
+}
+
+#[derive(Clone)]
 pub struct Asset {
     pub file_name: String,
     pub path: PathBuf,
-    pub loaded_at_time: SystemTime,
-    pub asset_kind: AssetKind,
+    pub storage_info: AssetStorageInfo,
 }

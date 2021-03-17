@@ -7,15 +7,13 @@ use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use wavefront_obj::obj;
 
-use crate::data;
-
 pub fn read_ron<T: DeserializeOwned>(path: &Path) -> Result<T, ron::Error> {
     let data = fs::read_to_string(path)?;
     ron::de::from_bytes(data.as_bytes())
 }
 
 // TODO: Handle transforms
-pub fn vertex_lists_from_gltf(path: &Path) -> Result<data::VertexLists, String> {
+pub fn vertex_lists_from_gltf(path: &Path) -> Result<graphics::data::VertexLists, String> {
     let (document, buffers, _images) = gltf::import(path).expect(
         format!(
             "[graphics/gltf] : File {} could not be opened",
@@ -46,7 +44,7 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<data::VertexLists, String> 
                 let normal = normals.get(idx as usize).unwrap().clone();
                 let tex_coord = tex_coords.get(idx as usize).unwrap().clone();
 
-                vertex_list.push(data::Vertex {
+                vertex_list.push(graphics::data::Vertex {
                     pos,
                     normal,
                     tex_coord,
@@ -59,7 +57,7 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<data::VertexLists, String> 
     return Ok(vertex_lists);
 }
 
-pub fn vertex_lists_from_obj(path: &Path) -> Result<data::VertexLists, String> {
+pub fn vertex_lists_from_obj(path: &Path) -> Result<graphics::data::VertexLists, String> {
     let mut f;
 
     if let Ok(file) = File::open(path) {
@@ -113,7 +111,7 @@ pub fn vertex_lists_from_obj(path: &Path) -> Result<data::VertexLists, String> {
                     },
                 };
 
-                let v = data::Vertex {
+                let v = graphics::data::Vertex {
                     pos: [pos.x as f32, pos.y as f32, pos.z as f32],
                     normal: [normal.x as f32, normal.y as f32, normal.z as f32],
                     tex_coord: [tc.u as f32, tc.v as f32],

@@ -59,7 +59,7 @@ pub struct StaticModel {
 
 impl StaticModel {
     pub fn new(
-        context: &crate::Context,
+        context: &crate::GraphicsContext,
         idx: usize,
         offset: Vector3<f32>,
         scale: f32,
@@ -83,7 +83,7 @@ impl StaticModel {
     }
 
     pub fn from_uniforms(
-        context: &crate::Context,
+        context: &crate::GraphicsContext,
         idx: usize,
         local_uniforms: crate::data::LocalUniforms,
     ) -> Self {

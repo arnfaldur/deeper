@@ -1,5 +1,5 @@
 [package]
-name = "entity-smith"
+name = "entity_smith"
 version = "0.1.0"
 authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
 edition = "2018"

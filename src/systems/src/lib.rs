@@ -1,12 +1,11 @@
 use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{InnerSpace, Vector2, Vector3};
-use legion::{*, IntoQuery};
-use legion::systems::{CommandBuffer, ParallelRunnable};
-use legion::world::SubWorld;
-
 use components::{AIFollow, Destination, HitPoints};
 use entity_smith::{Acceleration, FrameTime, Speed};
+use legion::systems::{CommandBuffer, ParallelRunnable};
+use legion::world::SubWorld;
+use legion::{IntoQuery, *};
 use physics::Velocity;
 use transforms::{Position, Rotation};
 

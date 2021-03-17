@@ -1,10 +1,11 @@
 #![allow(dead_code)]
 
-use legion::systems::Runnable;
 use std::time::SystemTime;
-use legion::SystemBuilder;
-use graphics::canvas::{RectangleDescriptor, AnchorPoint, ScreenVector};
+
+use graphics::canvas::{AnchorPoint, RectangleDescriptor, ScreenVector};
 use input::Command;
+use legion::systems::Runnable;
+use legion::SystemBuilder;
 
 #[derive(Clone, Copy)]
 pub(crate) enum BoardState {
@@ -170,7 +171,7 @@ impl SnakeSystem {
     fn system(mut board: SnakeBoard, mut time: SystemTime) -> impl Runnable {
         SystemBuilder::new("snake_game")
             .read_resource::<input::CommandManager>()
-            .write_resource::<graphics::Context>()
+            .write_resource::<graphics::GraphicsContext>()
             .build(move |_commands, _world, (input, context), _| {
                 snake_game(&mut board, &mut time, input, context);
 
@@ -178,7 +179,7 @@ impl SnakeSystem {
                     board: &mut SnakeBoard,
                     time: &mut SystemTime,
                     input: &input::CommandManager,
-                    context: &mut graphics::Context,
+                    context: &mut graphics::GraphicsContext,
                 ) {
                     if !input.get(Command::DebugToggleSnake) {
                         return;

@@ -5,6 +5,7 @@ use wgpu::CommandEncoderDescriptor;
 
 use super::data::{GlobalUniforms, Lights};
 use crate::data::LocalUniforms;
+use crate::GraphicsResources;
 
 // TODO: Have ass_man auto-load all shaders
 const FRAG_SRC: &str = include_str!("../../../shaders/forward.frag");
@@ -245,7 +246,7 @@ impl ModelRenderContext {
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        ass_man: &crate::assets::AssetManager,
+        graphics_resources: &GraphicsResources,
         model_queue: &super::ModelQueue,
         view: &wgpu::TextureView,
         debug_info: &mut crate::debug::DebugTimer,
@@ -309,7 +310,7 @@ impl ModelRenderContext {
         // render static meshes
         for model in &model_queue.static_models {
             render_pass.set_bind_group(1, &model.bind_group, &[]);
-            for mesh in &ass_man.models[model.idx].meshes {
+            for mesh in &graphics_resources.models[model.idx].meshes {
                 render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 render_pass.draw(0..mesh.num_vertices as u32, 0..1)
             }
@@ -352,7 +353,7 @@ impl ModelRenderContext {
         // render dynamic meshes
         for (i, model_desc) in model_queue.model_desc.iter().enumerate() {
             render_pass.set_bind_group(1, &self.bind_groups[i], &[]);
-            for mesh in &ass_man.models[model_desc.idx].meshes {
+            for mesh in &graphics_resources.models[model_desc.idx].meshes {
                 render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 render_pass.draw(0..mesh.num_vertices as u32, 0..1)
             }

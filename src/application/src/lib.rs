@@ -1,23 +1,21 @@
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 
 use entity_smith::FrameTime;
 use graphics::debug::DebugTimer;
 use graphics::gui::GuiContext;
+use input::{Command, CommandManager, InputState};
 use legion::{Resources, Schedule, World};
 use physics::PhysicsBuilderExtender;
 use transforms::TransformBuilderExtender;
 
-use input::{Command, CommandManager, InputState};
-use crate::systems;
-
-pub struct ECS {
+pub struct Application {
     pub world: World,
     pub resources: Resources,
 
     schedules: Vec<(String, Schedule, Box<dyn Fn(&CommandManager) -> bool>)>,
 }
 
-impl ECS {
+impl Application {
     pub fn new() -> Self {
         Self {
             world: World::default(),
@@ -31,7 +29,7 @@ impl ECS {
             "Engine Logic Schedule".into(),
             Schedule::builder()
                 .add_system(systems::assets::hot_loading_system(
-                    SystemTime::now(),
+                    //SystemTime::now(),
                     false,
                 ))
                 .add_system(systems::player::player_system())
@@ -40,15 +38,17 @@ impl ECS {
                 .add_system(systems::go_to_destination_system())
                 .add_physics_systems(&mut self.world, &mut self.resources)
                 .add_transform_systems()
-                .add_system(systems::assets::hot_loading_system(
-                    SystemTime::now(),
-                    false,
-                ))
                 .build(),
             Box::new(|command_manager| {
                 command_manager.get(Command::DebugToggleLogic)
                     || command_manager.get(Command::DebugStepLogic)
             }),
+        ));
+
+        self.schedules.push((
+            "Asset Management Schedule".into(),
+            assman::systems::assman_system_schedule(),
+            Box::new(|_| true),
         ));
 
         self.schedules.push((

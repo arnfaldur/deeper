@@ -2,27 +2,26 @@
 
 use std::time::Instant;
 
+use assman::{AssetStore, GraphicsAssetManager};
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
+use components::{ActiveCamera, FloorNumber, MapTransition, Player, PlayerCamera, Target};
 use entity_smith::{FrameTime, Smith};
-use graphics::assets::AssetManager;
 use graphics::components::{Camera, Model3D, TemporaryModel3DEntitySmith};
+use input::{CommandManager, InputState};
 use physics::PhysicsEntitySmith;
-use transforms::{Parent, TransformEntitySmith, SphericalOffset};
+use transforms::{Parent, SphericalOffset, TransformEntitySmith};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use input::{CommandManager, InputState};
-use components::{MapTransition, FloorNumber, Player, ActiveCamera, PlayerCamera, Target};
-
-mod ecs;
 mod misc;
-mod systems;
 
 async fn run_async() {
     // Asset Management Initialization
-    let mut ass_man = AssetManager::new();
+    let mut ass_man = AssetStore::init();
     let display_settings = ass_man.load_display_settings();
+
+    ass_man.register_assets(None);
 
     // Window and Event Creation
     let event_loop = EventLoop::new();
@@ -38,15 +37,17 @@ async fn run_async() {
     let window = builder.build(&event_loop).unwrap();
 
     // Graphics Initialization
-    let mut context = graphics::Context::new(&window).await;
+    let mut context = graphics::GraphicsContext::new(&window).await;
 
     let gui_context = graphics::gui::GuiContext::new(&window, &context);
 
-    ass_man.load_models(&mut context);
+    let mut graphics_resources = graphics::GraphicsResources { models: vec![] };
+
+    GraphicsAssetManager::new(&mut ass_man, &mut graphics_resources, &mut context).load_models();
 
     // ECS Initialization
 
-    let mut ecs = ecs::ECS::new();
+    let mut ecs = application::Application::new();
 
     ecs.create_schedules();
 
@@ -114,6 +115,7 @@ async fn run_async() {
         entity: player_camera,
     });
     ecs.resources.insert(context);
+    ecs.resources.insert(graphics_resources);
     ecs.resources.insert(gui_context);
     ecs.resources.insert(window);
     ecs.resources.insert(ass_man);
@@ -150,7 +152,7 @@ async fn run_async() {
                 ..
             } => {
                 ecs.resources
-                    .get_mut::<graphics::Context>()
+                    .get_mut::<graphics::GraphicsContext>()
                     .unwrap()
                     .resize(size);
             }

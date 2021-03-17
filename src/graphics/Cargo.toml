@@ -9,10 +9,10 @@ edition = "2018"
 [dependencies]
 
 # internal
-entity-smith = { path = "../entity_smith" }
-transforms = { path = "../transforms"}
-components = { path = "../components"}
-input = { path = "../input"}
+entity_smith = { path = "../entity_smith" }
+transforms = { path = "../transforms" }
+components = { path = "../components" }
+input = { path = "../input" }
 
 # misc
 itertools = "0.10.0"

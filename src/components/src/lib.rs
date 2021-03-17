@@ -4,10 +4,10 @@ use cgmath::Vector2;
 use legion::Entity;
 
 /*
-    Welcome to Ms. Deeper's home for orphan components.
+   Welcome to Ms. Deeper's home for orphan components.
 
-    Please take pity on these poor components and give them a proper home.
- */
+   Please take pity on these poor components and give them a proper home.
+*/
 
 // Note(Jökull): Begin entity pointers
 pub struct Player {

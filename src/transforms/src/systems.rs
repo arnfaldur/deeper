@@ -5,7 +5,7 @@ use legion::systems::{Builder, ParallelRunnable, Runnable};
 use legion::{component, maybe_changed, Entity, IntoQuery, SystemBuilder};
 
 use crate::components::{Children, Parent};
-use crate::{Position, Rotation, Scale, Transform, TransformEntitySmith, SphericalOffset};
+use crate::{Position, Rotation, Scale, SphericalOffset, Transform, TransformEntitySmith};
 //use crate::graphics::gui::GuiContext;
 
 // note(Jökull): This belongs here if anywhere
