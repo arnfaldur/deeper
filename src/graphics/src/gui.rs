@@ -3,6 +3,7 @@
 use imgui::TreeNode;
 
 use crate::debug::{DebugTimerInfo, TimerInfo};
+use crate::RenderContext;
 
 /// Did not want to go this way, but basically feel obligated to do so
 /// Based on the way that Amethyst integrates imgui into their engine
@@ -24,14 +25,14 @@ pub unsafe fn current_ui<'a>() -> Option<&'a imgui::Ui<'a>> { CURRENT_UI.as_ref(
 /// + May want to expand this in the future to more GUI libraries.
 ///     - Or just switch libraries entirely
 ///
-pub struct GuiContext {
+pub struct GuiRenderPipeline {
     pub imgui_ctx: imgui::Context,
     pub imgui_platform: imgui_winit_support::WinitPlatform,
     pub imgui_renderer: imgui_wgpu::Renderer,
 }
 
-impl GuiContext {
-    pub fn new(window: &winit::window::Window, context: &crate::GraphicsContext) -> Self {
+impl GuiRenderPipeline {
+    pub fn new(window: &winit::window::Window, graphics_context: &crate::GraphicsContext) -> Self {
         let mut imgui_ctx = imgui::Context::create();
         let mut imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui_ctx);
 
@@ -61,8 +62,8 @@ impl GuiContext {
         // Renderer setup
         let imgui_renderer = imgui_wgpu::Renderer::new(
             &mut imgui_ctx,
-            &context.device,
-            &context.queue,
+            &graphics_context.device,
+            &graphics_context.queue,
             imgui_wgpu::RendererConfig {
                 texture_format: crate::COLOR_FORMAT,
                 ..Default::default()
@@ -76,16 +77,13 @@ impl GuiContext {
         }
     }
 
-    pub fn render(
-        &mut self,
-        window: &winit::window::Window,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
-    ) {
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("ImGui Command Encoder"),
-        });
+    pub fn render(&mut self, window: &winit::window::Window, render_context: &RenderContext) {
+        let mut encoder =
+            render_context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("ImGui Command Encoder"),
+                });
 
         unsafe {
             if let Some(ui) = current_ui() {
@@ -104,7 +102,7 @@ impl GuiContext {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: view,
+                attachment: &render_context.current_frame.output.view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
@@ -115,20 +113,25 @@ impl GuiContext {
         });
 
         self.imgui_renderer
-            .render(draw_data, queue, device, &mut render_pass)
+            .render(
+                draw_data,
+                &render_context.queue,
+                &render_context.device,
+                &mut render_pass,
+            )
             .expect("Rendering failed");
 
         drop(render_pass);
 
-        queue.submit(std::iter::once(encoder.finish()));
+        render_context
+            .queue
+            .submit(std::iter::once(encoder.finish()));
     }
 
     pub fn debug_render(
         &mut self,
         window: &winit::window::Window,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
+        render_context: &RenderContext,
         debug_info: Option<DebugTimerInfo>,
     ) {
         use imgui::{im_str, Ui};
@@ -156,7 +159,7 @@ impl GuiContext {
             });
         }
 
-        self.render(window, device, queue, view);
+        self.render(window, render_context);
     }
 
     pub fn wants_input(&self) -> bool {

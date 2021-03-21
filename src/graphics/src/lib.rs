@@ -74,7 +74,7 @@ impl GraphicsContext {
         // present on the GPU
         let (device, queue) = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
+                power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: None,
             })
             .await

@@ -5,7 +5,7 @@ use entity_smith::EntitySmith;
 use wgpu::util::DeviceExt;
 
 use crate::data::{LocalUniforms, Material};
-use crate::models::ModelRenderPass;
+use crate::models::ModelRenderPipeline;
 use crate::{GraphicsContext, ModelID};
 
 pub trait TemporaryModel3DEntitySmith {
@@ -34,7 +34,7 @@ impl Model3D {
     pub fn from_index(
         idx: ModelID,
         graphics_context: &GraphicsContext,
-        model_render_pass: &ModelRenderPass,
+        model_render_pass: &ModelRenderPipeline,
     ) -> Self {
         let buffer = Arc::new(
             graphics_context
@@ -83,7 +83,7 @@ impl StaticModel {
         z_rotation: f32,
         material: Material,
         graphics_context: &GraphicsContext,
-        model_render_pass: &ModelRenderPass,
+        model_render_pass: &ModelRenderPipeline,
     ) -> Self {
         let matrix = Matrix4::from_translation(offset)
             * Matrix4::from_angle_z(cgmath::Deg(z_rotation))
@@ -98,7 +98,7 @@ impl StaticModel {
         idx: ModelID,
         local_uniforms: crate::data::LocalUniforms,
         graphics_context: &GraphicsContext,
-        model_render_pass: &ModelRenderPass,
+        model_render_pass: &ModelRenderPipeline,
     ) -> Self {
         let buffer =
             graphics_context

@@ -7,8 +7,9 @@ use assman::{AssetStore, GraphicsAssetManager};
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 use components::{ActiveCamera, FloorNumber, MapTransition, Player, PlayerCamera, Target};
 use entity_smith::{FrameTime, Smith};
-use graphics::components::{Camera, Model3D, TemporaryModel3DEntitySmith};
-use graphics::models::{ModelQueue, ModelRenderPass};
+use graphics::canvas::{CanvasQueue, CanvasRenderPipeline};
+use graphics::components::Camera;
+use graphics::models::{ModelQueue, ModelRenderPipeline};
 use input::{CommandManager, InputState};
 use physics::PhysicsEntitySmith;
 use transforms::{Parent, Scale, SphericalOffset, TransformEntitySmith};
@@ -17,19 +18,12 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use world_gen::components::DynamicModelRequest;
 
-mod misc;
-
 async fn run_async() {
     // Asset Management Initialization
-
-    println!("Starting Asset Manager..");
-
     let mut ass_man = AssetStore::init();
     let display_settings = ass_man.load_display_settings();
 
     ass_man.register_assets(None);
-
-    println!("Done registering assets..");
 
     // Window and Event Creation
     let event_loop = EventLoop::new();
@@ -44,18 +38,15 @@ async fn run_async() {
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
 
-    println!("Starting Graphics Layer...");
     // Graphics Initialization
-    let mut context = graphics::GraphicsContext::new(&window).await;
+    let mut graphics_context = graphics::GraphicsContext::new(&window).await;
 
-    let gui_context = graphics::gui::GuiContext::new(&window, &context);
+    let gui_context = graphics::gui::GuiRenderPipeline::new(&window, &graphics_context);
 
     let mut graphics_resources = graphics::GraphicsResources::new();
 
-    GraphicsAssetManager::new(&mut ass_man, &mut graphics_resources, &mut context)
+    GraphicsAssetManager::new(&mut ass_man, &mut graphics_resources, &mut graphics_context)
         .load_assets_recursive(None);
-
-    println!("Loaded Graphics Assets...");
 
     let color_texture_id = ass_man
         .get_asset_storage_info("gradient_texture_extended.png")
@@ -66,12 +57,12 @@ async fn run_async() {
         .unwrap()
         .id;
 
-    let model_render_pass = ModelRenderPass::new(&context, &graphics_resources, color_texture_id);
+    let model_render_pipeline =
+        ModelRenderPipeline::new(&graphics_context, &graphics_resources, color_texture_id);
 
-    println!("Finished Loading Graphics Layer...");
+    let canvas_render_pipeline = CanvasRenderPipeline::new(&graphics_context, &graphics_resources);
 
     // ECS Initialization
-
     let mut ecs = application::Application::new();
 
     ecs.create_schedules();
@@ -139,7 +130,7 @@ async fn run_async() {
     ecs.resources.insert(PlayerCamera {
         entity: player_camera,
     });
-    ecs.resources.insert(context);
+    ecs.resources.insert(graphics_context);
     ecs.resources.insert(graphics_resources);
     ecs.resources.insert(gui_context);
     ecs.resources.insert(window);
@@ -151,7 +142,9 @@ async fn run_async() {
     ecs.resources.insert(InputState::new());
     ecs.resources.insert(CommandManager::default_bindings());
     ecs.resources.insert(ModelQueue::new());
-    ecs.resources.insert(model_render_pass);
+    ecs.resources.insert(CanvasQueue::new());
+    ecs.resources.insert(canvas_render_pipeline);
+    ecs.resources.insert(model_render_pipeline);
 
     ecs.resources.insert(0 as i64);
 
@@ -159,7 +152,7 @@ async fn run_async() {
         let imgui_wants_input = {
             let mut gui_context = ecs
                 .resources
-                .get_mut::<graphics::gui::GuiContext>()
+                .get_mut::<graphics::gui::GuiRenderPipeline>()
                 .unwrap();
 
             gui_context.handle_event(

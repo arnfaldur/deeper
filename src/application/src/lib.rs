@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use entity_smith::FrameTime;
 use graphics::debug::DebugTimer;
-use graphics::gui::GuiContext;
+use graphics::gui::GuiRenderPipeline;
 use input::{Command, CommandManager, InputState};
 use legion::{Resources, Schedule, World};
 use physics::PhysicsBuilderExtender;
@@ -32,6 +32,7 @@ impl Application {
                 .add_system(systems::player::camera_control_system())
                 .add_system(world_gen::systems::dung_gen_system())
                 .add_system(systems::go_to_destination_system())
+                .add_system(misc::SnakeSystem::new())
                 .add_physics_systems(&mut self.world, &mut self.resources)
                 .add_transform_systems()
                 .build(),
@@ -66,10 +67,10 @@ impl Application {
 
         self.resources.insert(debug_timer);
 
-        //self.resources
-        //    .get_mut::<GuiContext>()
-        //    .unwrap()
-        //    .prep_frame(&self.resources.get::<winit::window::Window>().unwrap());
+        self.resources
+            .get_mut::<GuiRenderPipeline>()
+            .unwrap()
+            .prep_frame(&self.resources.get::<winit::window::Window>().unwrap());
 
         self.resources
             .get_mut::<CommandManager>()

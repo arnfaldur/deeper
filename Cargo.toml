@@ -22,6 +22,7 @@ members = [
     "src/components",
     "src/systems",
     "src/assman",
+    "src/misc",
 ]
 
 [dependencies]
@@ -37,6 +38,7 @@ input = { path = "src/input" }
 application = { path = "src/application" }
 systems = { path = "src/systems" }
 assman = { path = "src/assman" }
+misc = { path = "src/misc" }
 
 # misc
 itertools = "0.10.0"

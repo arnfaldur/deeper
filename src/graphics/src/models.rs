@@ -43,7 +43,7 @@ impl ModelQueue {
     }
 }
 
-pub struct ModelRenderPass {
+pub struct ModelRenderPipeline {
     global_uniform_buf: wgpu::Buffer,
     global_bind_group: wgpu::BindGroup,
     pub(crate) local_bind_group_layout: wgpu::BindGroupLayout,
@@ -53,7 +53,7 @@ pub struct ModelRenderPass {
     _texture_sampler: wgpu::Sampler,
 }
 
-impl ModelRenderPass {
+impl ModelRenderPipeline {
     pub fn new(
         context: &GraphicsContext,
         graphics_resources: &GraphicsResources,
@@ -160,8 +160,6 @@ impl ModelRenderPass {
             ],
         });
 
-        println!("Accessing shaders");
-
         let static_vs_module = graphics_resources.shaders.get("static.vert").unwrap();
         let dynamic_vs_module = graphics_resources.shaders.get("forward.vert").unwrap();
         let fs_module = graphics_resources.shaders.get("forward.frag").unwrap();
@@ -172,12 +170,9 @@ impl ModelRenderPass {
             push_constant_ranges: &[],
         });
 
-        println!("Created Pipeline Layout...");
-
-        println!("Compiling static Pipeling");
         let static_pipeline =
             Self::compile_pipeline(&device, &pipeline_layout, &static_vs_module, &fs_module);
-        println!("Compiling dynamic Pipeling");
+
         let dynamic_pipeline =
             Self::compile_pipeline(&device, &pipeline_layout, &dynamic_vs_module, &fs_module);
 

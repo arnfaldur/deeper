@@ -1,6 +1,6 @@
 use entity_smith::Smith;
 use graphics::components::{Model3D, StaticModel};
-use graphics::models::ModelRenderPass;
+use graphics::models::ModelRenderPipeline;
 use graphics::{GraphicsContext, GraphicsResources};
 use input::{Command, CommandManager};
 use itertools::Itertools;
@@ -25,7 +25,7 @@ fn assman_process_dynamic_model_requests() -> impl ParallelRunnable {
         .write_component::<Model3D>()
         .read_resource::<AssetStore>()
         .read_resource::<GraphicsContext>()
-        .read_resource::<ModelRenderPass>()
+        .read_resource::<ModelRenderPipeline>()
         .with_query(<(Entity, &mut DynamicModelRequest)>::query())
         .build(
             move |command_buffer,
@@ -56,7 +56,7 @@ fn assman_process_static_model_requests() -> impl ParallelRunnable {
         .write_resource::<AssetStore>()
         .write_resource::<GraphicsResources>()
         .write_resource::<GraphicsContext>()
-        .read_resource::<ModelRenderPass>()
+        .read_resource::<ModelRenderPipeline>()
         .with_query(<(Entity, &mut StaticModelRequest)>::query())
         .build(
             move |command_buffer,

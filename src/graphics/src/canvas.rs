@@ -7,6 +7,7 @@ use wgpu::util::DeviceExt;
 use wgpu::CommandEncoderDescriptor;
 
 use crate::data::{GlobalUniforms, LocalUniforms, Material};
+use crate::{GraphicsContext, GraphicsResources, RenderContext};
 
 /*
     This module's goal is to describe an appropriate way to interpret 2D elements
@@ -209,7 +210,7 @@ impl ImmediateElement {
     ) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
-            entries: &[CanvasRenderContext::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
+            entries: &[CanvasRenderPipeline::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -229,12 +230,9 @@ impl ImmediateElement {
     }
 }
 
-const CANVAS_FRAG_SRC: &str = include_str!("../../../shaders/canvas.frag");
-const CANVAS_VERT_SRC: &str = include_str!("../../../shaders/canvas.vert");
-
 const MAXIMUM_NUMBER_OF_QUADS: usize = 1024;
 
-pub struct CanvasRenderContext {
+pub struct CanvasRenderPipeline {
     global_uniform_buf: wgpu::Buffer,
     local_uniform_buf: wgpu::Buffer,
 
@@ -244,9 +242,10 @@ pub struct CanvasRenderContext {
 
     quad_mesh: super::data::Mesh,
     immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS],
+    local_uniform_buffer: [LocalUniforms; MAXIMUM_NUMBER_OF_QUADS],
 }
 
-impl CanvasRenderContext {
+impl CanvasRenderPipeline {
     // Ugly workaround since the OR operation on ShaderStages is not a const-friendly operation
     pub const VERTEX_FRAGMENT_VISIBILITY: wgpu::ShaderStage = wgpu::ShaderStage::from_bits_truncate(
         wgpu::ShaderStage::VERTEX.bits() | wgpu::ShaderStage::FRAGMENT.bits(),
@@ -312,104 +311,93 @@ impl CanvasRenderContext {
             ],
         };
 
-    pub fn new(device: &wgpu::Device, window_size: winit::dpi::PhysicalSize<u32>) -> Self {
+    pub fn new(graphics_context: &GraphicsContext, graphics_resources: &GraphicsResources) -> Self {
         // This describes the layout of bindings to buffers in the shader program
         let global_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[Self::GLOBAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
-            });
+            graphics_context
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[Self::GLOBAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
+                });
 
         let local_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[Self::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
-            });
+            graphics_context
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[Self::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
+                });
 
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&Self::TEXTURE_UNIFORM_BIND_GROUP_LAYOUT_DESCRIPTOR);
+        let texture_bind_group_layout = graphics_context
+            .device
+            .create_bind_group_layout(&Self::TEXTURE_UNIFORM_BIND_GROUP_LAYOUT_DESCRIPTOR);
 
         let global_uniforms = GlobalUniforms {
-            projection_view_matrix: super::util::generate_ortho_matrix(window_size.cast()).into(),
+            projection_view_matrix: super::util::generate_ortho_matrix(
+                graphics_context.window_size.cast(),
+            )
+            .into(),
             eye_position: [0.0, 0.0, 1.0, 0.0],
         };
 
-        let global_uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Global Shader Uniforms"),
-            contents: bytemuck::bytes_of(&global_uniforms),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
+        let global_uniform_buf =
+            graphics_context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Global Shader Uniforms"),
+                    contents: bytemuck::bytes_of(&global_uniforms),
+                    usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                });
 
-        let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &global_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: &global_uniform_buf,
-                    offset: 0,
-                    size: None,
-                },
-            }],
-        });
+        let global_bind_group =
+            graphics_context
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &global_bind_group_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &global_uniform_buf,
+                            offset: 0,
+                            size: None,
+                        },
+                    }],
+                });
 
-        let (vs_module, fs_module) = {
-            //Todo: Move shader compilation to ass_man
-            let mut shader_compiler = shaderc::Compiler::new().unwrap();
+        let vs_module = graphics_resources.shaders.get("canvas.vert").unwrap();
+        let fs_module = graphics_resources.shaders.get("canvas.frag").unwrap();
 
-            let vs_spirv = shader_compiler
-                .compile_into_spirv(
-                    CANVAS_VERT_SRC,
-                    shaderc::ShaderKind::Vertex,
-                    "canvas.vert",
-                    "main",
-                    None,
-                )
-                .unwrap();
-            let fs_spirv = shader_compiler
-                .compile_into_spirv(
-                    CANVAS_FRAG_SRC,
-                    shaderc::ShaderKind::Fragment,
-                    "canvas.frag",
-                    "main",
-                    None,
-                )
-                .unwrap();
+        let pipeline_layout =
+            graphics_context
+                .device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: None,
+                    bind_group_layouts: &[&global_bind_group_layout, &local_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
 
-            let vs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: Some("Canvas Vertex Shader"),
-                source: wgpu::util::make_spirv(&vs_spirv.as_binary_u8()),
-                flags: wgpu::ShaderFlags::default(),
-            });
-
-            let fs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: Some("Canvas Fragment Shader"),
-                source: wgpu::util::make_spirv(&fs_spirv.as_binary_u8()),
-                flags: wgpu::ShaderFlags::default(),
-            });
-
-            (vs, fs)
-        };
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&global_bind_group_layout, &local_bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let pipeline = Self::compile_pipeline(&device, &pipeline_layout, vs_module, fs_module);
+        let pipeline = Self::compile_pipeline(
+            &graphics_context.device,
+            &pipeline_layout,
+            &vs_module,
+            &fs_module,
+        );
 
         assert_eq!(
             std::mem::size_of::<LocalUniforms>(),
             wgpu::BIND_BUFFER_ALIGNMENT as usize
         );
 
-        let local_uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: (MAXIMUM_NUMBER_OF_QUADS * std::mem::size_of::<LocalUniforms>()) as u64,
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let local_uniform_buf = graphics_context
+            .device
+            .create_buffer(&wgpu::BufferDescriptor {
+                label: None,
+                size: (MAXIMUM_NUMBER_OF_QUADS * std::mem::size_of::<LocalUniforms>()) as u64,
+                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                mapped_at_creation: false,
+            });
 
         // Maybe use the array crate that automates this?
         let immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS] = unsafe {
@@ -418,7 +406,7 @@ impl CanvasRenderContext {
 
             for (i, elem) in arr.iter_mut().enumerate() {
                 *elem = MaybeUninit::new(ImmediateElement::new(
-                    device,
+                    &graphics_context.device,
                     &local_uniform_buf,
                     i as u64 * std::mem::size_of::<LocalUniforms>() as u64,
                     wgpu::BufferSize::new_unchecked(std::mem::size_of::<LocalUniforms>() as u64),
@@ -428,11 +416,14 @@ impl CanvasRenderContext {
             std::mem::transmute::<_, [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS]>(arr)
         };
 
-        let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&Self::QUAD_VERTEX_LIST[..]),
-            usage: wgpu::BufferUsage::VERTEX,
-        });
+        let vertex_buf =
+            graphics_context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(&Self::QUAD_VERTEX_LIST[..]),
+                    usage: wgpu::BufferUsage::VERTEX,
+                });
 
         let quad_mesh = super::data::Mesh {
             num_vertices: 6,
@@ -447,46 +438,40 @@ impl CanvasRenderContext {
             pipeline,
             quad_mesh,
             immediate_elements,
+            local_uniform_buffer: [Default::default(); MAXIMUM_NUMBER_OF_QUADS],
         }
     }
 
-    pub fn render(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        canvas_queue: &CanvasQueue,
-        view: &wgpu::TextureView,
-    ) {
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Canvas Render"),
-        });
+    pub fn render(&mut self, render_context: &RenderContext, canvas_queue: &CanvasQueue) {
+        let mut encoder = render_context
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Canvas Render"),
+            });
 
-        let uniforms = unsafe {
-            let mut arr: [MaybeUninit<LocalUniforms>; MAXIMUM_NUMBER_OF_QUADS] =
-                MaybeUninit::uninit().assume_init();
-
-            for step in canvas_queue.steps.iter() {
-                match step {
-                    CanvasStep::DrawRect {
-                        num,
-                        local_uniforms,
-                    } if *num < MAXIMUM_NUMBER_OF_QUADS => {
-                        arr[*num] = MaybeUninit::new(*local_uniforms);
-                    }
-                    _ => (),
+        for step in &canvas_queue.steps {
+            match step {
+                CanvasStep::DrawRect {
+                    num,
+                    local_uniforms,
+                } if *num < MAXIMUM_NUMBER_OF_QUADS => {
+                    self.local_uniform_buffer[*num] = *local_uniforms;
                 }
+                _ => (),
             }
+        }
 
-            std::mem::transmute::<_, [LocalUniforms; MAXIMUM_NUMBER_OF_QUADS]>(arr)
-        };
-
-        queue.write_buffer(&self.local_uniform_buf, 0, bytes_of(&uniforms));
+        render_context.queue.write_buffer(
+            &self.local_uniform_buf,
+            0,
+            bytes_of(&self.local_uniform_buffer),
+        );
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: view,
+                    attachment: &render_context.current_frame.output.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -520,7 +505,9 @@ impl CanvasRenderContext {
             }
         }
 
-        queue.submit(std::iter::once(encoder.finish()));
+        render_context
+            .queue
+            .submit(std::iter::once(encoder.finish()));
     }
 
     pub fn set_camera(&mut self, queue: &wgpu::Queue, window_size: winit::dpi::PhysicalSize<u32>) {
@@ -539,8 +526,8 @@ impl CanvasRenderContext {
     fn compile_pipeline(
         device: &wgpu::Device,
         pipeline_layout: &wgpu::PipelineLayout,
-        vs_module: wgpu::ShaderModule,
-        fs_module: wgpu::ShaderModule,
+        vs_module: &wgpu::ShaderModule,
+        fs_module: &wgpu::ShaderModule,
     ) -> wgpu::RenderPipeline {
         return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,

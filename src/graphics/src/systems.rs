@@ -2,11 +2,14 @@ use components::{ActiveCamera, Target};
 use legion::systems::Runnable;
 use legion::{IntoQuery, SystemBuilder};
 use transforms::{Position, Transform};
+use winit::window::Window;
 
+use crate::canvas::{CanvasQueue, CanvasRenderPipeline};
 use crate::components::{Camera, Model3D, StaticModel};
 use crate::data::{LocalUniforms, Material};
 use crate::debug::DebugTimer;
-use crate::models::{ModelQueue, ModelRenderPass};
+use crate::gui::GuiRenderPipeline;
+use crate::models::{ModelQueue, ModelRenderPipeline};
 use crate::{GraphicsContext, GraphicsResources};
 
 pub trait RenderBuilderExtender {
@@ -20,7 +23,6 @@ pub fn render_system_schedule() -> legion::systems::Schedule {
         .add_thread_local(update_camera_system())
         .add_thread_local(render_draw_static_models_system())
         .add_thread_local(render_draw_models_system())
-        //.add_thread_local(SnakeSystem::new())
         .add_thread_local(render_system())
         .build()
 }
@@ -33,7 +35,7 @@ fn update_camera_system() -> impl Runnable {
         .read_component::<Target>()
         .read_resource::<ActiveCamera>()
         .read_resource::<GraphicsContext>()
-        .write_resource::<ModelRenderPass>()
+        .write_resource::<ModelRenderPipeline>()
         .build(
             move |_, world, (active_cam, graphics_context, model_render_pass), _| {
                 if let Ok((cam, cam_pos, target)) =
@@ -60,12 +62,12 @@ fn render_draw_models_system() -> impl Runnable {
         .with_query(<(&Model3D, &Transform)>::query())
         .build(move |_, world, model_queue, query| {
             query.for_each_mut(world, |(model, transform)| {
-                render_model(model, transform, model_queue);
+                draw_model(model, transform, model_queue);
             });
         })
 }
 
-fn render_model(model: &Model3D, transform: &Transform, model_queue: &mut ModelQueue) {
+fn draw_model(model: &Model3D, transform: &Transform, model_queue: &mut ModelQueue) {
     model_queue.push_model(
         model.clone(),
         LocalUniforms::new(transform.absolute.into(), Material::default()),
@@ -90,28 +92,40 @@ fn render_draw_static_models(model: &StaticModel, model_queue: &mut ModelQueue) 
 }
 
 fn render_system() -> impl Runnable {
-    SystemBuilder::new("render_system")
+    SystemBuilder::new("render_models_system")
+        .read_resource::<Window>()
         .read_resource::<GraphicsResources>()
         .read_resource::<GraphicsContext>()
-        .read_resource::<ModelRenderPass>()
+        .read_resource::<ModelRenderPipeline>()
+        .write_resource::<CanvasRenderPipeline>()
+        .write_resource::<GuiRenderPipeline>()
         .write_resource::<ModelQueue>()
+        .write_resource::<CanvasQueue>()
         .write_resource::<DebugTimer>()
         .build(
             move |_,
                   _,
                   (
+                window,
                 graphics_resources,
                 graphics_context,
-                model_render_pass,
+                model_render_pipeline,
+                canvas_render_pipeline,
+                gui_render_pipeline,
                 model_queue,
+                canvas_queue,
                 debug_timer,
             ),
                   _| {
                 render(
+                    window,
                     graphics_resources,
                     graphics_context,
-                    model_render_pass,
+                    model_render_pipeline,
+                    canvas_render_pipeline,
+                    gui_render_pipeline,
                     model_queue,
+                    canvas_queue,
                     debug_timer,
                 )
             },
@@ -119,20 +133,33 @@ fn render_system() -> impl Runnable {
 }
 
 fn render(
+    window: &Window,
     graphics_resources: &GraphicsResources,
     graphics_context: &GraphicsContext,
-    model_render_pass: &ModelRenderPass,
+    model_render_pipeline: &ModelRenderPipeline,
+    canvas_render_pipeline: &mut CanvasRenderPipeline,
+    gui_render_pipeline: &mut GuiRenderPipeline,
     model_queue: &mut ModelQueue,
+    canvas_queue: &mut CanvasQueue,
     debug_timer: &mut DebugTimer,
 ) {
     let render_context = graphics_context.begin_render();
 
-    model_render_pass.render(
+    model_render_pipeline.render(
         &render_context,
         graphics_resources,
         model_queue,
         debug_timer,
     );
 
+    debug_timer.push("Canvas Render");
+
+    canvas_render_pipeline.render(&render_context, canvas_queue);
+
+    debug_timer.pop();
+
+    gui_render_pipeline.debug_render(window, &render_context, Some(debug_timer.finish()));
+
     model_queue.clear();
+    canvas_queue.clear();
 }

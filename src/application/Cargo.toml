@@ -17,6 +17,7 @@ input = { path = "../input" }
 systems = { path = "../systems" }
 world_gen = { path = "../world_gen" }
 assman = { path = "../assman" }
+misc = { path = "../misc" }
 
-legion = "0.4.0"
 winit = "0.24.0"
+legion = "0.4.0"

@@ -16,7 +16,7 @@ input = { path = "../input" }
 
 # misc
 itertools = "0.10.0"
-legion = "0.4.0"
+legion = { version = "0.4.0", features = ["extended-tuple-impls"] }
 slotmap = "1.0.2"
 
 # graphics and input
