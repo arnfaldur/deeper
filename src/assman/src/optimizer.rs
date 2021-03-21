@@ -1,12 +1,12 @@
 #![allow(unused)]
 use cgmath::SquareMatrix;
 use graphics::data::LocalUniforms;
-use graphics::GraphicsResources;
+use graphics::{GraphicsResources, ModelID};
 use itertools::Itertools;
 
 pub(crate) struct StaticMeshOptimizationEntry {
     archetype: LocalUniforms,
-    instances: Vec<(usize, LocalUniforms)>,
+    instances: Vec<(ModelID, LocalUniforms)>,
 }
 
 pub(crate) struct StaticMeshOptimizer {
@@ -16,7 +16,7 @@ pub(crate) struct StaticMeshOptimizer {
 impl StaticMeshOptimizer {
     pub(crate) fn new() -> Self { Self { entries: vec![] } }
 
-    pub(crate) fn insert(&mut self, idx: usize, local_uniforms: LocalUniforms) {
+    pub(crate) fn insert(&mut self, idx: ModelID, local_uniforms: LocalUniforms) {
         for entry in self.entries.iter_mut() {
             if entry.archetype.similar_to(&local_uniforms) {
                 entry.instances.push((idx, local_uniforms));

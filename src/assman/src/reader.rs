@@ -12,6 +12,12 @@ pub fn read_ron<T: DeserializeOwned>(path: &Path) -> Result<T, ron::Error> {
     ron::de::from_bytes(data.as_bytes())
 }
 
+pub fn read_image<P: AsRef<Path>>(path: P) -> Option<image::DynamicImage> {
+    image::io::Reader::open(path)
+        .ok()
+        .map_or(None, |e| e.decode().ok())
+}
+
 // TODO: Handle transforms
 pub fn vertex_lists_from_gltf(path: &Path) -> Result<graphics::data::VertexLists, String> {
     let (document, buffers, _images) = gltf::import(path).expect(

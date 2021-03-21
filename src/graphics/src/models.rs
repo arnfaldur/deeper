@@ -1,94 +1,115 @@
-use std::mem::MaybeUninit;
-
+use itertools::Itertools;
 use wgpu::util::DeviceExt;
-use wgpu::CommandEncoderDescriptor;
 
-use super::data::{GlobalUniforms, Lights};
-use crate::data::LocalUniforms;
-use crate::GraphicsResources;
+use crate::components::{Camera, Model3D, StaticModel};
+use crate::data::{GlobalUniforms, LocalUniforms};
+use crate::debug::DebugTimer;
+use crate::{GraphicsContext, GraphicsResources, RenderContext, TextureID};
 
-// TODO: Have ass_man auto-load all shaders
-const FRAG_SRC: &str = include_str!("../../../shaders/forward.frag");
-const DYNAMIC_VERT_SRC: &str = include_str!("../../../shaders/forward.vert");
-const STATIC_VERT_SRC: &str = include_str!("../../../shaders/static.vert");
+// TODO: Have ass_man auto-load all Shaders
+//const FRAG_SRC: &str = include_str!("../../assets/Shaders/forward.frag");
+//const DYNAMIC_VERT_SRC: &str = include_str!("../../assets/Shaders/forward.vert");
+//const STATIC_VERT_SRC: &str = include_str!("../../assets/Shaders/static.vert");
 
-const MAXIMUM_NUMBER_OF_DYNAMIC_MODELS: usize = 1024;
-
-pub struct ModelRenderContext {
-    depth_view: wgpu::TextureView,
-    global_uniform_buf: wgpu::Buffer,
-    local_uniform_buf: wgpu::Buffer,
-    bind_groups: [wgpu::BindGroup; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS],
-    pub lights_uniform_buf: wgpu::Buffer,
-    pub local_bind_group_layout: wgpu::BindGroupLayout,
-    global_bind_group: wgpu::BindGroup,
-    static_pipeline: wgpu::RenderPipeline,
-    dynamic_pipeline: wgpu::RenderPipeline,
-    pipeline_layout: wgpu::PipelineLayout,
+pub struct ModelQueue {
+    dynamic_models: Vec<(Model3D, LocalUniforms)>,
+    static_models: Vec<StaticModel>,
 }
 
-impl ModelRenderContext {
-    // Ugly workaround since the OR operation on ShaderStages is not a const-friendly operation
-    // Have a pull-request underway on the wgpu-types repo to fix this particular situation
-    pub const VERTEX_FRAGMENT_VISIBILITY: wgpu::ShaderStage = wgpu::ShaderStage::from_bits_truncate(
-        wgpu::ShaderStage::VERTEX.bits() | wgpu::ShaderStage::FRAGMENT.bits(),
-    );
+impl ModelQueue {
+    pub fn new() -> Self {
+        Self {
+            dynamic_models: vec![],
+            static_models: vec![],
+        }
+    }
 
-    pub const LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY: wgpu::BindGroupLayoutEntry =
-        wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: Self::VERTEX_FRAGMENT_VISIBILITY,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
+    pub fn push_static_model(&mut self, model: StaticModel) { self.static_models.push(model); }
 
-    const GLOBAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY: wgpu::BindGroupLayoutEntry =
-        wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: Self::VERTEX_FRAGMENT_VISIBILITY,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
+    pub fn push_model(&mut self, model: Model3D, uniforms: LocalUniforms) {
+        self.dynamic_models.push((model, uniforms));
+    }
 
-    const LIGHTS_UNIFORM_BIND_GROUP_LAYOUT_ENTRY: wgpu::BindGroupLayoutEntry =
-        wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStage::FRAGMENT,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
+    pub fn clear(&mut self) {
+        self.dynamic_models.clear();
+        self.static_models.clear();
+    }
 
-    pub fn new(device: &wgpu::Device, window_size: winit::dpi::PhysicalSize<u32>) -> Self {
-        // Essentially our depth buffer, needed for keeping track of what objects
-        // can be seen by the camera. (i.e. not occluded.)
-        let depth_view = Self::create_depth_view(&device, window_size);
+    pub fn drain(&mut self) -> Self {
+        Self {
+            dynamic_models: self.dynamic_models.drain(..).collect_vec(),
+            static_models: self.static_models.drain(..).collect_vec(),
+        }
+    }
+}
 
-        // This describes the layout of bindings to buffers in the shader program
+pub struct ModelRenderPass {
+    global_uniform_buf: wgpu::Buffer,
+    global_bind_group: wgpu::BindGroup,
+    pub(crate) local_bind_group_layout: wgpu::BindGroupLayout,
+    static_pipeline: wgpu::RenderPipeline,
+    dynamic_pipeline: wgpu::RenderPipeline,
+    _pipeline_layout: wgpu::PipelineLayout,
+    _texture_sampler: wgpu::Sampler,
+}
+
+impl ModelRenderPass {
+    pub fn new(
+        context: &GraphicsContext,
+        graphics_resources: &GraphicsResources,
+        color_texture_id: TextureID,
+    ) -> Self {
+        let device = &context.device;
+
         let global_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: None,
                 entries: &[
-                    Self::GLOBAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY,
-                    Self::LIGHTS_UNIFORM_BIND_GROUP_LAYOUT_ENTRY,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
         let local_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[Self::LOCAL_UNIFORM_BIND_GROUP_LAYOUT_ENTRY],
+                label: Some("Local Bind Group Layout -- Models"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
             });
 
         let global_uniforms: GlobalUniforms = Default::default();
@@ -99,44 +120,21 @@ impl ModelRenderContext {
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
-        let local_uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Model Local Shader Uniform"),
-            size: (MAXIMUM_NUMBER_OF_DYNAMIC_MODELS * std::mem::size_of::<LocalUniforms>()) as u64,
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let color_texture_view = &graphics_resources
+            .textures
+            .get(color_texture_id)
+            .unwrap()
+            .texture_view;
 
-        let bind_groups: [wgpu::BindGroup; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS] = unsafe {
-            let mut arr: [MaybeUninit<wgpu::BindGroup>; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS] =
-                MaybeUninit::uninit().assume_init();
-
-            for (i, elem) in arr.iter_mut().enumerate() {
-                *elem =
-                    MaybeUninit::new(device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: None,
-                        layout: &local_bind_group_layout,
-                        entries: &[wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::Buffer {
-                                buffer: &local_uniform_buf,
-                                offset: (i * std::mem::size_of::<LocalUniforms>()) as u64,
-                                size: wgpu::BufferSize::new(
-                                    std::mem::size_of::<LocalUniforms>() as u64
-                                ),
-                            },
-                        }],
-                    }));
-            }
-
-            std::mem::transmute::<_, [wgpu::BindGroup; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS]>(arr)
-        };
-
-        let lights: Lights = Default::default();
-
-        let lights_uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Lights"),
-            contents: bytemuck::bytes_of(&lights),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: None,
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
         });
 
         let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -153,141 +151,72 @@ impl ModelRenderContext {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &lights_uniform_buf,
-                        offset: 0,
-                        size: None,
-                    },
+                    resource: wgpu::BindingResource::TextureView(color_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&texture_sampler),
                 },
             ],
         });
 
-        let (static_vs_module, dynamic_vs_module, fs_module) = {
-            //Todo: Move shader compilation to ass_man
-            let mut shader_compiler = shaderc::Compiler::new().unwrap();
+        println!("Accessing shaders");
 
-            let svs_spirv = shader_compiler
-                .compile_into_spirv(
-                    STATIC_VERT_SRC,
-                    shaderc::ShaderKind::Vertex,
-                    "static.vert",
-                    "main",
-                    None,
-                )
-                .unwrap();
-
-            let dvs_spirv = shader_compiler
-                .compile_into_spirv(
-                    DYNAMIC_VERT_SRC,
-                    shaderc::ShaderKind::Vertex,
-                    "forward.vert",
-                    "main",
-                    None,
-                )
-                .unwrap();
-
-            let fs_spirv = shader_compiler
-                .compile_into_spirv(
-                    FRAG_SRC,
-                    shaderc::ShaderKind::Fragment,
-                    "forward.frag",
-                    "main",
-                    None,
-                )
-                .unwrap();
-
-            let svs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: Some("Static Vertex Shader"),
-                source: wgpu::util::make_spirv(&svs_spirv.as_binary_u8()),
-                flags: wgpu::ShaderFlags::default(),
-            });
-
-            let dvs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: Some("Dynamic Vertex Shader"),
-                source: wgpu::util::make_spirv(&dvs_spirv.as_binary_u8()),
-                flags: wgpu::ShaderFlags::default(),
-            });
-
-            let fs = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: Some("Fragment Shader"),
-                source: wgpu::util::make_spirv(&fs_spirv.as_binary_u8()),
-                flags: wgpu::ShaderFlags::default(),
-            });
-
-            (svs, dvs, fs)
-        };
+        let static_vs_module = graphics_resources.shaders.get("static.vert").unwrap();
+        let dynamic_vs_module = graphics_resources.shaders.get("forward.vert").unwrap();
+        let fs_module = graphics_resources.shaders.get("forward.frag").unwrap();
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
+            label: Some("Model Render Pipeline Layout"),
             bind_group_layouts: &[&global_bind_group_layout, &local_bind_group_layout],
             push_constant_ranges: &[],
         });
 
+        println!("Created Pipeline Layout...");
+
+        println!("Compiling static Pipeling");
         let static_pipeline =
             Self::compile_pipeline(&device, &pipeline_layout, &static_vs_module, &fs_module);
+        println!("Compiling dynamic Pipeling");
         let dynamic_pipeline =
             Self::compile_pipeline(&device, &pipeline_layout, &dynamic_vs_module, &fs_module);
 
         Self {
-            depth_view,
             global_uniform_buf,
-            local_uniform_buf,
-            bind_groups,
-            lights_uniform_buf,
-            local_bind_group_layout,
             global_bind_group,
+            local_bind_group_layout,
             static_pipeline,
             dynamic_pipeline,
-            pipeline_layout,
+            _pipeline_layout: pipeline_layout,
+            _texture_sampler: texture_sampler,
         }
     }
 
     pub fn render(
         &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        render_context: &RenderContext,
         graphics_resources: &GraphicsResources,
-        model_queue: &super::ModelQueue,
-        view: &wgpu::TextureView,
-        debug_info: &mut crate::debug::DebugTimer,
+        model_queue: &ModelQueue,
+        debug_info: &mut DebugTimer,
     ) {
-        assert!(model_queue.model_desc.len() < MAXIMUM_NUMBER_OF_DYNAMIC_MODELS);
-        assert!(model_queue.local_uniforms.len() < MAXIMUM_NUMBER_OF_DYNAMIC_MODELS);
-        assert_eq!(
-            model_queue.model_desc.len(),
-            model_queue.local_uniforms.len()
-        );
+        debug_info.push("Model Render Pass");
 
-        debug_info.push("Copy Uniforms");
+        let depth_view =
+            Self::create_depth_view(&render_context.device, render_context.window_size);
 
-        let uniforms = unsafe {
-            let mut arr: [MaybeUninit<LocalUniforms>; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS] =
-                MaybeUninit::uninit().assume_init();
+        debug_info.push("Static Model Render");
 
-            for (i, elem) in model_queue.local_uniforms.iter().enumerate() {
-                arr[i] = MaybeUninit::new(*elem);
-            }
-
-            std::mem::transmute::<_, [LocalUniforms; MAXIMUM_NUMBER_OF_DYNAMIC_MODELS]>(arr)
-        };
-
-        debug_info.pop();
-        debug_info.push("Write Uniform Buffer");
-
-        queue.write_buffer(&self.local_uniform_buf, 0, bytemuck::bytes_of(&uniforms));
-
-        debug_info.pop();
-        debug_info.push("Render Pass");
-
-        debug_info.push("Static Meshes");
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Model Render"),
-        });
+        let mut encoder =
+            render_context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Static Model Render"),
+                });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: view,
+                attachment: &render_context.current_frame.output.view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -295,7 +224,7 @@ impl ModelRenderContext {
                 },
             }],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: &self.depth_view,
+                attachment: &depth_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
                     store: true,
@@ -318,19 +247,31 @@ impl ModelRenderContext {
 
         drop(render_pass);
 
-        queue.submit(std::iter::once(encoder.finish()));
+        render_context
+            .queue
+            .submit(std::iter::once(encoder.finish()));
 
         debug_info.pop();
-        debug_info.push("Dynamic Meshes");
 
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Model Render"),
-        });
+        debug_info.push("Dynamic Model Render");
+
+        for (model, uniforms) in &model_queue.dynamic_models {
+            render_context
+                .queue
+                .write_buffer(&model.buffer, 0, bytemuck::bytes_of(uniforms));
+        }
+
+        let mut encoder =
+            render_context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Dynamic Model Render"),
+                });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: view,
+                attachment: &render_context.current_frame.output.view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
@@ -338,7 +279,7 @@ impl ModelRenderContext {
                 },
             }],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: &self.depth_view,
+                attachment: &depth_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: true,
@@ -351,31 +292,29 @@ impl ModelRenderContext {
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
         // render dynamic meshes
-        for (i, model_desc) in model_queue.model_desc.iter().enumerate() {
-            render_pass.set_bind_group(1, &self.bind_groups[i], &[]);
-            for mesh in &graphics_resources.models[model_desc.idx].meshes {
+        for (model, _) in model_queue.dynamic_models.iter() {
+            render_pass.set_bind_group(1, &model.bind_group, &[]);
+            for mesh in &graphics_resources.models[model.idx].meshes {
                 render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 render_pass.draw(0..mesh.num_vertices as u32, 0..1)
             }
         }
         drop(render_pass);
 
-        queue.submit(std::iter::once(encoder.finish()));
+        render_context
+            .queue
+            .submit(std::iter::once(encoder.finish()));
 
         debug_info.pop();
 
         debug_info.pop();
     }
 
-    pub fn resize(&mut self, device: &wgpu::Device, size: winit::dpi::PhysicalSize<u32>) {
-        self.depth_view = Self::create_depth_view(device, size);
-    }
-
-    pub fn set_3d_camera(
+    // TODO: Possibly cleaner to do just do "set view matrix"?
+    pub fn set_camera(
         &mut self,
-        queue: &wgpu::Queue,
-        window_size: winit::dpi::PhysicalSize<u32>,
-        camera: &crate::components::Camera,
+        graphics_context: &GraphicsContext,
+        camera: &Camera,
         position: cgmath::Vector3<f32>,
         target: cgmath::Vector3<f32>,
     ) {
@@ -383,10 +322,10 @@ impl ModelRenderContext {
             camera,
             position,
             target,
-            window_size.width as f32 / window_size.height as f32,
+            graphics_context.window_size.width as f32 / graphics_context.window_size.height as f32,
         );
 
-        queue.write_buffer(
+        graphics_context.queue.write_buffer(
             &self.global_uniform_buf,
             0,
             bytemuck::bytes_of(&GlobalUniforms {
@@ -396,14 +335,25 @@ impl ModelRenderContext {
         );
     }
 
-    pub fn recompile_pipeline(
-        &mut self,
+    fn create_depth_view(
         device: &wgpu::Device,
-        vs_module: &wgpu::ShaderModule,
-        fs_module: &wgpu::ShaderModule,
-    ) {
-        self.dynamic_pipeline =
-            Self::compile_pipeline(device, &self.pipeline_layout, vs_module, fs_module);
+        size: winit::dpi::PhysicalSize<u32>,
+    ) -> wgpu::TextureView {
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            size: wgpu::Extent3d {
+                width: size.width,
+                height: size.height,
+                depth: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: super::DEPTH_FORMAT,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+        });
+
+        return depth_texture.create_view(&Default::default());
     }
 
     fn compile_pipeline(
@@ -449,26 +399,5 @@ impl ModelRenderContext {
             }),
             multisample: wgpu::MultisampleState::default(),
         });
-    }
-
-    fn create_depth_view(
-        device: &wgpu::Device,
-        size: winit::dpi::PhysicalSize<u32>,
-    ) -> wgpu::TextureView {
-        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: wgpu::Extent3d {
-                width: size.width,
-                height: size.height,
-                depth: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: super::DEPTH_FORMAT,
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-        });
-
-        return depth_texture.create_view(&Default::default());
     }
 }

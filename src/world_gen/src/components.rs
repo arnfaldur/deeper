@@ -1,4 +1,4 @@
-use graphics::data::{LocalUniforms, Material};
+use graphics::data::LocalUniforms;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum TileType {
@@ -29,6 +29,12 @@ pub struct StaticModelRequest {
 
 pub struct DynamicModelRequest {
     pub label: String,
-    pub material: Material,
-    pub scale: f32,
+}
+
+impl DynamicModelRequest {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+        }
+    }
 }

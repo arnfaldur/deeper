@@ -66,10 +66,10 @@ impl Application {
 
         self.resources.insert(debug_timer);
 
-        self.resources
-            .get_mut::<GuiContext>()
-            .unwrap()
-            .prep_frame(&self.resources.get::<winit::window::Window>().unwrap());
+        //self.resources
+        //    .get_mut::<GuiContext>()
+        //    .unwrap()
+        //    .prep_frame(&self.resources.get::<winit::window::Window>().unwrap());
 
         self.resources
             .get_mut::<CommandManager>()

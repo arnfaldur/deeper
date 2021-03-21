@@ -1,4 +1,5 @@
 (
     models : ["obj", "glb", "gltf"],
-    images : ["png", "jpg", "jpeg"],
+    textures : ["png", "jpg", "jpeg"],
+    shaders : ["vert", "frag"],
 )

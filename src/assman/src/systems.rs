@@ -1,5 +1,6 @@
 use entity_smith::Smith;
 use graphics::components::{Model3D, StaticModel};
+use graphics::models::ModelRenderPass;
 use graphics::{GraphicsContext, GraphicsResources};
 use input::{Command, CommandManager};
 use itertools::Itertools;
@@ -23,22 +24,29 @@ fn assman_process_dynamic_model_requests() -> impl ParallelRunnable {
         .write_component::<DynamicModelRequest>()
         .write_component::<Model3D>()
         .read_resource::<AssetStore>()
+        .read_resource::<GraphicsContext>()
+        .read_resource::<ModelRenderPass>()
         .with_query(<(Entity, &mut DynamicModelRequest)>::query())
-        .build(move |command_buffer, world, asset_store, query| {
-            query.for_each_mut(world, |(entity, request)| {
-                let request: &mut DynamicModelRequest = request;
-                if let Some(idx) = asset_store.get_model_index(&request.label) {
-                    command_buffer
-                        .forge(*entity)
-                        .add_component(
-                            Model3D::from_index(idx)
-                                .with_material(request.material)
-                                .with_scale(request.scale),
-                        )
-                        .remove_component::<DynamicModelRequest>();
-                }
-            })
-        })
+        .build(
+            move |command_buffer,
+                  world,
+                  (asset_store, graphics_context, model_render_pass),
+                  query| {
+                query.for_each_mut(world, |(entity, request)| {
+                    let request: &mut DynamicModelRequest = request;
+                    if let Some(idx) = asset_store.get_model_index(&request.label) {
+                        command_buffer
+                            .forge(*entity)
+                            .add_component(Model3D::from_index(
+                                idx,
+                                graphics_context,
+                                model_render_pass,
+                            ))
+                            .remove_component::<DynamicModelRequest>();
+                    }
+                })
+            },
+        )
 }
 
 fn assman_process_static_model_requests() -> impl ParallelRunnable {
@@ -48,11 +56,12 @@ fn assman_process_static_model_requests() -> impl ParallelRunnable {
         .write_resource::<AssetStore>()
         .write_resource::<GraphicsResources>()
         .write_resource::<GraphicsContext>()
+        .read_resource::<ModelRenderPass>()
         .with_query(<(Entity, &mut StaticModelRequest)>::query())
         .build(
             move |command_buffer,
                   world,
-                  (asset_store, graphics_resources, graphics_context),
+                  (asset_store, graphics_resources, graphics_context, model_render_pass),
                   query| {
                 let mut optimizer = StaticMeshOptimizer::new();
 
@@ -88,9 +97,10 @@ fn assman_process_static_model_requests() -> impl ParallelRunnable {
                     command_buffer
                         .smith()
                         .add_component(StaticModel::from_uniforms(
-                            graphics_context,
                             idx,
                             *local_uniforms,
+                            graphics_context,
+                            model_render_pass,
                         ));
                 }
             },

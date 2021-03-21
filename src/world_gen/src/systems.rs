@@ -8,7 +8,7 @@ use legion::world::SubWorld;
 use legion::{Entity, IntoQuery, SystemBuilder};
 use physics::PhysicsEntitySmith;
 use rand::prelude::*;
-use transforms::TransformEntitySmith;
+use transforms::{Scale, TransformEntitySmith};
 
 use crate::components::{DynamicModelRequest, StaticModelRequest, TileType, WallDirection};
 use crate::dung_gen::DungGen;
@@ -19,7 +19,6 @@ pub fn dung_gen_system() -> impl Runnable {
         .read_component::<Faction>()
         .write_resource::<MapTransition>()
         .write_resource::<FloorNumber>()
-        .write_resource::<graphics::GraphicsContext>()
         .read_resource::<Player>()
         .build(move |command_buffer, world, resources, _| {
             dung_gen(
@@ -28,7 +27,6 @@ pub fn dung_gen_system() -> impl Runnable {
                 &mut resources.0,
                 &mut resources.1,
                 &mut resources.2,
-                &resources.3,
             );
         })
 }
@@ -38,7 +36,6 @@ pub fn dung_gen(
     world: &mut SubWorld,
     transition: &mut MapTransition,
     floor: &mut FloorNumber,
-    context: &mut graphics::GraphicsContext,
     player: &Player,
 ) {
     match *transition {
@@ -86,9 +83,7 @@ pub fn dung_gen(
                 .position(player_start.extend(0.))
                 .velocity_zero();
 
-            let room_centers = &dungeon.room_centers;
-            // TODO: Turn lights into entities
-            graphics::util::make_lights(&context, room_centers);
+            let _room_centers = &dungeon.room_centers;
 
             for (&(x, y), &tile_type) in dungeon.world.iter() {
                 let pos = Vector2::new(x as f32, y as f32);
@@ -181,13 +176,8 @@ pub fn dung_gen(
                         })
                         .any(DynamicModelRequest {
                             label: "monstroman.obj".to_string(),
-                            material: graphics::data::Material::glossy(Vector3::<f32>::new(
-                                rng.gen(),
-                                rng.gen(),
-                                rng.gen(),
-                            )),
-                            scale: rad * 1.7,
                         })
+                        .any(Scale(rad * 1.7))
                         .done();
                 }
             }

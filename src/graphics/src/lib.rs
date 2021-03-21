@@ -1,13 +1,7 @@
 #![feature(slice_group_by)]
-
-// How dirty of me
-use models::*;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
-
-use crate::components::{Model3D, StaticModel};
-use crate::data::*;
 
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -23,43 +17,40 @@ pub mod models;
 pub mod systems;
 pub mod util;
 
-pub type ModelID = usize;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use slotmap::SlotMap;
+
+use crate::data::Vertex;
+
+pub type ModelID = slotmap::DefaultKey;
+pub type TextureID = slotmap::DefaultKey;
+pub type ShaderID = String;
 
 pub struct GraphicsResources {
-    pub models: Vec<Model>,
+    pub models: SlotMap<ModelID, data::Model>,
+    pub textures: SlotMap<TextureID, data::Texture>,
+    pub shaders: HashMap<ShaderID, Arc<wgpu::ShaderModule>>,
 }
 
-pub struct ModelQueue {
-    pub local_uniforms: Vec<LocalUniforms>,
-    pub model_desc: Vec<Model3D>,
-    pub static_models: Vec<StaticModel>,
-}
-
-impl ModelQueue {
-    fn new() -> Self {
+impl GraphicsResources {
+    pub fn new() -> Self {
         Self {
-            local_uniforms: vec![],
-            model_desc: vec![],
-            static_models: vec![],
+            models: SlotMap::new(),
+            textures: SlotMap::new(),
+            shaders: HashMap::new(),
         }
     }
-
-    fn push_model(&mut self, model: Model3D, uniforms: LocalUniforms) {
-        self.model_desc.push(model);
-        self.local_uniforms.push(uniforms);
-    }
-
-    fn clear(&mut self) {
-        self.local_uniforms.clear();
-        self.model_desc.clear();
-        self.static_models.clear();
-    }
 }
 
-/** The graphics context.
-    Currently just a grab-bag of all the state and functionality
-    needed to power all graphics. Needs simplification.
-*/
+pub struct RenderContext<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+    pub current_frame: Arc<wgpu::SwapChainFrame>,
+    pub window_size: PhysicalSize<u32>,
+}
+
 pub struct GraphicsContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -67,14 +58,7 @@ pub struct GraphicsContext {
     surface: wgpu::Surface,
     swap_chain: wgpu::SwapChain,
     sc_desc: wgpu::SwapChainDescriptor,
-
-    pub model_render_ctx: ModelRenderContext,
-    model_queue: ModelQueue,
-
     pub window_size: PhysicalSize<u32>,
-
-    pub canvas_render_ctx: canvas::CanvasRenderContext,
-    pub canvas_queue: canvas::CanvasQueue,
 }
 
 impl GraphicsContext {
@@ -98,7 +82,7 @@ impl GraphicsContext {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
+                    features: wgpu::Features::default(),
                     limits: wgpu::Limits::default(),
                 },
                 None,
@@ -112,126 +96,23 @@ impl GraphicsContext {
         let sc_desc = util::sc_desc_from_size(window_size);
         let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-        // Maybe we should generalize render contexts? 🤔
-        let model_render_ctx = ModelRenderContext::new(&device, window_size);
-        let canvas_render_ctx = canvas::CanvasRenderContext::new(&device, window_size);
-
-        let context = GraphicsContext {
+        Self {
             device,
             queue,
             surface,
             swap_chain,
             sc_desc,
             window_size,
-            model_queue: ModelQueue::new(),
-            model_render_ctx,
-            canvas_render_ctx,
-            canvas_queue: canvas::CanvasQueue::new(),
-        };
-
-        return context;
+        }
     }
 
-    pub fn recompile_model_pipeline(
-        &mut self,
-        vs_module: &wgpu::ShaderModule,
-        fs_module: &wgpu::ShaderModule,
-    ) {
-        self.model_render_ctx
-            .recompile_pipeline(&self.device, vs_module, fs_module);
-    }
-
-    pub fn draw_static_model(&mut self, model: StaticModel) {
-        self.model_queue.static_models.push(model);
-    }
-
-    pub fn draw_model(
-        &mut self,
-        model: &Model3D,
-        transform: cgmath::Matrix4<f32>,
-        // position: Vector3<f32>,
-        // rotation: Option<Deg<f32>>,
-    ) {
-        use cgmath::Matrix4;
-
-        let mut matrix = Matrix4::from_scale(model.scale);
-        matrix = transform * matrix;
-        //
-        // if let Some(rot) = rotation {
-        //     matrix = Matrix4::from_angle_z(rot) * matrix;
-        // }
-        //
-        // matrix = Matrix4::from_translation(position) * matrix;
-
-        self.model_queue.push_model(
-            model.clone(),
-            LocalUniforms::new(matrix.into(), model.material),
-        );
-    }
-
-    pub fn set_3d_camera(
-        &mut self,
-        camera: &crate::components::Camera,
-        cam_position: cgmath::Vector3<f32>,
-        cam_target: cgmath::Vector3<f32>,
-    ) {
-        self.model_render_ctx.set_3d_camera(
-            &self.queue,
-            self.window_size,
-            camera,
-            cam_position,
-            cam_target,
-        );
-    }
-
-    pub fn render(
-        &mut self,
-        graphics_resources: &GraphicsResources,
-        gui_context: &mut gui::GuiContext,
-        window: &winit::window::Window,
-        debug_timer: &mut crate::debug::DebugTimer, // TODO: Revisit
-        draw_debug: bool,
-    ) {
-        let current_frame = self.swap_chain.get_current_frame().unwrap();
-
-        debug_timer.push("Model Rendering");
-
-        self.model_render_ctx.render(
-            &self.device,
-            &self.queue,
-            graphics_resources,
-            &self.model_queue,
-            &current_frame.output.view,
-            debug_timer,
-        );
-
-        self.model_queue.clear();
-
-        debug_timer.pop();
-        debug_timer.push("Canvas Rendering");
-
-        self.canvas_render_ctx.render(
-            &self.device,
-            &self.queue,
-            &self.canvas_queue,
-            &current_frame.output.view,
-        );
-
-        self.canvas_queue.clear();
-
-        debug_timer.pop();
-
-        gui_context.debug_render(
-            window,
-            &self.device,
-            &self.queue,
-            &current_frame.output.view,
-            if draw_debug {
-                Some(debug_timer.finish())
-            } else {
-                None
-            },
-        );
+    pub fn begin_render(&self) -> RenderContext {
+        RenderContext {
+            device: &self.device,
+            queue: &self.queue,
+            current_frame: Arc::new(self.swap_chain.get_current_frame().unwrap()),
+            window_size: self.window_size,
+        }
     }
 
     pub fn model_from_vertex_list(&self, vertex_lists: Vec<Vec<Vertex>>) -> data::Model {
@@ -259,43 +140,10 @@ impl GraphicsContext {
         }
     }
 
-    // Note(Jökull): A step in the right direction, but a bit heavy-handed
-    pub fn model_bind_group_from_uniform_data(
-        &self,
-        local_uniforms: LocalUniforms,
-    ) -> wgpu::BindGroup {
-        let uniform_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::bytes_of(&local_uniforms),
-                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            });
-
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &self.model_render_ctx.local_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: &uniform_buf,
-                    offset: 0,
-                    size: None,
-                },
-            }],
-        });
-
-        bind_group
-    }
-
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
         self.window_size = size;
 
         self.sc_desc = util::sc_desc_from_size(size);
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
-
-        self.model_render_ctx.resize(&self.device, size);
-
-        self.canvas_render_ctx.set_camera(&self.queue, size);
     }
 }

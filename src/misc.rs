@@ -202,24 +202,24 @@ impl SnakeSystem {
 
                     for (i, row) in board.board.iter().enumerate() {
                         for (j, square) in row.iter().enumerate() {
-                            context.canvas_queue.draw_rect(
-                                RectangleDescriptor::AnchorRect {
-                                    anchor: AnchorPoint::TopLeft,
-                                    position: ScreenVector::new_relative(0.5, 0.5),
-                                    dimensions: ScreenVector::new_relative_to_width(0.025, 0.025),
-                                    offset: ScreenVector::new_relative_to_width(
-                                        (j as f32 - 8.0) / 16.0 / 2.0,
-                                        (i as f32 - 8.0) / 16.0 / 2.0,
-                                    ),
-                                },
-                                match square {
-                                    BoardState::Empty => cgmath::Vector4::new(0.1, 0.1, 0.1, 1.0),
-                                    BoardState::Snake => cgmath::Vector4::new(0.8, 0.2, 0.2, 1.0),
-                                    BoardState::Food => cgmath::Vector4::new(0.8, 0.8, 0.2, 1.0),
-                                    BoardState::Wall => cgmath::Vector4::new(0.2, 0.2, 0.2, 1.0),
-                                },
-                                context.window_size,
-                            );
+                            //context.canvas_queue.draw_rect(
+                            //    RectangleDescriptor::AnchorRect {
+                            //        anchor: AnchorPoint::TopLeft,
+                            //        position: ScreenVector::new_relative(0.5, 0.5),
+                            //        dimensions: ScreenVector::new_relative_to_width(0.025, 0.025),
+                            //        offset: ScreenVector::new_relative_to_width(
+                            //            (j as f32 - 8.0) / 16.0 / 2.0,
+                            //            (i as f32 - 8.0) / 16.0 / 2.0,
+                            //        ),
+                            //    },
+                            //    match square {
+                            //        BoardState::Empty => cgmath::Vector4::new(0.1, 0.1, 0.1, 1.0),
+                            //        BoardState::Snake => cgmath::Vector4::new(0.8, 0.2, 0.2, 1.0),
+                            //        BoardState::Food => cgmath::Vector4::new(0.8, 0.8, 0.2, 1.0),
+                            //        BoardState::Wall => cgmath::Vector4::new(0.2, 0.2, 0.2, 1.0),
+                            //    },
+                            //    context.window_size,
+                            //);
                         }
                     }
                 }

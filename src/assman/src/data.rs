@@ -18,8 +18,8 @@ pub struct PathSettings {
 #[derive(Serialize, Deserialize, Default)]
 pub struct Extensions {
     pub models: Vec<String>,
-    //pub textures: Vec<String>,
-    //pub shaders: Vec<String>,
+    pub textures: Vec<String>,
+    pub shaders: Vec<String>,
 }
 
 impl Extensions {
@@ -61,8 +61,8 @@ impl<T> StorageInfo<T> {
 #[derive(Clone, Debug)]
 pub enum AssetStorageInfo {
     Model(Option<StorageInfo<graphics::ModelID>>),
-    //Texture(Option<StorageInfo<graphics::TextureID>>),
-    //Shader(Option<StorageInfo<graphics::ShaderID>>),
+    Texture(Option<StorageInfo<graphics::TextureID>>),
+    Shader(Option<StorageInfo<graphics::ShaderID>>),
     Unrecognized,
 }
 

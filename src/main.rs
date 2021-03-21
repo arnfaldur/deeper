@@ -2,26 +2,34 @@
 
 use std::time::Instant;
 
+use assman::data::AssetStorageInfo;
 use assman::{AssetStore, GraphicsAssetManager};
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 use components::{ActiveCamera, FloorNumber, MapTransition, Player, PlayerCamera, Target};
 use entity_smith::{FrameTime, Smith};
 use graphics::components::{Camera, Model3D, TemporaryModel3DEntitySmith};
+use graphics::models::{ModelQueue, ModelRenderPass};
 use input::{CommandManager, InputState};
 use physics::PhysicsEntitySmith;
-use transforms::{Parent, SphericalOffset, TransformEntitySmith};
+use transforms::{Parent, Scale, SphericalOffset, TransformEntitySmith};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use world_gen::components::DynamicModelRequest;
 
 mod misc;
 
 async fn run_async() {
     // Asset Management Initialization
+
+    println!("Starting Asset Manager..");
+
     let mut ass_man = AssetStore::init();
     let display_settings = ass_man.load_display_settings();
 
     ass_man.register_assets(None);
+
+    println!("Done registering assets..");
 
     // Window and Event Creation
     let event_loop = EventLoop::new();
@@ -36,14 +44,31 @@ async fn run_async() {
         .with_inner_size(size);
     let window = builder.build(&event_loop).unwrap();
 
+    println!("Starting Graphics Layer...");
     // Graphics Initialization
     let mut context = graphics::GraphicsContext::new(&window).await;
 
     let gui_context = graphics::gui::GuiContext::new(&window, &context);
 
-    let mut graphics_resources = graphics::GraphicsResources { models: vec![] };
+    let mut graphics_resources = graphics::GraphicsResources::new();
 
-    GraphicsAssetManager::new(&mut ass_man, &mut graphics_resources, &mut context).load_models();
+    GraphicsAssetManager::new(&mut ass_man, &mut graphics_resources, &mut context)
+        .load_assets_recursive(None);
+
+    println!("Loaded Graphics Assets...");
+
+    let color_texture_id = ass_man
+        .get_asset_storage_info("gradient_texture_extended.png")
+        .map(|f| match f {
+            AssetStorageInfo::Texture(storage_info) => storage_info.unwrap(),
+            _ => panic!(),
+        })
+        .unwrap()
+        .id;
+
+    let model_render_pass = ModelRenderPass::new(&context, &graphics_resources, color_texture_id);
+
+    println!("Finished Loading Graphics Layer...");
 
     // ECS Initialization
 
@@ -69,7 +94,8 @@ async fn run_async() {
         .name("Player model")
         .any(Parent(player))
         .orientation(1.0)
-        .model(Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.5))
+        .any(DynamicModelRequest::new("arissa.obj"))
+        .any(Scale(0.5))
         .get_entity();
 
     for &dir in &[
@@ -81,9 +107,8 @@ async fn run_async() {
         command_buffer
             .smith()
             .position(dir.normalize())
-            .model(
-                Model3D::from_index(ass_man.get_model_index("arissa.obj").unwrap()).with_scale(0.1),
-            )
+            .any(DynamicModelRequest::new("arissa.obj"))
+            .any(Scale(0.2))
             .child_of(player_model);
     }
 
@@ -125,6 +150,8 @@ async fn run_async() {
     ecs.resources.insert(FloorNumber(1));
     ecs.resources.insert(InputState::new());
     ecs.resources.insert(CommandManager::default_bindings());
+    ecs.resources.insert(ModelQueue::new());
+    ecs.resources.insert(model_render_pass);
 
     ecs.resources.insert(0 as i64);
 

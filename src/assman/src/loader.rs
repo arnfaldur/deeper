@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::SystemTime;
 
 use super::data::*;
 use super::reader;
@@ -75,13 +77,20 @@ impl AssetStore {
         }
     }
 
+    pub fn get_asset_storage_info(&self, file_name: &str) -> Option<AssetStorageInfo> {
+        self.assets
+            .values()
+            .find(|p| p.file_name == file_name.to_string())
+            .map(|f| f.storage_info.clone())
+    }
+
     fn new_asset_storage_info_from_ext(&self, ext: &String) -> AssetStorageInfo {
         if self.extensions.models.contains(ext) {
             AssetStorageInfo::Model(None)
-        //} else if self.extensions.textures.contains(ext) {
-        //    AssetStorageInfo::Texture(None)
-        //} else if self.extensions.shaders.contains(ext) {
-        //    AssetStorageInfo::Shader(None)
+        } else if self.extensions.textures.contains(ext) {
+            AssetStorageInfo::Texture(None)
+        } else if self.extensions.shaders.contains(ext) {
+            AssetStorageInfo::Shader(None)
         } else {
             AssetStorageInfo::Unrecognized
         }
@@ -139,13 +148,14 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
             &path.extension().unwrap().to_str().unwrap().to_string(),
         ) {
             AssetStorageInfo::Model(..) => self.load_model(path),
-            //AssetStorageInfo::Texture(..) => self.load_texture(path),
-            //AssetStorageInfo::Shader(..) => self.load_shader(path),
+            AssetStorageInfo::Texture(..) => self.load_texture(path),
+            AssetStorageInfo::Shader(..) => self.load_shader(path),
             AssetStorageInfo::Unrecognized => None,
         }
     }
 
-    pub fn load_assets_recursive(&mut self, path: &Path) {
+    pub fn load_assets_recursive(&mut self, path: Option<&Path>) {
+        let path = path.unwrap_or(&self.asset_store.paths.assets_path);
         fs::read_dir(path)
             .unwrap()
             .filter_map(|x| x.ok())
@@ -153,7 +163,7 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
                 let file_type = e.file_type().unwrap();
 
                 if file_type.is_dir() {
-                    self.load_assets_recursive(&e.path());
+                    self.load_assets_recursive(Some(&e.path()));
                 } else if file_type.is_file() {
                     if self.asset_store.assets.contains_key(&e.path()) {
                         self.load_asset(&e.path());
@@ -171,89 +181,93 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
             .map(|e| e.clone())
     }
 
-    //fn load_shader(&mut self, path: &Path) -> Option<Asset> {
-    //    let file_name = path.file_name().unwrap().to_str().unwrap();
-    //    let ext = path.extension().unwrap().to_str().unwrap();
+    fn load_shader(&mut self, path: &Path) -> Option<Asset> {
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+        let ext = path.extension().unwrap().to_str().unwrap();
 
-    //    let mut shader_compiler = shaderc::Compiler::new().unwrap();
+        let mut shader_compiler = shaderc::Compiler::new().unwrap();
 
-    //    if let Ok(spirv) = shader_compiler.compile_into_spirv(
-    //        &fs::read_to_string(path).unwrap(),
-    //        match ext {
-    //            "frag" => shaderc::ShaderKind::Fragment,
-    //            "vert" => shaderc::ShaderKind::Vertex,
-    //            &_ => {
-    //                eprintln!("Invalid shader extension: {}", &ext);
-    //                shaderc::ShaderKind::InferFromSource
-    //            }
-    //        },
-    //        file_name,
-    //        "main",
-    //        None,
-    //    ) {
-    //        let shader_module =
-    //            self.graphics_context
-    //                .device
-    //                .create_shader_module(&wgpu::ShaderModuleDescriptor {
-    //                    label: None,
-    //                    source: wgpu::util::make_spirv(spirv.as_binary_u8()),
-    //                    flags: Default::default(),
-    //                });
-    //        if let Some(Asset {
-    //                        asset_storage_info: AssetStorageInfo::Shader(Some(storage_info)),
-    //                        ..
-    //                    }) = self.asset_store.assets.get_mut(path)
-    //        {
-    //            *storage_info.loaded_at_time = SystemTime::now();
-    //            *self
-    //                .graphics_resources
-    //                .shaders
-    //                .get_mut(&storage_info.id)
-    //                .unwrap() = Arc::new(shader_module);
-    //        } else {
-    //            let id = file_name.to_string();
-    //            self.graphics_resources
-    //                .shaders
-    //                .insert(id.clone(), Arc::new(shader_module));
-    //            self.asset_store
-    //                .register_asset(path, AssetStorageInfo::Shader(StorageInfo::now(id)));
-    //        }
-    //    }
+        if let Ok(spirv) = shader_compiler.compile_into_spirv(
+            &fs::read_to_string(path).unwrap(),
+            match ext {
+                "frag" => shaderc::ShaderKind::Fragment,
+                "vert" => shaderc::ShaderKind::Vertex,
+                &_ => {
+                    eprintln!("Invalid shader extension: {}", &ext);
+                    shaderc::ShaderKind::InferFromSource
+                }
+            },
+            file_name,
+            "main",
+            None,
+        ) {
+            let shader_module =
+                self.graphics_context
+                    .device
+                    .create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: None,
+                        source: wgpu::util::make_spirv(spirv.as_binary_u8()),
+                        flags: Default::default(),
+                    });
+            if let Some(Asset {
+                storage_info: AssetStorageInfo::Shader(Some(storage_info)),
+                ..
+            }) = self.asset_store.assets.get_mut(path)
+            {
+                storage_info.loaded_at_time = SystemTime::now();
+                *self
+                    .graphics_resources
+                    .shaders
+                    .get_mut(&storage_info.id)
+                    .unwrap() = Arc::new(shader_module);
+            } else {
+                let id = file_name.to_string();
+                self.graphics_resources
+                    .shaders
+                    .insert(id.clone(), Arc::new(shader_module));
+                self.asset_store
+                    .register_asset(path, AssetStorageInfo::Shader(StorageInfo::now(id)));
+            }
+        }
 
-    //    *self.asset_store.assets.get(path)
-    //}
+        self.asset_store.assets.get(path).map(|f| f.clone())
+    }
 
-    //fn load_texture(&mut self, path: &Path) -> Option<Asset> {
-    //    if let Some(Asset {
-    //                    asset_storage_info: AssetStorageInfo::Image(Some(storage_info)),
-    //                    ..
-    //                }) = self.asset_store.assets.get_mut(path)
-    //    {
-    //        if let Some(image) = reader::read_image(path) {
-    //            *storage_info.time_loaded = SystemTime::now();
-    //            *self
-    //                .graphics_resources
-    //                .textures
-    //                .get_mut(storage_info.id)
-    //                .unwrap() = graphics::data::Texture::new(image, self.graphics_context);
-    //        } else {
-    //            println!("Failed to load: {}", path.display());
-    //        }
-    //    } else {
-    //        if let Some(image) = reader::read_image(path) {
-    //            let id = self
-    //                .graphics_resources
-    //                .textures
-    //                .insert(graphics::data::Texture::new(image, self.graphics_context));
-    //            self.asset_store
-    //                .register_asset(path, AssetStorageInfo::Image(StorageInfo::now(id)));
-    //        } else {
-    //            println!("Failed to load: {}", path.display());
-    //        }
-    //    }
+    fn load_texture(&mut self, path: &Path) -> Option<Asset> {
+        let asset_entry = self.asset_store.assets.get_mut(path).cloned();
 
-    //    *self.asset_store.assets.get(path)
-    //}
+        let mut exists = false;
+
+        if let Some(asset) = asset_entry {
+            if let AssetStorageInfo::Texture(Some(mut storage_info)) = asset.storage_info.clone() {
+                exists = true;
+                if let Some(image) = reader::read_image(path) {
+                    storage_info.loaded_at_time = SystemTime::now();
+                    *self
+                        .graphics_resources
+                        .textures
+                        .get_mut(storage_info.id)
+                        .unwrap() = graphics::data::Texture::new(image, self.graphics_context);
+                } else {
+                    println!("Failed to load: {}", path.display());
+                }
+            }
+        }
+        if !exists {
+            if let Some(image) = reader::read_image(path) {
+                let id = self
+                    .graphics_resources
+                    .textures
+                    .insert(graphics::data::Texture::new(image, self.graphics_context));
+                self.asset_store
+                    .register_asset(path, AssetStorageInfo::Texture(StorageInfo::now(id)));
+            } else {
+                println!("Failed to load: {}", path.display());
+            }
+        }
+
+        self.asset_store.assets.get(path).map(|f| f.clone())
+    }
 
     fn load_model(&mut self, path: &Path) -> Option<Asset> {
         let ext = path.extension().unwrap().to_str().unwrap();
@@ -266,19 +280,15 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
             if let AssetStorageInfo::Model(Some(storage_info)) = asset.storage_info.clone() {
                 exists = true;
                 let model = self.get_graphics_model(path, ext);
-                self.graphics_resources
-                    .models
-                    .insert(storage_info.id, model);
+                self.graphics_resources.models[storage_info.id] = model;
                 asset.storage_info = AssetStorageInfo::Model(StorageInfo::now(storage_info.id));
-                self.asset_store.assets.insert(path.to_owned(), asset);
+                self.asset_store.assets.insert(path.to_path_buf(), asset);
             }
         }
         if !exists {
-            let id = self.graphics_resources.models.len();
-
             let model = self.get_graphics_model(path, ext);
 
-            self.graphics_resources.models.push(model);
+            let id = self.graphics_resources.models.insert(model);
 
             self.asset_store
                 .register_asset(path, AssetStorageInfo::Model(StorageInfo::now(id)));
@@ -288,23 +298,16 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
     }
 
     pub fn load_models(&mut self) {
-        self.load_assets_recursive(&self.asset_store.paths.models_path.clone());
+        self.load_assets_recursive(Some(&self.asset_store.paths.models_path.clone()));
     }
-
-    //pub fn load_images(&mut self, context: &mut graphics::GraphicsContext) {
-    //    self.load_assets_recursive(&self.asset_store.paths.textures_path.clone(), context);
-    //}
 
     pub fn allocate_graphics_model_from_vertex_lists(
         &mut self,
         vertex_lists: graphics::data::VertexLists,
     ) -> graphics::ModelID {
-        let ret = self.graphics_resources.models.len();
         self.graphics_resources
             .models
-            .push(self.graphics_context.model_from_vertex_list(vertex_lists));
-
-        ret
+            .insert(self.graphics_context.model_from_vertex_list(vertex_lists))
     }
 
     fn get_graphics_model(&mut self, path: &Path, ext: &str) -> graphics::data::Model {

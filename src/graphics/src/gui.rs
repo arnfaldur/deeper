@@ -2,6 +2,8 @@
 
 use imgui::TreeNode;
 
+use crate::debug::{DebugTimerInfo, TimerInfo};
+
 /// Did not want to go this way, but basically feel obligated to do so
 /// Based on the way that Amethyst integrates imgui into their engine
 /// This solves a problem where we must keep a reference to the current
@@ -127,12 +129,12 @@ impl GuiContext {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         view: &wgpu::TextureView,
-        debug_info: Option<crate::debug::DebugTimerInfo>,
+        debug_info: Option<DebugTimerInfo>,
     ) {
         use imgui::{im_str, Ui};
         if let Some(debug_info) = debug_info {
             Self::with_ui(|ui| {
-                fn recur(info: &crate::debug::TimerInfo, ui: &Ui) {
+                fn recur(info: &TimerInfo, ui: &Ui) {
                     TreeNode::new(&im_str!("{}", info.label))
                         .label(&im_str!("{} : {:?}", info.label, info.duration))
                         .leaf(info.children.is_empty())

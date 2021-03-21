@@ -2,6 +2,11 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector3};
 use entity_smith::EntitySmith;
+use wgpu::util::DeviceExt;
+
+use crate::data::{LocalUniforms, Material};
+use crate::models::ModelRenderPass;
+use crate::{GraphicsContext, ModelID};
 
 pub trait TemporaryModel3DEntitySmith {
     fn model(&mut self, model: Model3D) -> &mut Self;
@@ -19,79 +24,106 @@ pub struct Camera {
 
 #[derive(Clone)]
 pub struct Model3D {
-    pub idx: usize,
-    pub scale: f32,
-    pub material: crate::data::Material,
+    pub idx: ModelID,
+    pub bind_group: Arc<wgpu::BindGroup>,
+    pub buffer: Arc<wgpu::Buffer>,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
 impl Model3D {
-    pub fn new() -> Self {
+    pub fn from_index(
+        idx: ModelID,
+        graphics_context: &GraphicsContext,
+        model_render_pass: &ModelRenderPass,
+    ) -> Self {
+        let buffer = Arc::new(
+            graphics_context
+                .device
+                .create_buffer(&wgpu::BufferDescriptor {
+                    label: None,
+                    size: std::mem::size_of::<LocalUniforms>() as u64,
+                    usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                    mapped_at_creation: false,
+                }),
+        );
+
+        let bind_group = Arc::new(graphics_context.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &model_render_pass.local_bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &buffer,
+                        offset: 0,
+                        size: None,
+                    },
+                }],
+            },
+        ));
         Self {
-            idx: 0,
-            material: crate::data::Material::default(),
-            scale: 1.0,
+            idx,
+            bind_group,
+            buffer,
         }
-    }
-
-    pub fn from_index(index: usize) -> Self {
-        let mut m = Self::new();
-        m.idx = index;
-        return m;
-    }
-
-    pub fn with_scale(mut self, scale: f32) -> Self {
-        self.scale = scale;
-        self
-    }
-
-    pub fn with_material(mut self, material: crate::data::Material) -> Self {
-        self.material = material;
-        self
     }
 }
 
 #[derive(Clone)]
 pub struct StaticModel {
-    pub idx: usize,
+    pub idx: ModelID,
     pub bind_group: Arc<wgpu::BindGroup>,
 }
 
 impl StaticModel {
     pub fn new(
-        context: &crate::GraphicsContext,
-        idx: usize,
+        idx: ModelID,
         offset: Vector3<f32>,
         scale: f32,
         z_rotation: f32,
-        material: crate::data::Material,
+        material: Material,
+        graphics_context: &GraphicsContext,
+        model_render_pass: &ModelRenderPass,
     ) -> Self {
-        let _uniforms_size = std::mem::size_of::<crate::data::LocalUniforms>() as u64;
+        let matrix = Matrix4::from_translation(offset)
+            * Matrix4::from_angle_z(cgmath::Deg(z_rotation))
+            * Matrix4::from_scale(scale);
 
-        let mut matrix = Matrix4::from_scale(scale);
-        matrix = Matrix4::from_angle_z(cgmath::Deg(z_rotation)) * matrix;
-        matrix = Matrix4::from_translation(offset) * matrix;
+        let local_uniforms = LocalUniforms::new(matrix.into(), material);
 
-        let local_uniforms = crate::data::LocalUniforms::new(matrix.into(), material);
-
-        let bind_group = context.model_bind_group_from_uniform_data(local_uniforms);
-
-        Self {
-            idx,
-            bind_group: Arc::new(bind_group),
-        }
+        Self::from_uniforms(idx, local_uniforms, graphics_context, model_render_pass)
     }
 
     pub fn from_uniforms(
-        context: &crate::GraphicsContext,
-        idx: usize,
+        idx: ModelID,
         local_uniforms: crate::data::LocalUniforms,
+        graphics_context: &GraphicsContext,
+        model_render_pass: &ModelRenderPass,
     ) -> Self {
-        let bind_group = context.model_bind_group_from_uniform_data(local_uniforms);
+        let buffer =
+            graphics_context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::bytes_of(&local_uniforms),
+                    usage: wgpu::BufferUsage::UNIFORM,
+                });
 
-        Self {
-            idx,
-            bind_group: Arc::new(bind_group),
-        }
+        let bind_group = Arc::new(graphics_context.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &model_render_pass.local_bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &buffer,
+                        offset: 0,
+                        size: None,
+                    },
+                }],
+            },
+        ));
+
+        Self { idx, bind_group }
     }
 }
