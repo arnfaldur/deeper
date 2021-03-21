@@ -5,10 +5,10 @@ use std::time::Instant;
 use assman::data::AssetStorageInfo;
 use assman::{AssetStore, GraphicsAssetManager};
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
-use components::{ActiveCamera, FloorNumber, MapTransition, Player, PlayerCamera, Target};
+use components::{FloorNumber, MapTransition, Player, PlayerCamera};
 use entity_smith::{FrameTime, Smith};
 use graphics::canvas::{CanvasQueue, CanvasRenderPipeline};
-use graphics::components::Camera;
+use graphics::components::{ActiveCamera, Camera, Target};
 use graphics::models::{ModelQueue, ModelRenderPipeline};
 use input::{CommandManager, InputState};
 use physics::PhysicsEntitySmith;
@@ -107,7 +107,7 @@ async fn run_async() {
         .smith()
         .name("The camera")
         .any(Parent(player))
-        .any(Target(player))
+        .any(Target { entity: player })
         .position(Vector3::zero())
         .velocity(Vector2::zero())
         .any(Camera {

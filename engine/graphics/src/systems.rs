@@ -1,11 +1,10 @@
-use components::{ActiveCamera, Target};
 use legion::systems::Runnable;
 use legion::{IntoQuery, SystemBuilder};
 use transforms::{Position, Transform};
 use winit::window::Window;
 
 use crate::canvas::{CanvasQueue, CanvasRenderPipeline};
-use crate::components::{Camera, Model3D, StaticModel};
+use crate::components::{ActiveCamera, Camera, DynamicModel, StaticModel, Target};
 use crate::data::{LocalUniforms, Material};
 use crate::debug::DebugTimer;
 use crate::gui::GuiRenderPipeline;
@@ -41,7 +40,7 @@ fn update_camera_system() -> impl Runnable {
                 if let Ok((cam, cam_pos, target)) =
                     <(&Camera, &Transform, &Target)>::query().get(world, active_cam.entity)
                 {
-                    if let Ok(target_pos) = <&Transform>::query().get(world, target.0) {
+                    if let Ok(target_pos) = <&Transform>::query().get(world, target.entity) {
                         model_render_pass.set_camera(
                             graphics_context,
                             cam,
@@ -56,10 +55,10 @@ fn update_camera_system() -> impl Runnable {
 
 fn render_draw_models_system() -> impl Runnable {
     SystemBuilder::new("render_draw_models")
-        .read_component::<Model3D>()
+        .read_component::<DynamicModel>()
         .read_component::<Transform>()
         .write_resource::<ModelQueue>()
-        .with_query(<(&Model3D, &Transform)>::query())
+        .with_query(<(&DynamicModel, &Transform)>::query())
         .build(move |_, world, model_queue, query| {
             query.for_each_mut(world, |(model, transform)| {
                 draw_model(model, transform, model_queue);
@@ -67,7 +66,7 @@ fn render_draw_models_system() -> impl Runnable {
         })
 }
 
-fn draw_model(model: &Model3D, transform: &Transform, model_queue: &mut ModelQueue) {
+fn draw_model(model: &DynamicModel, transform: &Transform, model_queue: &mut ModelQueue) {
     model_queue.push_model(
         model.clone(),
         LocalUniforms::new(transform.absolute.into(), Material::default()),

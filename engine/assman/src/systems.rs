@@ -1,5 +1,5 @@
 use entity_smith::Smith;
-use graphics::components::{Model3D, StaticModel};
+use graphics::components::{DynamicModel, StaticModel};
 use graphics::models::ModelRenderPipeline;
 use graphics::{GraphicsContext, GraphicsResources};
 use input::{Command, CommandManager};
@@ -22,7 +22,7 @@ pub fn assman_system_schedule() -> Schedule {
 fn assman_process_dynamic_model_requests() -> impl ParallelRunnable {
     SystemBuilder::new("process_dynamic_model_requests")
         .write_component::<DynamicModelRequest>()
-        .write_component::<Model3D>()
+        .write_component::<DynamicModel>()
         .read_resource::<AssetStore>()
         .read_resource::<GraphicsContext>()
         .read_resource::<ModelRenderPipeline>()
@@ -37,7 +37,7 @@ fn assman_process_dynamic_model_requests() -> impl ParallelRunnable {
                     if let Some(idx) = asset_store.get_model_index(&request.label) {
                         command_buffer
                             .forge(*entity)
-                            .add_component(Model3D::from_index(
+                            .add_component(DynamicModel::from_index(
                                 idx,
                                 graphics_context,
                                 model_render_pass,

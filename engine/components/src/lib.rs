@@ -15,10 +15,6 @@ pub struct Player {
     pub player: Entity,
 }
 
-pub struct ActiveCamera {
-    pub entity: Entity,
-}
-
 pub struct PlayerCamera {
     pub entity: Entity,
 }
@@ -66,7 +62,5 @@ pub enum MapTransition {
 }
 
 pub struct MapSwitcher(pub MapTransition);
-
-pub struct Target(pub Entity);
 
 pub struct FloorNumber(pub i32);

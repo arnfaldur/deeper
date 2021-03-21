@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use wgpu::util::DeviceExt;
 
-use crate::components::{Camera, Model3D, StaticModel};
+use crate::components::{Camera, DynamicModel, StaticModel};
 use crate::data::{GlobalUniforms, LocalUniforms};
 use crate::debug::DebugTimer;
 use crate::{GraphicsContext, GraphicsResources, RenderContext, TextureID};
@@ -12,7 +12,7 @@ use crate::{GraphicsContext, GraphicsResources, RenderContext, TextureID};
 //const STATIC_VERT_SRC: &str = include_str!("../../assets/Shaders/static.vert");
 
 pub struct ModelQueue {
-    dynamic_models: Vec<(Model3D, LocalUniforms)>,
+    dynamic_models: Vec<(DynamicModel, LocalUniforms)>,
     static_models: Vec<StaticModel>,
 }
 
@@ -26,7 +26,7 @@ impl ModelQueue {
 
     pub fn push_static_model(&mut self, model: StaticModel) { self.static_models.push(model); }
 
-    pub fn push_model(&mut self, model: Model3D, uniforms: LocalUniforms) {
+    pub fn push_model(&mut self, model: DynamicModel, uniforms: LocalUniforms) {
         self.dynamic_models.push((model, uniforms));
     }
 

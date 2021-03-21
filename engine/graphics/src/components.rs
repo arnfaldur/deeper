@@ -1,20 +1,12 @@
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector3};
-use entity_smith::EntitySmith;
+use legion::Entity;
 use wgpu::util::DeviceExt;
 
 use crate::data::{LocalUniforms, Material};
 use crate::models::ModelRenderPipeline;
 use crate::{GraphicsContext, ModelID};
-
-pub trait TemporaryModel3DEntitySmith {
-    fn model(&mut self, model: Model3D) -> &mut Self;
-}
-
-impl<'a> TemporaryModel3DEntitySmith for EntitySmith<'a> {
-    fn model(&mut self, model: Model3D) -> &mut Self { self.add_component(model) }
-}
 
 pub struct Camera {
     pub fov: f32,
@@ -22,15 +14,23 @@ pub struct Camera {
     pub roaming: bool,
 }
 
+pub struct ActiveCamera {
+    pub entity: Entity,
+}
+
+pub struct Target {
+    pub entity: Entity,
+}
+
 #[derive(Clone)]
-pub struct Model3D {
+pub struct DynamicModel {
     pub idx: ModelID,
     pub bind_group: Arc<wgpu::BindGroup>,
     pub buffer: Arc<wgpu::Buffer>,
 }
 
 // Note(Jökull): Probably not great to have both constructor and builder patterns
-impl Model3D {
+impl DynamicModel {
     pub fn from_index(
         idx: ModelID,
         graphics_context: &GraphicsContext,

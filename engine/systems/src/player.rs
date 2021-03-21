@@ -2,9 +2,9 @@ use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
 use cgmath::{Deg, EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
-use components::{Destination, Faction, HitPoints, Player, PlayerCamera, Target};
+use components::{Destination, Faction, HitPoints, Player, PlayerCamera};
 use entity_smith::Smith;
-use graphics::components::Camera;
+use graphics::components::{Camera, Target};
 use graphics::util::{correction_matrix, project_screen_to_world};
 use input::{Command, CommandManager, InputState};
 use legion::systems::ParallelRunnable;
@@ -73,7 +73,10 @@ pub fn camera_control(
     if let Ok(cam_target_pos) = <&transforms::Transform>::query()
         .get(
             &world,
-            <&Target>::query().get(&world, player_cam.entity).unwrap().0,
+            <&Target>::query()
+                .get(&world, player_cam.entity)
+                .unwrap()
+                .entity,
         )
         .map(|trans| trans.absolute.w.truncate())
     {
@@ -180,7 +183,10 @@ pub fn player(
         let camera_target_pos = <&transforms::Transform>::query()
             .get(
                 &world,
-                <&Target>::query().get(&world, player_cam.entity).unwrap().0,
+                <&Target>::query()
+                    .get(&world, player_cam.entity)
+                    .unwrap()
+                    .entity,
             )
             .map(|trans| trans.absolute.w.truncate())
             .unwrap();

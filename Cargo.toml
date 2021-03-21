@@ -12,33 +12,33 @@ lto = false
 
 [workspace]
 members = [
-    "src/physics",
-    "src/entity_smith",
-    "src/transforms",
-    "src/world_gen",
-    "src/graphics",
-    "src/input",
-    "src/application",
-    "src/components",
-    "src/systems",
-    "src/assman",
-    "src/misc",
+    "engine/physics",
+    "engine/entity_smith",
+    "engine/transforms",
+    "engine/world_gen",
+    "engine/graphics",
+    "engine/input",
+    "engine/application",
+    "engine/components",
+    "engine/systems",
+    "engine/assman",
+    "engine/misc",
 ]
 
 [dependencies]
 
 # internal
-physics = { path = "src/physics" }
-transforms = { path = "src/transforms" }
-entity_smith = { path = "src/entity_smith" }
-graphics = { path = "src/graphics" }
-world_gen = { path = "src/world_gen" }
-components = { path = "src/components" }
-input = { path = "src/input" }
-application = { path = "src/application" }
-systems = { path = "src/systems" }
-assman = { path = "src/assman" }
-misc = { path = "src/misc" }
+physics = { path = "engine/physics" }
+transforms = { path = "engine/transforms" }
+entity_smith = { path = "engine/entity_smith" }
+graphics = { path = "engine/graphics" }
+world_gen = { path = "engine/world_gen" }
+components = { path = "engine/components" }
+input = { path = "engine/input" }
+application = { path = "engine/application" }
+systems = { path = "engine/systems" }
+assman = { path = "engine/assman" }
+misc = { path = "engine/misc" }
 
 # misc
 itertools = "0.10.0"
