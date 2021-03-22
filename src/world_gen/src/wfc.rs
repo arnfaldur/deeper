@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -7,7 +6,8 @@ use std::ops::{Index, IndexMut};
 
 use bit_set::BitSet;
 use cgmath::{Vector2, Zero};
-use image::{DynamicImage, Rgb, RgbImage};
+use image::{DynamicImage, ImageBuffer, Pixel, Rgb, RgbImage};
+use itertools::Itertools;
 use rand::prelude::*;
 
 type V2u = Vector2<usize>;
@@ -49,6 +49,11 @@ impl<T> Grid<T> {
             size: V2u::zero(),
             buf: Vec::with_capacity(capacity.y * capacity.x),
         }
+    }
+    pub unsafe fn uninitialized_with_capacity(capacity: V2u) -> Self {
+        let mut result = Self::with_capacity(capacity);
+        result.set_len(capacity);
+        return result;
     }
     pub fn resize(&mut self, size: V2u, value: T)
     where
@@ -108,6 +113,91 @@ impl<T> IndexMut<&V2u> for Grid<T> {
     }
 }
 
+#[derive(Debug)]
+struct EntropyHierarchy {
+    hierarchy: BTreeMap<usize, BitSet>,
+}
+
+impl EntropyHierarchy {
+    fn add(&mut self, value: usize, entropy: usize) {
+        if !self.hierarchy.entry(entropy).or_default().insert(value) {
+            println!(
+                "adding {} to {}, in hierarchy {:?}",
+                value, entropy, self.hierarchy
+            );
+            panic!();
+        }
+    }
+
+    fn reduce_entropy(&mut self, value: usize, original_entropy: usize, reduced_entropy: usize) {
+        if let Some(true) = self
+            .hierarchy
+            .get_mut(&original_entropy)
+            .map(|e| e.remove(value))
+        {
+        } else {
+            println!(
+                "value {} missing from entropy class {}, going to {} in hierarchy {:?}",
+                value, original_entropy, reduced_entropy, self.hierarchy
+            );
+            panic!();
+        }
+        self.add(value, reduced_entropy);
+    }
+    fn get_lowest_entropy(&mut self) -> (&usize, &mut BitSet) {
+        self.hierarchy.iter_mut().find(|(i, _)| **i > 1).unwrap()
+    }
+    fn cleanup(&mut self) { self.hierarchy.retain(|_, set| !set.is_empty()); }
+    fn is_converged(&self) -> bool {
+        for layer in self.hierarchy.iter() {
+            if *layer.0 > 1 {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+// impl<P> From<ImageBuffer<P, Vec<S>>> for Grid<P>
+// where
+//     P: Pixel + 'static,
+//     P::Subpixel: 'static,
+//     C: Deref<Target = [P::Subpixel]>,
+// {
+impl<P> From<ImageBuffer<P, Vec<P::Subpixel>>> for Grid<P>
+where
+    P: Pixel + 'static,
+{
+    fn from(img: ImageBuffer<P, Vec<P::Subpixel>>) -> Self {
+        let image_size = V2u {
+            y: img.height() as usize,
+            x: img.width() as usize,
+        };
+        let mut result = unsafe { Grid::uninitialized_with_capacity(image_size) };
+        for (y, row) in img.rows().enumerate() {
+            for (x, pixel) in row.enumerate() {
+                result[V2u { y, x }] = *pixel;
+            }
+        }
+        return result;
+    }
+}
+
+impl<P> From<Grid<P>> for ImageBuffer<P, Vec<P::Subpixel>>
+where
+    P: Pixel + 'static,
+{
+    fn from(grid: Grid<P>) -> Self {
+        let mut result = ImageBuffer::new(grid.size.x as u32, grid.size.y as u32);
+        for (y, row) in result.rows_mut().enumerate() {
+            for (x, pixel) in row.enumerate() {
+                *pixel = grid[V2u { y, x }];
+            }
+        }
+        return result;
+    }
+}
+
 fn wfc<T: Copy + Eq + Hash + Debug>(
     input: Grid<T>,
     neighbourhood: Vec<V2i>,
@@ -119,15 +209,14 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
     fn to_2d_index(index_1d: isize, row_size: usize) -> V2i {
         V2i::new(index_1d % row_size as isize, index_1d / row_size as isize)
     }
+    fn in_bounds(index: V2i, bounds: V2u) -> bool {
+        index.x >= 0 && index.y >= 0 && index.x < bounds.x as isize && index.y < bounds.y as isize
+    }
     let mut rng = rand::thread_rng();
 
     let mut wave_map = Grid::new();
 
-    let mut thing = HashSet::new();
-    for color in input.buf.clone().into_iter() {
-        thing.insert(color);
-    }
-    let colors: Vec<T> = thing.into_iter().collect();
+    let colors: Vec<T> = input.buf.clone().into_iter().unique().collect();
 
     let mut color_locations = HashMap::new();
     for color in colors.iter() {
@@ -140,22 +229,13 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
             .and_then(|set| Some(set.insert(i)));
         locations.push(i);
     }
-    println!("colors located");
-
-    for loc in color_locations.iter() {
-        println!("{:?} -> {}", loc.0, loc.1.len());
-    }
 
     let mut adjacencies: HashMap<(T, V2i), BitSet> = HashMap::new();
     for &offset in neighbourhood.iter() {
         for &location in locations.iter() {
             if let Some(&color_a) = input.buf.get(location) {
                 let index = to_2d_index(location as isize, input.size.x) + offset;
-                if index.x >= 0
-                    && index.y >= 0
-                    && index.x < input.size.x as isize
-                    && index.y < input.size.y as isize
-                {
+                if in_bounds(index, input.size) {
                     adjacencies
                         .entry((color_a, offset))
                         .or_default()
@@ -164,56 +244,79 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
             }
         }
     }
-    println!("ting realized");
-
-    for boi in adjacencies.iter() {
-        println!("{:?} -> {}", boi.0, boi.1.len());
-    }
 
     wave_map.resize(output_size, BitSet::from_iter(locations));
 
-    let mut entropy_hierarchy: BTreeMap<usize, HashSet<usize>> = BTreeMap::new();
+    let mut entropy_hierarchy = EntropyHierarchy {
+        hierarchy: BTreeMap::new(),
+    };
     for (i, set) in wave_map.buf.iter().enumerate() {
-        entropy_hierarchy.entry(set.len()).or_default().insert(i);
+        entropy_hierarchy.add(i, set.len());
     }
 
-    'collapser: loop {
+    loop {
         // collapse superposition
-        let mut biib = entropy_hierarchy.first_entry().unwrap();
-        let collapse_index = *biib.get().iter().choose(&mut rng).unwrap();
-        println!("collapsing: {:?}", collapse_index);
+        let (&_least_entropy, peak) = entropy_hierarchy.get_lowest_entropy();
+        let collapse_index = peak.iter().choose(&mut rng).unwrap();
+        // println!(
+        //     "collapsing: {:?} {:?} with entropy {}",
+        //     to_2d_index(collapse_index as isize, wave_map.size.x),
+        //     collapse_index,
+        //     least_entropy
+        // );
         let chosen = wave_map.buf[collapse_index]
             .iter()
             .choose(&mut rng)
             .unwrap();
         let chosen_color = input.buf[chosen];
-        biib.get_mut().remove(&collapse_index);
+        let mister = peak.remove(collapse_index);
+        if !mister {
+            panic!("getting {} in {:?}", collapse_index, entropy_hierarchy);
+        }
+        entropy_hierarchy.add(collapse_index, 1);
+
         wave_map.buf[collapse_index].clear();
         wave_map.buf[collapse_index].insert(chosen);
 
         // reduce entropy
         for &offset in neighbourhood.iter() {
-            if let Some(constraining_set) = adjacencies.get(&(chosen_color, offset)) {
-                let index =
-                    (collapse_index as isize + to_1d_index(offset, wave_map.size.x)) as usize;
-                if let Some(set_to_reduce) = wave_map.buf.get_mut(index) {
-                    // println!(
-                    //     "{:?} ro {} co {}",
-                    //     offset,
-                    //     set_to_reduce.len(),
-                    //     constraining_set.len()
-                    // );
-                    let boi = entropy_hierarchy
-                        .get_mut(&set_to_reduce.len())
-                        .map(|e| e.remove(&index));
+            if let Some(neighbour_color) =
+                input.get(to_2d_index(chosen as isize, input.size.x) + offset)
+            {
+                if let Some(constraining_set) = color_locations.get(neighbour_color) {
+                    let index_2d = to_2d_index(collapse_index as isize, wave_map.size.x) + offset;
+                    let index = to_1d_index(index_2d, wave_map.size.x) as usize;
+                    if let Some(set_to_reduce) = wave_map.get_mut(index_2d) {
+                        let reduced_set: BitSet =
+                            set_to_reduce.intersection(constraining_set).collect();
+                        entropy_hierarchy.reduce_entropy(
+                            index,
+                            set_to_reduce.len(),
+                            reduced_set.len(),
+                        );
+                        *set_to_reduce = reduced_set;
+                    }
+                    for &inner_offset in neighbourhood.iter() {
+                        if let Some(inner_constraining_set) =
+                            adjacencies.get(&(*neighbour_color, inner_offset))
+                        {
+                            let inner_index_2d = index_2d + inner_offset;
+                            let inner_index = to_1d_index(inner_index_2d, wave_map.size.x) as usize;
+                            if inner_index != collapse_index {
+                                if let Some(set_to_reduce) = wave_map.get_mut(inner_index_2d) {
+                                    let reduced_set: BitSet = set_to_reduce
+                                        .intersection(inner_constraining_set)
+                                        .collect();
 
-                    set_to_reduce.intersect_with(constraining_set);
-
-                    if set_to_reduce.len() > 1 {
-                        entropy_hierarchy
-                            .entry(set_to_reduce.len())
-                            .or_default()
-                            .insert(index);
+                                    entropy_hierarchy.reduce_entropy(
+                                        inner_index,
+                                        set_to_reduce.len(),
+                                        reduced_set.len(),
+                                    );
+                                    *set_to_reduce = reduced_set;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -221,40 +324,39 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
 
         for (i, set) in wave_map.buf.iter().enumerate() {
             if set.len() > 1 {
-                if !entropy_hierarchy.get(&set.len()).unwrap().contains(&i) {
-                    println!(
-                        "{:?} {} {}",
+                if !entropy_hierarchy
+                    .hierarchy
+                    .get(&set.len())
+                    .unwrap()
+                    .contains(i)
+                {
+                    print!(
+                        "malformed entropy hierarchy!: {:?} {} {}",
                         to_2d_index(i as isize, wave_map.size.x),
                         i,
                         set.len()
                     );
+                    for e in entropy_hierarchy.hierarchy.iter() {
+                        if e.1.contains(set.len()) {
+                            println!(" marked as {}", e.0);
+                        }
+                    }
                 }
             }
         }
 
-        if entropy_hierarchy.remove(&0).is_some() {
-            println!("removing 0");
-        }
-        if entropy_hierarchy.remove(&1).is_some() {
-            println!("removing 1");
-        }
-        while let Some(true) = entropy_hierarchy.first_entry().map(|e| e.get().is_empty()) {
-            entropy_hierarchy.first_entry().unwrap().remove();
-        }
+        entropy_hierarchy.cleanup();
 
         // find points of lowest entropy
-        if entropy_hierarchy.is_empty() {
+        if entropy_hierarchy.is_converged() {
             break;
         }
     }
-
-    println!("done collapsing");
 
     let mut result = Grid::with_capacity(output_size);
     unsafe {
         result.set_len(output_size);
     }
-    println!("did an unsafe thing");
     for (i, set) in wave_map.buf.iter().enumerate() {
         // if set.len() > 1 {
         //     return Err("WFC failed: entropy is more than 1 somewhere".to_string());
@@ -271,48 +373,31 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
             };
         }
     }
-    println!("Made the result");
     return Ok(result);
 }
 
 pub fn test() {
-    let oli = image::open("oliprik.png").unwrap();
+    let oli = image::open("samples/Flowers.png").unwrap();
     println!("opened óli prik");
     match oli {
         DynamicImage::ImageRgb8(img) => {
-            let mut ingrid = Grid::new();
-            ingrid.resize(
-                V2u {
-                    y: img.height() as usize,
-                    x: img.width() as usize,
-                },
-                Rgb([0, 0, 0]),
-            );
-            for (y, row) in img.rows().enumerate() {
-                for (x, pixel) in row.enumerate() {
-                    ingrid[V2u { y, x }] = *pixel;
-                }
-            }
-            println!("óli is grid");
-            let size = V2u::new(128, 128);
-            let master = wfc(ingrid, Vec::from(SQUARE_NEIGHBOURHOOD), size).unwrap();
-            println!("óli has been collapsed");
-            let mut output: RgbImage = RgbImage::new(size.x as u32, size.y as u32);
-            for (y, row) in output.rows_mut().enumerate() {
-                for (x, pixel) in row.enumerate() {
-                    let boi = master[V2u { y, x }];
-                    *pixel = match boi {
-                        Ok(col) => col,
-                        Err(0) => Rgb([255, 0, 0]),
-                        Err(2) => Rgb([0, 255, 0]),
-                        Err(_) => Rgb([0, 0, 255]),
-                    }
-                }
-            }
-            println!("óli is imaged again");
+            let size = V2u::new(64, 64);
+            let master = wfc(img.into(), Vec::from(SQUARE_NEIGHBOURHOOD), size).unwrap();
+            let mut other: Grid<Rgb<u8>> = Grid::new();
+            other.size = master.size;
+            other.buf = master
+                .buf
+                .iter()
+                .map(|pix| match pix {
+                    Ok(col) => *col,
+                    Err(0) => Rgb([255, 0, 0]),
+                    Err(2) => Rgb([0, 255, 0]),
+                    Err(_) => Rgb([0, 0, 255]),
+                })
+                .collect();
 
-            output.save("WFC.png").unwrap();
-            println!("óli is safe");
+            RgbImage::from(other).save("WFC.png").unwrap();
+            println!("saved result to WFC.png");
         }
         _ => {
             println!("wrong image type!")
