@@ -19,6 +19,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use world_gen::components::DynamicModelRequest;
 
 async fn run_async() {
+    world_gen::test();
     // Asset Management Initialization
     let mut ass_man = AssetStore::init();
     let display_settings = ass_man.load_display_settings();
