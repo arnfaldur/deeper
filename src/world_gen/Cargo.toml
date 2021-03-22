@@ -10,13 +10,15 @@ edition = "2018"
 
 # internal
 components = { path = "../components"}
-transforms = { path = "../transforms"}
-graphics = { path = "../graphics"}
-entity_smith = { path = "../entity_smith"}
-physics = { path = "../physics"}
+transforms = { path = "../transforms" }
+graphics = { path = "../graphics" }
+entity_smith = { path = "../entity_smith" }
+physics = { path = "../physics" }
 
 rand = "0.8.3"
 ena = "0.14.0"
 cgmath = "0.18.0"
 legion = "0.4.0"
 itertools = "0.10.0"
+image = "0.23.14"
+apply = "0.3.0"

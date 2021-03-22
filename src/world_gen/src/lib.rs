@@ -1,3 +1,4 @@
 pub mod components;
-pub mod dung_gen;
+mod dung_gen;
 pub mod systems;
+mod wfc;
