@@ -1,13 +1,13 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
+use std::time::Instant;
 
 use bit_set::BitSet;
-use cgmath::{Vector2, Zero};
+use cgmath::{Array, Vector2, Zero};
 use image::{DynamicImage, ImageBuffer, Pixel, Rgb, RgbImage};
-use itertools::Itertools;
 use rand::prelude::*;
 
 type V2u = Vector2<usize>;
@@ -119,6 +119,11 @@ struct EntropyHierarchy {
 }
 
 impl EntropyHierarchy {
+    fn new() -> Self {
+        Self {
+            hierarchy: BTreeMap::new(),
+        }
+    }
     fn add(&mut self, value: usize, entropy: usize) {
         if !self.hierarchy.entry(entropy).or_default().insert(value) {
             println!(
@@ -164,11 +169,11 @@ impl EntropyHierarchy {
 //     P::Subpixel: 'static,
 //     C: Deref<Target = [P::Subpixel]>,
 // {
-impl<P> From<ImageBuffer<P, Vec<P::Subpixel>>> for Grid<P>
+impl<P> From<&ImageBuffer<P, Vec<P::Subpixel>>> for Grid<P>
 where
     P: Pixel + 'static,
 {
-    fn from(img: ImageBuffer<P, Vec<P::Subpixel>>) -> Self {
+    fn from(img: &ImageBuffer<P, Vec<P::Subpixel>>) -> Self {
         let image_size = V2u {
             y: img.height() as usize,
             x: img.width() as usize,
@@ -183,11 +188,11 @@ where
     }
 }
 
-impl<P> From<Grid<P>> for ImageBuffer<P, Vec<P::Subpixel>>
+impl<P> From<&Grid<P>> for ImageBuffer<P, Vec<P::Subpixel>>
 where
     P: Pixel + 'static,
 {
-    fn from(grid: Grid<P>) -> Self {
+    fn from(grid: &Grid<P>) -> Self {
         let mut result = ImageBuffer::new(grid.size.x as u32, grid.size.y as u32);
         for (y, row) in result.rows_mut().enumerate() {
             for (x, pixel) in row.enumerate() {
@@ -198,37 +203,32 @@ where
     }
 }
 
+fn to_1d_index(index_2d: V2i, row_size: usize) -> isize {
+    index_2d.y * row_size as isize + index_2d.x
+}
+
+fn to_2d_index(index_1d: isize, row_size: usize) -> V2i {
+    V2i::new(index_1d % row_size as isize, index_1d / row_size as isize)
+}
+
+fn in_bounds(index: V2i, bounds: V2u) -> bool {
+    index.x >= 0 && index.y >= 0 && index.x < bounds.x as isize && index.y < bounds.y as isize
+}
+
 fn wfc<T: Copy + Eq + Hash + Debug>(
     input: Grid<T>,
     neighbourhood: Vec<V2i>,
     output_size: V2u,
-) -> Result<Grid<Result<T, i32>>, String> {
-    fn to_1d_index(index_2d: V2i, row_size: usize) -> isize {
-        index_2d.y * row_size as isize + index_2d.x
-    }
-    fn to_2d_index(index_1d: isize, row_size: usize) -> V2i {
-        V2i::new(index_1d % row_size as isize, index_1d / row_size as isize)
-    }
-    fn in_bounds(index: V2i, bounds: V2u) -> bool {
-        index.x >= 0 && index.y >= 0 && index.x < bounds.x as isize && index.y < bounds.y as isize
-    }
+) -> Vec<Grid<Result<T, usize>>> {
     let mut rng = rand::thread_rng();
 
     let mut wave_map = Grid::new();
 
-    let colors: Vec<T> = input.buf.clone().into_iter().unique().collect();
-
-    let mut color_locations = HashMap::new();
-    for color in colors.iter() {
-        color_locations.insert(color, BitSet::new());
-    }
-    let mut locations = Vec::new();
+    let mut color_locations: HashMap<&T, BitSet> = HashMap::new();
     for (i, color) in input.buf.iter().enumerate() {
-        color_locations
-            .get_mut(color)
-            .and_then(|set| Some(set.insert(i)));
-        locations.push(i);
+        color_locations.entry(color).or_default().insert(i);
     }
+    let locations: Vec<usize> = Vec::from_iter(0..input.buf.len());
 
     let mut adjacencies: HashMap<(T, V2i), BitSet> = HashMap::new();
     for &offset in neighbourhood.iter() {
@@ -245,18 +245,18 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
         }
     }
 
-    wave_map.resize(output_size, BitSet::from_iter(locations));
+    let thing = BitSet::from_iter(locations);
+    wave_map.resize(output_size, thing.clone());
 
-    let mut entropy_hierarchy = EntropyHierarchy {
-        hierarchy: BTreeMap::new(),
-    };
+    let mut entropy_hierarchy = EntropyHierarchy::new();
     for (i, set) in wave_map.buf.iter().enumerate() {
         entropy_hierarchy.add(i, set.len());
     }
 
+    let mut result = Vec::new();
     loop {
         // collapse superposition
-        let (&_least_entropy, peak) = entropy_hierarchy.get_lowest_entropy();
+        let (&least_entropy, peak) = entropy_hierarchy.get_lowest_entropy();
         let collapse_index = peak.iter().choose(&mut rng).unwrap();
         // println!(
         //     "collapsing: {:?} {:?} with entropy {}",
@@ -268,12 +268,8 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
             .iter()
             .choose(&mut rng)
             .unwrap();
-        let chosen_color = input.buf[chosen];
-        let mister = peak.remove(collapse_index);
-        if !mister {
-            panic!("getting {} in {:?}", collapse_index, entropy_hierarchy);
-        }
-        entropy_hierarchy.add(collapse_index, 1);
+
+        entropy_hierarchy.reduce_entropy(collapse_index, least_entropy, 1);
 
         wave_map.buf[collapse_index].clear();
         wave_map.buf[collapse_index].insert(chosen);
@@ -285,66 +281,28 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
             {
                 if let Some(constraining_set) = color_locations.get(neighbour_color) {
                     let index_2d = to_2d_index(collapse_index as isize, wave_map.size.x) + offset;
-                    let index = to_1d_index(index_2d, wave_map.size.x) as usize;
-                    if let Some(set_to_reduce) = wave_map.get_mut(index_2d) {
-                        let reduced_set: BitSet =
-                            set_to_reduce.intersection(constraining_set).collect();
-                        entropy_hierarchy.reduce_entropy(
-                            index,
-                            set_to_reduce.len(),
-                            reduced_set.len(),
-                        );
-                        *set_to_reduce = reduced_set;
-                    }
+                    smoething(
+                        &mut wave_map,
+                        &mut entropy_hierarchy,
+                        constraining_set,
+                        index_2d,
+                    );
                     for &inner_offset in neighbourhood.iter() {
                         if let Some(inner_constraining_set) =
                             adjacencies.get(&(*neighbour_color, inner_offset))
                         {
                             let inner_index_2d = index_2d + inner_offset;
-                            let inner_index = to_1d_index(inner_index_2d, wave_map.size.x) as usize;
-                            if inner_index != collapse_index {
-                                if let Some(set_to_reduce) = wave_map.get_mut(inner_index_2d) {
-                                    let reduced_set: BitSet = set_to_reduce
-                                        .intersection(inner_constraining_set)
-                                        .collect();
-
-                                    entropy_hierarchy.reduce_entropy(
-                                        inner_index,
-                                        set_to_reduce.len(),
-                                        reduced_set.len(),
-                                    );
-                                    *set_to_reduce = reduced_set;
-                                }
-                            }
+                            smoething(
+                                &mut wave_map,
+                                &mut entropy_hierarchy,
+                                inner_constraining_set,
+                                inner_index_2d,
+                            )
                         }
                     }
                 }
             }
         }
-
-        for (i, set) in wave_map.buf.iter().enumerate() {
-            if set.len() > 1 {
-                if !entropy_hierarchy
-                    .hierarchy
-                    .get(&set.len())
-                    .unwrap()
-                    .contains(i)
-                {
-                    print!(
-                        "malformed entropy hierarchy!: {:?} {} {}",
-                        to_2d_index(i as isize, wave_map.size.x),
-                        i,
-                        set.len()
-                    );
-                    for e in entropy_hierarchy.hierarchy.iter() {
-                        if e.1.contains(set.len()) {
-                            println!(" marked as {}", e.0);
-                        }
-                    }
-                }
-            }
-        }
-
         entropy_hierarchy.cleanup();
 
         // find points of lowest entropy
@@ -353,10 +311,30 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
         }
     }
 
-    let mut result = Grid::with_capacity(output_size);
-    unsafe {
-        result.set_len(output_size);
+    result.push(to_image(&input, output_size, &wave_map));
+    return result;
+}
+
+fn smoething(
+    wave_map: &mut Grid<BitSet>,
+    entropy_hierarchy: &mut EntropyHierarchy,
+    constraining_set: &BitSet,
+    index_2d: V2i,
+) {
+    let index = to_1d_index(index_2d, wave_map.size.x) as usize;
+    if let Some(set_to_reduce) = wave_map.get_mut(index_2d) {
+        let original = set_to_reduce.len();
+        set_to_reduce.intersect_with(constraining_set);
+        entropy_hierarchy.reduce_entropy(index, original, set_to_reduce.len());
     }
+}
+
+fn to_image<T: Copy + Eq + Hash + Debug>(
+    input: &Grid<T>,
+    output_size: Vector2<usize>,
+    wave_map: &Grid<BitSet>,
+) -> Grid<Result<T, usize>> {
+    let mut result = unsafe { Grid::uninitialized_with_capacity(output_size) };
     for (i, set) in wave_map.buf.iter().enumerate() {
         // if set.len() > 1 {
         //     return Err("WFC failed: entropy is more than 1 somewhere".to_string());
@@ -364,43 +342,46 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
         //     return Err("WFC failed: entropy is less than 1 somewhere".to_string());
         // } else
         {
-            result.buf[i] = if set.len() > 1 {
-                Err(2)
-            } else if set.len() < 1 {
-                Err(0)
+            result.buf[i] = if set.len() != 1 {
+                Err(set.len())
             } else {
                 Ok(input.buf[set.iter().next().unwrap()])
             };
         }
     }
-    return Ok(result);
+    return result;
 }
 
 pub fn test() {
-    let oli = image::open("samples/Flowers.png").unwrap();
+    let timer = Instant::now();
+    let oli = image::open("oliprik.png").unwrap();
     println!("opened óli prik");
     match oli {
         DynamicImage::ImageRgb8(img) => {
-            let size = V2u::new(64, 64);
-            let master = wfc(img.into(), Vec::from(SQUARE_NEIGHBOURHOOD), size).unwrap();
-            let mut other: Grid<Rgb<u8>> = Grid::new();
-            other.size = master.size;
-            other.buf = master
-                .buf
-                .iter()
-                .map(|pix| match pix {
-                    Ok(col) => *col,
-                    Err(0) => Rgb([255, 0, 0]),
-                    Err(2) => Rgb([0, 255, 0]),
-                    Err(_) => Rgb([0, 0, 255]),
-                })
-                .collect();
+            let size = V2u::from_value(256);
+            let master = wfc(Grid::from(&img), Vec::from(SQUARE_NEIGHBOURHOOD), size);
+            for (i, master) in master.iter().enumerate() {
+                let mut other: Grid<Rgb<u8>> = Grid::new();
+                other.size = master.size;
+                other.buf = master
+                    .buf
+                    .iter()
+                    .map(|pix| match pix {
+                        Ok(col) => *col,
+                        Err(0) => Rgb([255, 0, 0]),
+                        Err(n) => Rgb([0, (*n % 256) as u8, (60 + (*n / 256) * 10) as u8]),
+                    })
+                    .collect();
 
-            RgbImage::from(other).save("WFC.png").unwrap();
-            println!("saved result to WFC.png");
+                RgbImage::from(&other)
+                    .save(format!("temp/WFC{}.png", i))
+                    .unwrap();
+                println!("saved result to WFC.png");
+            }
         }
         _ => {
             println!("wrong image type!")
         }
     }
+    println!("elapsed {:?}", timer.elapsed());
 }
