@@ -8,11 +8,28 @@ use legion::{Resources, Schedule, World};
 use physics::PhysicsBuilderExtender;
 use transforms::TransformBuilderExtender;
 
+type ScheduleCondition = Box<dyn Fn(&CommandManager) -> bool>;
+
+pub struct ScheduleEntry {
+    _label: String,
+    schedule: Schedule,
+    condition: Option<ScheduleCondition>,
+}
+
+impl ScheduleEntry {
+    fn new(label: &str, schedule: Schedule, condition: Option<ScheduleCondition>) -> Self {
+        Self {
+            _label: label.to_string(),
+            schedule,
+            condition,
+        }
+    }
+}
+
 pub struct Application {
     pub world: World,
     pub resources: Resources,
-
-    schedules: Vec<(String, Schedule, Box<dyn Fn(&CommandManager) -> bool>)>,
+    schedules: Vec<ScheduleEntry>,
 }
 
 impl Application {
@@ -25,8 +42,8 @@ impl Application {
     }
 
     pub fn create_schedules(&mut self) {
-        self.schedules.push((
-            "Engine Logic Schedule".into(),
+        self.schedules.push(ScheduleEntry::new(
+            "Engine Logic Schedule",
             Schedule::builder()
                 .add_system(systems::player::player_system())
                 .add_system(systems::player::camera_control_system())
@@ -36,22 +53,22 @@ impl Application {
                 .add_physics_systems(&mut self.world, &mut self.resources)
                 .add_transform_systems()
                 .build(),
-            Box::new(|command_manager| {
+            Some(Box::new(|command_manager| {
                 command_manager.get(Command::DebugToggleLogic)
                     || command_manager.get(Command::DebugStepLogic)
-            }),
+            })),
         ));
 
-        self.schedules.push((
+        self.schedules.push(ScheduleEntry::new(
             "Asset Management Schedule".into(),
             assman::systems::assman_system_schedule(),
-            Box::new(|_| true),
+            None,
         ));
 
-        self.schedules.push((
+        self.schedules.push(ScheduleEntry::new(
             "Render Schedule".into(),
             graphics::systems::render_system_schedule(),
-            Box::new(|_| true),
+            None,
         ));
     }
 
@@ -77,17 +94,20 @@ impl Application {
             .unwrap()
             .update(&self.resources.get::<InputState>().unwrap());
 
-        for (_, schedule, condition) in &mut self.schedules {
-            let test: bool = {
+        for entry in &mut self.schedules {
+            let test = {
                 let command_manager = self
                     .resources
                     .get::<CommandManager>()
                     .expect("Schedule Execution requires a CommandManager in resources");
 
-                (condition)(&command_manager)
+                entry
+                    .condition
+                    .as_ref()
+                    .map_or(true, |f| (f)(&command_manager))
             };
             if test {
-                schedule.execute(&mut self.world, &mut self.resources);
+                entry.schedule.execute(&mut self.world, &mut self.resources);
             }
         }
 
