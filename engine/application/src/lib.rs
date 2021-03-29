@@ -1,9 +1,11 @@
 use std::time::Instant;
 
 use entity_smith::FrameTime;
+use enum_map::{Enum, EnumMap};
 use graphics::debug::DebugTimer;
 use graphics::gui::GuiRenderPipeline;
 use input::{Command, CommandManager, InputState};
+use legion::systems::Runnable;
 use legion::{Resources, Schedule, World};
 use physics::PhysicsBuilderExtender;
 use transforms::TransformBuilderExtender;
@@ -26,10 +28,25 @@ impl ScheduleEntry {
     }
 }
 
+/// Describes at what application stage a unit system bundle is run
+#[derive(Enum)] // Needed for EnumMap
+enum UnitStage {
+    /// Run once at initialization of the application
+    Init,
+    /// Run at the start of every frame
+    StartFrame,
+    /// Run every frame, precedes `UnitStage::Render`
+    Logic,
+    /// Run every frame, succeeds `UnitStage::Logic`
+    Render,
+    /// Run at the end of every frame
+    EndFrame,
+}
+
 pub struct Application {
     pub world: World,
     pub resources: Resources,
-    schedules: Vec<ScheduleEntry>,
+    schedules: EnumMap<UnitStage, Vec<ScheduleEntry>>,
 }
 
 impl Application {
@@ -37,12 +54,18 @@ impl Application {
         Self {
             world: World::default(),
             resources: Resources::default(),
-            schedules: vec![],
+            schedules: EnumMap::default(),
         }
     }
 
     pub fn create_schedules(&mut self) {
-        self.schedules.push(ScheduleEntry::new(
+        self.schedules[UnitStage::StartFrame].push(ScheduleEntry::new(
+            "Asset Management Schedule".into(),
+            assman::systems::assman_system_schedule(),
+            None,
+        ));
+
+        self.schedules[UnitStage::Logic].push(ScheduleEntry::new(
             "Engine Logic Schedule",
             Schedule::builder()
                 .add_system(systems::player::player_system())
@@ -59,13 +82,7 @@ impl Application {
             })),
         ));
 
-        self.schedules.push(ScheduleEntry::new(
-            "Asset Management Schedule".into(),
-            assman::systems::assman_system_schedule(),
-            None,
-        ));
-
-        self.schedules.push(ScheduleEntry::new(
+        self.schedules[UnitStage::Render].push(ScheduleEntry::new(
             "Render Schedule".into(),
             graphics::systems::render_system_schedule(),
             None,
@@ -94,20 +111,22 @@ impl Application {
             .unwrap()
             .update(&self.resources.get::<InputState>().unwrap());
 
-        for entry in &mut self.schedules {
-            let test = {
-                let command_manager = self
-                    .resources
-                    .get::<CommandManager>()
-                    .expect("Schedule Execution requires a CommandManager in resources");
+        for stage in self.schedules.values_mut() {
+            for entry in stage {
+                let test = {
+                    let command_manager = self
+                        .resources
+                        .get::<CommandManager>()
+                        .expect("Schedule Execution requires a CommandManager in resources");
 
-                entry
-                    .condition
-                    .as_ref()
-                    .map_or(true, |f| (f)(&command_manager))
-            };
-            if test {
-                entry.schedule.execute(&mut self.world, &mut self.resources);
+                    entry
+                        .condition
+                        .as_ref()
+                        .map_or(true, |f| (f)(&command_manager))
+                };
+                if test {
+                    entry.schedule.execute(&mut self.world, &mut self.resources);
+                }
             }
         }
 

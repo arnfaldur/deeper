@@ -21,3 +21,5 @@ misc = { path = "../misc" }
 
 winit = "0.24.0"
 legion = "0.4.0"
+apply = "0.3.0"
+enum-map = "1.0.0"
