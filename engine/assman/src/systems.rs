@@ -4,19 +4,23 @@ use graphics::models::ModelRenderPipeline;
 use graphics::{GraphicsContext, GraphicsResources};
 use input::{Command, CommandManager};
 use itertools::Itertools;
-use legion::systems::{ParallelRunnable, Schedule};
+use legion::systems::ParallelRunnable;
 use legion::{Entity, IntoQuery, SystemBuilder};
 use world_gen::components::{DynamicModelRequest, StaticModelRequest};
 
 use crate::optimizer::StaticMeshOptimizer;
 use crate::{AssetStore, GraphicsAssetManager};
 
-pub fn assman_system_schedule() -> Schedule {
-    Schedule::builder()
-        .add_system(assman_process_dynamic_model_requests())
-        .add_system(assman_process_static_model_requests())
-        .add_system(hot_loading_system())
-        .build()
+pub trait AssetManagerBuilderExtender {
+    fn add_assman_systems(&mut self) -> &mut Self;
+}
+
+impl AssetManagerBuilderExtender for legion::systems::Builder {
+    fn add_assman_systems(&mut self) -> &mut Self {
+        self.add_system(assman_process_dynamic_model_requests())
+            .add_system(assman_process_static_model_requests())
+            .add_system(hot_loading_system())
+    }
 }
 
 fn assman_process_dynamic_model_requests() -> impl ParallelRunnable {

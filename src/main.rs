@@ -6,7 +6,7 @@ use assman::data::AssetStorageInfo;
 use assman::{AssetStore, GraphicsAssetManager};
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 use components::{FloorNumber, MapTransition, Player, PlayerCamera};
-use entity_smith::{FrameTime, Smith};
+use entity_smith::Smith;
 use graphics::canvas::{CanvasQueue, CanvasRenderPipeline};
 use graphics::components::{ActiveCamera, Camera, Target};
 use graphics::models::{ModelQueue, ModelRenderPipeline};
@@ -63,9 +63,10 @@ async fn run_async() {
     let canvas_render_pipeline = CanvasRenderPipeline::new(&graphics_context, &graphics_resources);
 
     // ECS Initialization
-    let mut ecs = application::Application::new();
-
-    ecs.create_schedules();
+    let mut ecs = application::Application::builder()
+        .create_schedules()
+        .with_unit(misc::SnakeUnit)
+        .build();
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&ecs.world);
 
@@ -136,7 +137,6 @@ async fn run_async() {
     ecs.resources.insert(window);
     ecs.resources.insert(ass_man);
     ecs.resources.insert(Instant::now());
-    ecs.resources.insert(FrameTime(f32::EPSILON));
     ecs.resources.insert(MapTransition::Deeper);
     ecs.resources.insert(FloorNumber(1));
     ecs.resources.insert(InputState::new());

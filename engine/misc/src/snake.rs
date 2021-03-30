@@ -2,14 +2,15 @@
 
 use std::time::SystemTime;
 
+use application::UnitStage;
 use graphics::canvas::{AnchorPoint, CanvasQueue, RectangleDescriptor, ScreenVector};
 use graphics::GraphicsContext;
 use input::{Command, CommandManager};
-use legion::systems::Runnable;
+use legion::systems::{Builder, Runnable};
 use legion::SystemBuilder;
 
 #[derive(Clone, Copy)]
-pub(crate) enum BoardState {
+enum BoardState {
     Empty,
     Snake,
     Food,
@@ -32,23 +33,23 @@ impl std::fmt::Display for BoardState {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) enum Direction {
+enum Direction {
     Up,
     Down,
     Left,
     Right,
 }
 
-pub(crate) struct SnakeBoard {
-    pub(crate) new_dir: Direction,
+struct SnakeBoard {
+    new_dir: Direction,
     player_dir: Direction,
     snake: std::collections::VecDeque<(usize, usize)>,
-    pub(crate) board: [[BoardState; 16]; 16],
+    board: [[BoardState; 16]; 16],
     food: Option<(usize, usize)>,
 }
 
 impl SnakeBoard {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         let snake = vec![(4, 5), (4, 4)];
 
         let mut ret = SnakeBoard {
@@ -106,7 +107,7 @@ impl SnakeBoard {
         board
     }
 
-    pub(crate) fn advance(&mut self) {
+    fn advance(&mut self) {
         let mut current_pos = self.snake[0];
 
         self.player_dir = match self.new_dir {
@@ -160,6 +161,19 @@ impl SnakeBoard {
                 print!("{}", *square);
             }
             println!();
+        }
+    }
+}
+
+pub struct SnakeUnit;
+
+impl application::Unit for SnakeUnit {
+    fn add_systems(&self, stage: UnitStage, builder: &mut Builder) {
+        match stage {
+            UnitStage::Logic => {
+                builder.add_system(SnakeSystem::new());
+            }
+            _ => (),
         }
     }
 }

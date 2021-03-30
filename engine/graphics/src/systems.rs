@@ -11,19 +11,19 @@ use crate::gui::GuiRenderPipeline;
 use crate::models::{ModelQueue, ModelRenderPipeline};
 use crate::{GraphicsContext, GraphicsResources};
 
+pub const DISPLAY_DEBUG_DEFAULT: bool = false;
+
 pub trait RenderBuilderExtender {
     fn add_render_systems(&mut self) -> &mut Self;
 }
 
-pub const DISPLAY_DEBUG_DEFAULT: bool = false;
-
-pub fn render_system_schedule() -> legion::systems::Schedule {
-    legion::systems::Schedule::builder()
-        .add_thread_local(update_camera_system())
-        .add_thread_local(render_draw_static_models_system())
-        .add_thread_local(render_draw_models_system())
-        .add_thread_local(render_system())
-        .build()
+impl RenderBuilderExtender for legion::systems::Builder {
+    fn add_render_systems(&mut self) -> &mut Self {
+        self.add_thread_local(update_camera_system())
+            .add_thread_local(render_draw_static_models_system())
+            .add_thread_local(render_draw_models_system())
+            .add_thread_local(render_system())
+    }
 }
 
 fn update_camera_system() -> impl Runnable {
