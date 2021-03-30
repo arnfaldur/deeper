@@ -8,5 +8,9 @@ edition = "2018"
 
 [dependencies]
 
+# internal
+application = { path = "../application" }
+
+legion = "0.4.0"
 cgmath = "0.18.0"
 winit = "0.24.0"

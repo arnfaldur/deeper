@@ -1,10 +1,10 @@
 #![allow(unused)]
 
-use cgmath::Vector2;
-use winit::event::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
+mod systems;
 
-#[derive(Default)]
-pub struct EventBucket<'a>(pub Vec<Event<'a, ()>>);
+use cgmath::Vector2;
+pub use systems::InputUnit;
+use winit::event::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
 
 pub struct ButtonState {
     pub pressed: bool,

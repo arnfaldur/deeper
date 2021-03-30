@@ -8,16 +8,6 @@ edition = "2018"
 
 [dependencies]
 
-#internal
-graphics = { path = "../graphics" }
-entity_smith = { path = "../entity_smith" }
-physics = { path = "../physics" }
-transforms = { path = "../transforms" }
-input = { path = "../input" }
-systems = { path = "../systems" }
-world_gen = { path = "../world_gen" }
-assman = { path = "../assman" }
-
 winit = "0.24.0"
 legion = "0.4.0"
 apply = "0.3.0"
