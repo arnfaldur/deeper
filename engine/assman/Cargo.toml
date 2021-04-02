@@ -10,7 +10,6 @@ edition = "2018"
 
 # internal
 graphics = { path = "../graphics"}
-world_gen = { path = "../world_gen"}
 entity_smith = { path = "../entity_smith"}
 input = { path = "../input"}
 

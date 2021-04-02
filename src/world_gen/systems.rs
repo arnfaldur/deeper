@@ -1,5 +1,5 @@
+use assman::components::{DynamicModelRequest, StaticModelRequest};
 use cgmath::{vec2, Vector2, Vector3};
-use components::*;
 use entity_smith::Smith;
 use graphics;
 use graphics::data::LocalUniforms;
@@ -10,8 +10,11 @@ use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::{Scale, TransformEntitySmith};
 
-use crate::components::{DynamicModelRequest, StaticModelRequest, TileType, WallDirection};
-use crate::dung_gen::DungGen;
+use crate::components::{AIFollow, HitPoints, Player};
+use crate::world_gen::components::{
+    Faction, FloorNumber, MapSwitcher, MapTransition, TileType, WallDirection,
+};
+use crate::world_gen::dung_gen::DungGen;
 
 pub fn dung_gen_system() -> impl Runnable {
     SystemBuilder::new("DungGen System")

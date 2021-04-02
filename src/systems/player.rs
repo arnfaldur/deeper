@@ -2,7 +2,6 @@ use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
 use cgmath::{Deg, EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
-use components::{Destination, Faction, HitPoints, Player, PlayerCamera};
 use entity_smith::Smith;
 use graphics::components::{Camera, Target};
 use graphics::util::{correction_matrix, project_screen_to_world};
@@ -12,6 +11,9 @@ use legion::world::SubWorld;
 use legion::*;
 use physics::Velocity;
 use transforms::{Position, Rotation, SphericalOffset, Transform};
+
+use crate::components::{Destination, HitPoints, Player, PlayerCamera};
+use crate::world_gen::components::Faction;
 
 pub fn camera_control_system() -> impl ParallelRunnable {
     SystemBuilder::new("camera_control_system")

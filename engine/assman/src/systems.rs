@@ -6,8 +6,8 @@ use input::{Command, CommandManager};
 use itertools::Itertools;
 use legion::systems::ParallelRunnable;
 use legion::{Entity, IntoQuery, SystemBuilder};
-use world_gen::components::{DynamicModelRequest, StaticModelRequest};
 
+use crate::components::{DynamicModelRequest, StaticModelRequest};
 use crate::optimizer::StaticMeshOptimizer;
 use crate::{AssetStore, GraphicsAssetManager};
 

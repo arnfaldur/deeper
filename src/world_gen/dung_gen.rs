@@ -7,7 +7,7 @@ use rand::Rng;
 
 use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
 use self::rand::thread_rng;
-use crate::components::{TileType, WallDirection};
+use crate::world_gen::components::{TileType, WallDirection};
 
 pub struct DungGen {
     pub width: i32,

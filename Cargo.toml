@@ -15,14 +15,10 @@ members = [
     "engine/physics",
     "engine/entity_smith",
     "engine/transforms",
-    "engine/world_gen",
     "engine/graphics",
     "engine/input",
     "engine/application",
-    "engine/components",
-    "engine/systems",
     "engine/assman",
-    "engine/misc",
 ]
 
 [dependencies]
@@ -32,24 +28,20 @@ physics = { path = "engine/physics" }
 transforms = { path = "engine/transforms" }
 entity_smith = { path = "engine/entity_smith" }
 graphics = { path = "engine/graphics" }
-world_gen = { path = "engine/world_gen" }
-components = { path = "engine/components" }
 input = { path = "engine/input" }
 application = { path = "engine/application" }
-systems = { path = "engine/systems" }
 assman = { path = "engine/assman" }
-misc = { path = "engine/misc" }
 
 # misc
 itertools = "0.10.0"
-rayon = "*"
+rayon = "1.5.0"
 futures = "0.3.13"
 winit = "0.24.0"
+ena = "0.14.0"
 
 # math
 cgmath = "0.18.0"
 rand = "0.8.3"
-
 
 # loader
 ron = "0.6.4"

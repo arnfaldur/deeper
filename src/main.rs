@@ -1,13 +1,19 @@
 #![allow(deprecated)]
 
+mod components;
+mod misc;
+mod systems;
+mod world_gen;
+
 use std::time::Instant;
 
 use application::UnitStage;
+use assman::components::DynamicModelRequest;
 use assman::data::AssetStorageInfo;
 use assman::systems::AssetManagerBuilderExtender;
 use assman::{AssetStore, GraphicsAssetManager};
 use cgmath::{InnerSpace, Vector2, Vector3, Zero};
-use components::{FloorNumber, MapTransition, Player, PlayerCamera};
+use components::{Player, PlayerCamera};
 use entity_smith::{FrameTime, Smith};
 use graphics::canvas::{CanvasQueue, CanvasRenderPipeline};
 use graphics::components::{ActiveCamera, Camera, Target};
@@ -21,7 +27,8 @@ use transforms::{Parent, Scale, SphericalOffset, TransformBuilderExtender, Trans
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-use world_gen::components::DynamicModelRequest;
+
+use crate::world_gen::components::{FloorNumber, MapTransition};
 
 async fn run_async() {
     // Asset Management Initialization
@@ -152,20 +159,21 @@ async fn run_async() {
     ecs.resources.insert(PlayerCamera {
         entity: player_camera,
     });
+
+    ecs.resources.insert(Instant::now());
+    ecs.resources.insert(MapTransition::Deeper);
+    ecs.resources.insert(FloorNumber(1));
+
+    ecs.resources.insert(ass_man);
+
     ecs.resources.insert(graphics_context);
     ecs.resources.insert(graphics_resources);
     ecs.resources.insert(gui_context);
     ecs.resources.insert(window);
-    ecs.resources.insert(ass_man);
-    ecs.resources.insert(Instant::now());
-    ecs.resources.insert(MapTransition::Deeper);
-    ecs.resources.insert(FloorNumber(1));
     ecs.resources.insert(ModelQueue::new());
     ecs.resources.insert(CanvasQueue::new());
     ecs.resources.insert(canvas_render_pipeline);
     ecs.resources.insert(model_render_pipeline);
-
-    ecs.resources.insert(0 as i64);
 
     event_loop.run(move |event, _, control_flow| {
         let imgui_wants_input = {

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use cgmath::Vector2;
 use legion::Entity;
 
@@ -21,8 +19,6 @@ pub struct PlayerCamera {
 
 // end entity pointers
 
-pub struct Agent;
-
 pub struct AIFollow {
     pub target: Entity,
     pub minimum_distance: f32,
@@ -42,25 +38,7 @@ impl Destination {
     }
 }
 
-#[derive(Eq, PartialEq)]
-#[derive(Copy, Clone)]
-pub enum Faction {
-    Enemies,
-    Friends,
-    Frenemies,
-}
-
 pub struct HitPoints {
     pub max: f32,
     pub health: f32,
 }
-
-#[derive(Copy, Clone)]
-pub enum MapTransition {
-    None,
-    Deeper, // Down to the next floor
-}
-
-pub struct MapSwitcher(pub MapTransition);
-
-pub struct FloorNumber(pub i32);

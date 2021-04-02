@@ -1,13 +1,14 @@
 use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{InnerSpace, Vector2, Vector3};
-use components::{AIFollow, Destination, HitPoints};
 use entity_smith::{Acceleration, FrameTime, Speed};
 use legion::systems::{CommandBuffer, ParallelRunnable};
 use legion::world::SubWorld;
-use legion::{IntoQuery, *};
+use legion::{Entity, EntityStore, IntoQuery, SystemBuilder, TryWrite};
 use physics::Velocity;
 use transforms::{Position, Rotation};
+
+use crate::components::{AIFollow, Destination, HitPoints};
 
 pub mod player;
 
