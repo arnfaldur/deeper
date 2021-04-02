@@ -12,4 +12,3 @@ entity_smith = { path = "../entity_smith" }
 
 legion = "0.4"
 cgmath = "0.18.0"
-winit = "0.24.0"
