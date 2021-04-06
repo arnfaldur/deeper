@@ -11,6 +11,7 @@ edition = "2018"
 # internal
 entity_smith = { path = "../entity_smith" }
 transforms = { path = "../transforms" }
+debug = { path = "../debug" }
 
 # misc
 itertools = "0.10.0"

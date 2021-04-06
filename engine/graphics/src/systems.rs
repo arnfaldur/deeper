@@ -1,3 +1,4 @@
+use debug::DebugTimer;
 use legion::systems::Runnable;
 use legion::{IntoQuery, SystemBuilder};
 use transforms::{Position, Transform};
@@ -6,7 +7,6 @@ use winit::window::Window;
 use crate::canvas::{CanvasQueue, CanvasRenderPipeline};
 use crate::components::{ActiveCamera, Camera, DynamicModel, StaticModel, Target};
 use crate::data::{LocalUniforms, Material};
-use crate::debug::DebugTimer;
 use crate::gui::GuiRenderPipeline;
 use crate::models::{ModelQueue, ModelRenderPipeline};
 use crate::{GraphicsContext, GraphicsResources};
@@ -44,8 +44,8 @@ fn update_camera_system() -> impl Runnable {
                         model_render_pass.set_camera(
                             graphics_context,
                             cam,
-                            cam_pos.absolute.w.truncate(),
-                            target_pos.absolute.w.truncate(),
+                            cam_pos.world_position(),
+                            target_pos.world_position(),
                         );
                     }
                 }
@@ -69,7 +69,7 @@ fn render_draw_models_system() -> impl Runnable {
 fn draw_model(model: &DynamicModel, transform: &Transform, model_queue: &mut ModelQueue) {
     model_queue.push_model(
         model.clone(),
-        LocalUniforms::new(transform.absolute.into(), Material::default()),
+        LocalUniforms::new(transform.world_transform().into(), Material::default()),
     )
 }
 

@@ -1,14 +1,13 @@
 use std::f32::consts::PI;
 
 use cgmath::num_traits::clamp;
-use cgmath::{Deg, EuclideanSpace, InnerSpace, Point3, Vector2, Vector3, Vector4};
+use cgmath::{Deg, InnerSpace, Vector2, Vector3};
 use entity_smith::Smith;
 use graphics::components::{Camera, Target};
-use graphics::util::{correction_matrix, project_screen_to_world};
 use input::{Command, CommandManager, InputState};
 use legion::systems::ParallelRunnable;
 use legion::world::SubWorld;
-use legion::*;
+use legion::{EntityStore, IntoQuery, SystemBuilder};
 use physics::Velocity;
 use transforms::{Position, Rotation, SphericalOffset, Transform};
 
@@ -80,11 +79,11 @@ pub fn camera_control(
                 .unwrap()
                 .entity,
         )
-        .map(|trans| trans.absolute.w.truncate())
+        .map(|trans| trans.world_position())
     {
         if let Ok(cam_pos) = <&transforms::Transform>::query()
             .get(&world, player_cam.entity)
-            .map(|trans| trans.absolute.w.truncate())
+            .map(|trans| trans.world_position())
         {
             // let (cam_pos, height): (&Position, &Height) = <(&Position, &Height)>::query()
             //     .get(&world, player_cam.entity)
@@ -179,7 +178,7 @@ pub fn player(
 
         let camera_position = <&transforms::Transform>::query()
             .get(&world, player_cam.entity)
-            .map(|trans| trans.absolute.w.truncate())
+            .map(|trans| trans.world_position())
             .unwrap_or_else(|_| (unreachable!()));
 
         let camera_target_pos = <&transforms::Transform>::query()
@@ -190,29 +189,12 @@ pub fn player(
                     .unwrap()
                     .entity,
             )
-            .map(|trans| trans.absolute.w.truncate())
+            .map(|trans| trans.world_position())
             .unwrap();
 
-        let aspect_ratio = context.window_size.width as f32 / context.window_size.height as f32;
-
-        // TODO: find a better place for this
-        let mx_view = cgmath::Matrix4::look_at_rh(
-            Point3::from_vec(camera_position),
-            Point3::from_vec(camera_target_pos),
-            Vector3::unit_z(),
-        );
-        let mx_projection = cgmath::perspective(cgmath::Deg(camera.fov), aspect_ratio, 1.0, 1000.0);
-
-        if let Some(mouse_world_pos) = project_screen_to_world(
-            Vector3::new(mouse_pos.x, mouse_pos.y, 1.0),
-            correction_matrix() * mx_projection * mx_view,
-            Vector4::new(
-                0,
-                0,
-                context.window_size.width as i32,
-                context.window_size.height as i32,
-            ),
-        ) {
+        if let Some(mouse_world_pos) =
+            context.screen_to_world(mouse_pos, camera, camera_position, camera_target_pos)
+        {
             let ray_delta: Vector3<f32> = mouse_world_pos - camera_position;
             let t: f32 = mouse_world_pos.z / ray_delta.z;
             let ray_hit = (mouse_world_pos - ray_delta * t).truncate();
@@ -225,7 +207,7 @@ pub fn player(
             let difference: Vector2<f32> = {
                 let player_pos = <&Transform>::query()
                     .get(&world, player.player)
-                    .map(|trans| trans.absolute.w.truncate())
+                    .map(|trans| trans.world_position())
                     .expect("I have no place in this world.");
                 ray_hit - player_pos.truncate()
             };

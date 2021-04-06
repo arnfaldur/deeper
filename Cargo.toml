@@ -19,6 +19,7 @@ members = [
     "engine/input",
     "engine/application",
     "engine/assman",
+    "engine/debug",
 ]
 
 [dependencies]
@@ -31,6 +32,7 @@ graphics = { path = "engine/graphics" }
 input = { path = "engine/input" }
 application = { path = "engine/application" }
 assman = { path = "engine/assman" }
+debug = { path = "engine/debug" }
 
 # misc
 itertools = "0.10.0"

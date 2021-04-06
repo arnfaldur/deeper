@@ -1,8 +1,8 @@
 // Welcome to crazy-land
 
+use debug::{DebugTimerInfo, TimerInfo};
 use imgui::TreeNode;
 
-use crate::debug::{DebugTimerInfo, TimerInfo};
 use crate::RenderContext;
 
 /// Did not want to go this way, but basically feel obligated to do so

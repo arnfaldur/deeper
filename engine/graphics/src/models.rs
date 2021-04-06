@@ -1,9 +1,9 @@
+use debug::DebugTimer;
 use itertools::Itertools;
 use wgpu::util::DeviceExt;
 
 use crate::components::{Camera, DynamicModel, StaticModel};
 use crate::data::{GlobalUniforms, LocalUniforms};
-use crate::debug::DebugTimer;
 use crate::{GraphicsContext, GraphicsResources, RenderContext, TextureID};
 
 // TODO: Have ass_man auto-load all Shaders

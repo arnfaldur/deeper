@@ -42,8 +42,8 @@ impl From<Deg<f32>> for Rotation {
 
 #[derive(Copy, Clone)]
 pub struct Transform {
-    pub absolute: Matrix4<f32>,
-    pub relative: Matrix4<f32>,
+    pub(crate) absolute: Matrix4<f32>,
+    pub(crate) relative: Matrix4<f32>,
 }
 
 impl Transform {
@@ -53,6 +53,12 @@ impl Transform {
             relative: Matrix4::identity(),
         }
     }
+
+    pub fn world_transform(&self) -> Matrix4<f32> { self.absolute }
+    pub fn local_transform(&self) -> Matrix4<f32> { self.relative }
+
+    pub fn local_position(&self) -> Vector3<f32> { self.relative.w.truncate() }
+    pub fn world_position(&self) -> Vector3<f32> { self.absolute.w.truncate() }
 }
 
 impl Default for Position {

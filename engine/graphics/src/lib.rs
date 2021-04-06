@@ -1,4 +1,3 @@
-#![feature(slice_group_by)]
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -11,18 +10,21 @@ pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
 pub mod canvas;
 pub mod components;
 pub mod data;
-pub mod debug;
 pub mod gui;
 pub mod models;
 pub mod systems;
-pub mod util;
+pub mod unit;
+mod util;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use cgmath::{EuclideanSpace, Point3, Vector2, Vector3, Vector4};
 use slotmap::SlotMap;
 
+use crate::components::Camera;
 use crate::data::Vertex;
+use crate::util::{correction_matrix, project_screen_to_world};
 
 pub type ModelID = slotmap::DefaultKey;
 pub type TextureID = slotmap::DefaultKey;
@@ -145,5 +147,33 @@ impl GraphicsContext {
 
         self.sc_desc = util::sc_desc_from_size(size);
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+    }
+
+    pub fn screen_to_world(
+        &self,
+        mouse_pos: Vector2<f32>,
+        camera: &Camera,
+        camera_position: Vector3<f32>,
+        camera_target_pos: Vector3<f32>,
+    ) -> Option<Vector3<f32>> {
+        let aspect_ratio = self.window_size.width as f32 / self.window_size.height as f32;
+
+        let mx_view = cgmath::Matrix4::look_at_rh(
+            Point3::from_vec(camera_position),
+            Point3::from_vec(camera_target_pos),
+            Vector3::unit_z(),
+        );
+        let mx_projection = cgmath::perspective(cgmath::Deg(camera.fov), aspect_ratio, 1.0, 1000.0);
+
+        project_screen_to_world(
+            Vector3::new(mouse_pos.x, mouse_pos.y, 1.0),
+            correction_matrix() * mx_projection * mx_view,
+            Vector4::new(
+                0.0,
+                0.0,
+                self.window_size.width as f32,
+                self.window_size.height as f32,
+            ),
+        )
     }
 }
