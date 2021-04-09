@@ -94,10 +94,12 @@ struct CanvasVertex {
 }
 
 pub enum RectangleDescriptor {
+    /// A Rectangle described as the positions of its corners
     CornerRect {
         corner1: ScreenVector,
         corner2: ScreenVector,
     },
+    /// A Rectangle described by its dimensions and position in relation to some anchor point
     AnchorRect {
         anchor: AnchorPoint,
         position: ScreenVector,
@@ -177,12 +179,12 @@ impl CanvasQueue {
         &mut self,
         desc: RectangleDescriptor,
         color: cgmath::Vector4<f32>,
-        size: winit::dpi::PhysicalSize<u32>,
+        screen_size: winit::dpi::PhysicalSize<u32>,
     ) {
         self.steps.push(CanvasStep::DrawRect {
             num: self.num,
             local_uniforms: {
-                let (position, dimensions) = desc.as_screen_coordinates(&size);
+                let (position, dimensions) = desc.as_screen_coordinates(&screen_size);
 
                 LocalUniforms::new(
                     (cgmath::Matrix4::from_translation(position.extend(0.0))
