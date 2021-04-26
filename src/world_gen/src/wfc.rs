@@ -444,30 +444,37 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
     while !entropy_hierarchy.is_converged() {
         // collapse superposition
         let (&least_entropy, bottom) = entropy_hierarchy.get_lowest_entropy();
-        let collapse_index = bottom.iter().choose(&mut rng).unwrap();
+        let collapsing_output_index = bottom.iter().choose(&mut rng).unwrap();
         // println!(
         //     "collapsing: {:?} {:?} with entropy {}",
         //     to_2d_index(collapse_index as isize, wave_map.size.x),
         //     collapse_index,
         //     least_entropy
         // );
-        let chosen = wave_map.buf[collapse_index]
-            .iter()
-            .choose(&mut rng)
-            .unwrap();
+        let chosen_tile = {
+            let result = wave_map.buf[collapsing_output_index]
+                .iter()
+                .choose(&mut rng)
+                .unwrap();
+            //TODO: check if wavemap boundrys match the chosen tile and if not, look for another one
+            result
+        };
 
-        entropy_hierarchy.reduce_entropy(collapse_index, least_entropy, 1);
+        entropy_hierarchy.reduce_entropy(collapsing_output_index, least_entropy, 1);
 
-        wave_map.buf[collapse_index].clear();
-        wave_map.buf[collapse_index].insert(chosen);
+        wave_map.buf[collapsing_output_index].clear();
+        wave_map.buf[collapsing_output_index].insert(chosen_tile);
 
         // reduce entropy
         for (&offset, constraint) in adjacencies.iter() {
-            let index_2d = wave_map.to_2d_index(collapse_index as isize).unwrap() + offset;
+            let index_2d = wave_map
+                .to_2d_index(collapsing_output_index as isize)
+                .unwrap()
+                + offset;
             if let Some(index) = wave_map.to_1d_index(index_2d) {
                 let set_to_reduce = wave_map.get_mut(index_2d).unwrap();
                 let original = set_to_reduce.len();
-                set_to_reduce.intersect_with(&constraint.0[chosen]);
+                set_to_reduce.intersect_with(&constraint.0[chosen_tile]);
                 if original != set_to_reduce.len() {
                     entropy_hierarchy.reduce_entropy(index as usize, original, set_to_reduce.len());
 
@@ -497,10 +504,10 @@ fn wfc<T: Copy + Eq + Hash + Debug>(
             }
         }
         entropy_hierarchy.cleanup();
-        if result.len() > 400 {
-            break;
-        }
-        result.push(to_image(&input, output_size, &wave_map));
+        // if result.len() > 400 {
+        //     break;
+        // }
+        // result.push(to_image(&input, output_size, &wave_map));
     }
 
     result.push(to_image(&input, output_size, &wave_map));
@@ -535,9 +542,10 @@ fn to_image<T: Copy + Eq + Hash + Debug>(
 
 pub fn test() {
     let timer = Instant::now();
-    let oli = image::open("oliprik.png").unwrap();
+    // let pic = image::open("oliprik.png").unwrap();
+    let pic = image::open("samples/Flowers.png").unwrap();
     println!("opened óli prik");
-    match oli {
+    match pic {
         DynamicImage::ImageRgb8(img) => {
             let size = V2u::from_value(256);
             let master = wfc(Grid::from(&img), Vec::from(SQUARE_NEIGHBOURHOOD), size);
