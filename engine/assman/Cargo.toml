@@ -1,0 +1,25 @@
+[package]
+name = "assman"
+version = "0.1.0"
+authors = ["Arnaldur Bjarnason <aarnaldur@gmail.com>", "Jökull Reynisson <jokullmani12@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+# internal
+graphics = { path = "../graphics"}
+entity_smith = { path = "../entity_smith"}
+input = { path = "../input"}
+
+ron = "0.6.4"
+serde = { version = "1.0.123", features = ["derive"] }
+wavefront_obj = "9.0.0"
+itertools = "0.10.0"
+gltf = "0.15.2"
+shaderc = "0.7.2"
+wgpu = "0.7.0"
+cgmath = "0.18.0"
+legion = "0.4.0"
+image = "0.23.14"
