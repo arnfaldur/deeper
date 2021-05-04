@@ -32,7 +32,7 @@ impl Application {
                 .add_system(systems::player::camera_control_system())
                 .add_system(world_gen::systems::dung_gen_system())
                 .add_system(systems::go_to_destination_system())
-                .add_system(misc::SnakeSystem::new())
+                //.add_system(misc::SnakeSystem::new())
                 .add_physics_systems(&mut self.world, &mut self.resources)
                 .add_transform_systems()
                 .build(),

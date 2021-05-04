@@ -244,7 +244,7 @@ impl Texture {
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
-            image.clone().into_bgra8().as_bytes(),
+            image.flipv().into_bgra8().as_bytes(),
             wgpu::TextureDataLayout {
                 offset: 0,
                 bytes_per_row: 4 * image.width(),
