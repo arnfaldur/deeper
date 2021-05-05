@@ -1,3 +1,10 @@
+#![feature(map_first_last)]
+#![feature(btree_retain)]
+
 pub mod components;
-pub mod dung_gen;
+mod dung_gen;
 pub mod systems;
+mod wfc;
+
+// fixme: this should be removed
+pub use wfc::test;
