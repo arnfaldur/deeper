@@ -112,19 +112,19 @@ impl SnakeBoard {
 
         self.player_dir = match self.new_dir {
             Direction::Up => match self.player_dir {
-                Direction::Down => self.player_dir.clone(),
+                Direction::Down => self.player_dir,
                 _ => self.new_dir,
             },
             Direction::Down => match self.player_dir {
-                Direction::Up => self.player_dir.clone(),
+                Direction::Up => self.player_dir,
                 _ => self.new_dir,
             },
             Direction::Left => match self.player_dir {
-                Direction::Right => self.player_dir.clone(),
+                Direction::Right => self.player_dir,
                 _ => self.new_dir,
             },
             Direction::Right => match self.player_dir {
-                Direction::Left => self.player_dir.clone(),
+                Direction::Left => self.player_dir,
                 _ => self.new_dir,
             },
         };
@@ -169,11 +169,8 @@ pub struct SnakeUnit;
 
 impl application::Unit for SnakeUnit {
     fn add_systems(&self, stage: UnitStage, builder: &mut Builder) {
-        match stage {
-            UnitStage::Logic => {
-                builder.add_system(SnakeSystem::new());
-            }
-            _ => (),
+        if let UnitStage::Logic = stage {
+            builder.add_system(SnakeSystem::new());
         }
     }
 }
@@ -181,6 +178,8 @@ impl application::Unit for SnakeUnit {
 pub struct SnakeSystem;
 
 impl SnakeSystem {
+    // May need to review this choice
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> impl Runnable { Self::system(SnakeBoard::new(), SystemTime::now()) }
 
     fn system(mut board: SnakeBoard, mut time: SystemTime) -> impl Runnable {

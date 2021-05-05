@@ -163,13 +163,17 @@ pub struct CanvasQueue {
     steps: Vec<CanvasStep>,
 }
 
-impl CanvasQueue {
-    pub fn new() -> Self {
+impl Default for CanvasQueue {
+    fn default() -> Self {
         Self {
             num: 0,
             steps: vec![],
         }
     }
+}
+
+impl CanvasQueue {
+    pub fn new() -> Self { Default::default() }
 
     pub fn clear(&mut self) {
         self.steps.clear();
@@ -532,7 +536,7 @@ impl CanvasRenderPipeline {
         vs_module: &wgpu::ShaderModule,
         fs_module: &wgpu::ShaderModule,
     ) -> wgpu::RenderPipeline {
-        return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Option::from(pipeline_layout),
             vertex: wgpu::VertexState {
@@ -560,7 +564,7 @@ impl CanvasRenderPipeline {
                 }],
             }),
             multisample: wgpu::MultisampleState::default(),
-        });
+        })
     }
 }
 

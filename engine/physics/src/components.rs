@@ -5,7 +5,7 @@ use nphysics2d::object::{DefaultBodyHandle, DefaultColliderHandle};
 pub struct Velocity(pub cgmath::Vector2<f32>);
 
 impl Default for Velocity {
-    fn default() -> Self { return Velocity(cgmath::Vector2::zero()); }
+    fn default() -> Self { Velocity(cgmath::Vector2::zero()) }
 }
 
 pub struct Force(pub nphysics2d::algebra::Force2<f32>);

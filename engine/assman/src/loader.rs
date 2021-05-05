@@ -40,20 +40,18 @@ impl AssetStore {
 
                 if file_type.is_dir() {
                     self.register_assets(Some(&e.path()));
-                } else if file_type.is_file() {
-                    if !self.assets.contains_key(&e.path()) {
-                        self.register_asset(
-                            &e.path(),
-                            self.new_asset_storage_info_from_ext(
-                                &e.path()
-                                    .extension()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap_or("")
-                                    .to_string(),
-                            ),
-                        );
-                    }
+                } else if file_type.is_file() && !self.assets.contains_key(&e.path()) {
+                    self.register_asset(
+                        &e.path(),
+                        self.new_asset_storage_info_from_ext(
+                            &e.path()
+                                .extension()
+                                .unwrap()
+                                .to_str()
+                                .unwrap_or("")
+                                .to_string(),
+                        ),
+                    );
                 }
             })
             .count(); // Consume
@@ -61,17 +59,13 @@ impl AssetStore {
 
     // Temporary evil
     pub fn get_model_index(&self, name: &str) -> Option<graphics::ModelID> {
-        if let Some(x) = self
+        if let Some(AssetStorageInfo::Model(Some(x))) = self
             .assets
             .values()
-            .find(|p| p.file_name == name.to_string())
+            .find(|p| p.file_name == *name)
             .map(|f| f.storage_info.clone())
         {
-            if let AssetStorageInfo::Model(Some(y)) = x {
-                Some(y.id)
-            } else {
-                None
-            }
+            Some(x.id)
         } else {
             None
         }
@@ -80,16 +74,16 @@ impl AssetStore {
     pub fn get_asset_storage_info(&self, file_name: &str) -> Option<AssetStorageInfo> {
         self.assets
             .values()
-            .find(|p| p.file_name == file_name.to_string())
+            .find(|p| p.file_name == *file_name)
             .map(|f| f.storage_info.clone())
     }
 
-    fn new_asset_storage_info_from_ext(&self, ext: &String) -> AssetStorageInfo {
-        if self.extensions.models.contains(ext) {
+    fn new_asset_storage_info_from_ext(&self, ext: &str) -> AssetStorageInfo {
+        if self.extensions.models.iter().any(|s| s == ext) {
             AssetStorageInfo::Model(None)
-        } else if self.extensions.textures.contains(ext) {
+        } else if self.extensions.textures.iter().any(|s| s == ext) {
             AssetStorageInfo::Texture(None)
-        } else if self.extensions.shaders.contains(ext) {
+        } else if self.extensions.shaders.iter().any(|s| s == ext) {
             AssetStorageInfo::Shader(None)
         } else {
             AssetStorageInfo::Unrecognized
@@ -164,10 +158,8 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
 
                 if file_type.is_dir() {
                     self.load_assets_recursive(Some(&e.path()));
-                } else if file_type.is_file() {
-                    if self.asset_store.assets.contains_key(&e.path()) {
-                        self.load_asset(&e.path());
-                    }
+                } else if file_type.is_file() && self.asset_store.assets.contains_key(&e.path()) {
+                    self.load_asset(&e.path());
                 }
             })
             .count();
@@ -177,8 +169,8 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
         self.asset_store
             .assets
             .values()
-            .find(|asset| asset.file_name == file_name.to_string())
-            .map(|e| e.clone())
+            .find(|asset| asset.file_name == file_name)
+            .cloned()
     }
 
     fn load_shader(&mut self, path: &Path) -> Option<Asset> {
@@ -230,7 +222,7 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
             }
         }
 
-        self.asset_store.assets.get(path).map(|f| f.clone())
+        self.asset_store.assets.get(path).cloned()
     }
 
     fn load_texture(&mut self, path: &Path) -> Option<Asset> {
@@ -239,7 +231,7 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
         let mut exists = false;
 
         if let Some(asset) = asset_entry {
-            if let AssetStorageInfo::Texture(Some(mut storage_info)) = asset.storage_info.clone() {
+            if let AssetStorageInfo::Texture(Some(mut storage_info)) = asset.storage_info {
                 exists = true;
                 if let Some(image) = reader::read_image(path) {
                     storage_info.loaded_at_time = SystemTime::now();
@@ -266,7 +258,7 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
             }
         }
 
-        self.asset_store.assets.get(path).map(|f| f.clone())
+        self.asset_store.assets.get(path).cloned()
     }
 
     fn load_model(&mut self, path: &Path) -> Option<Asset> {
@@ -294,7 +286,7 @@ impl<'a, 'b, 'c> GraphicsAssetManager<'a, 'b, 'c> {
                 .register_asset(path, AssetStorageInfo::Model(StorageInfo::now(id)));
         }
 
-        self.asset_store.assets.get(path).map(|f| f.clone())
+        self.asset_store.assets.get(path).cloned()
     }
 
     pub fn load_models(&mut self) {

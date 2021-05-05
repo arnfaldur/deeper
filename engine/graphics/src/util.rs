@@ -25,8 +25,8 @@ pub fn generate_matrix(aspect_ratio: f32, t: f32) -> cgmath::Matrix4<f32> {
         cgmath::Point3::new(0., 0., 0.),
         cgmath::Vector3::unit_z(),
     );
-    let mx_correction = correction_matrix();
-    return mx_correction * mx_projection * mx_view;
+
+    correction_matrix() * mx_projection * mx_view
 }
 
 // Function by Vallentin

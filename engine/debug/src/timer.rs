@@ -8,14 +8,18 @@ pub struct DebugTimer {
     popped: Vec<(String, Duration, Generation)>,
 }
 
-impl DebugTimer {
-    pub fn new() -> Self {
+impl Default for DebugTimer {
+    fn default() -> Self {
         Self {
             current_gen: 0,
             stack: vec![],
             popped: vec![],
         }
     }
+}
+
+impl DebugTimer {
+    pub fn new() -> Self { Default::default() }
 
     pub fn push(&mut self, label: &str) {
         self.current_gen += 1;
@@ -87,7 +91,7 @@ pub struct DebugTimerInfo {
 }
 
 impl DebugTimerInfo {
-    fn new(input_vec: &Vec<(String, Duration, Generation)>) -> Self {
+    fn new(input_vec: &[(String, Duration, Generation)]) -> Self {
         let groups = input_vec.group_by(|(_, _, a), _| *a != 0);
 
         let mut roots = vec![];

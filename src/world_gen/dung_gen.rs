@@ -56,25 +56,25 @@ impl DungGen {
 
     pub fn width(mut self, width: i32) -> DungGen {
         self.width = width;
-        return self;
+        self
     }
     pub fn height(mut self, height: i32) -> DungGen {
         self.height = height;
-        return self;
+        self
     }
 
     pub fn room_min(mut self, room_min: i32) -> DungGen {
         self.room_min = room_min;
-        return self;
+        self
     }
     pub fn room_range(mut self, room_range: i32) -> DungGen {
         self.room_range = room_range;
-        return self;
+        self
     }
 
     pub fn n_rooms(mut self, n_rooms: usize) -> DungGen {
         self.n_rooms = n_rooms;
-        return self;
+        self
     }
 
     pub fn generate(mut self) -> DungGen {
@@ -171,7 +171,7 @@ impl DungGen {
             }
 
             // If there are none remaining, we are done.
-            if remaining.len() == 0 {
+            if remaining.is_empty() {
                 break;
             }
 
@@ -205,29 +205,27 @@ impl DungGen {
                 if x <= x_end {
                     self.world.insert((x, y_start), TileType::Path);
                 }
-                if let None = self.world.get(&(x, y_start + 1)) {
+                if self.world.get(&(x, y_start + 1)).is_none() {
                     self.world.insert((x, y_start + 1), TileType::Wall(None));
                 }
-                if let None = self.world.get(&(x, y_start - 1)) {
+                if self.world.get(&(x, y_start - 1)).is_none() {
                     self.world.insert((x, y_start - 1), TileType::Wall(None));
                 }
             }
 
             // And now make sure we iterate in the correct y direction as well.
             if y_start > y_end {
-                let temp = y_start;
-                y_start = y_end;
-                y_end = temp;
+                std::mem::swap(&mut y_start, &mut y_end);
             }
 
             for y in y_start..=y_end + 1 {
                 if y <= y_end {
                     self.world.insert((x_end, y), TileType::Path);
                 }
-                if let None = self.world.get(&(x_end + 1, y)) {
+                if self.world.get(&(x_end + 1, y)).is_none() {
                     self.world.insert((x_end + 1, y), TileType::Wall(None));
                 }
-                if let None = self.world.get(&(x_end - 1, y)) {
+                if self.world.get(&(x_end - 1, y)).is_none() {
                     self.world.insert((x_end - 1, y), TileType::Wall(None));
                 }
             }
@@ -325,7 +323,7 @@ impl DungGen {
         // Mark the rest of the world as consisting of nothing
         for x in 0..self.width {
             for y in 0..self.width {
-                if let None = self.world.get(&(x, y)) {
+                if self.world.get(&(x, y)).is_none() {
                     self.world.insert((x, y), TileType::Nothing);
                 }
             }
@@ -338,7 +336,7 @@ impl DungGen {
         self.world
             .insert(self.room_centers[ladder_loc], TileType::LadderDown);
 
-        return self;
+        self
     }
 
     #[allow(dead_code)]
@@ -356,6 +354,7 @@ impl DungGen {
             }
             println!();
         }
-        return self;
+
+        self
     }
 }

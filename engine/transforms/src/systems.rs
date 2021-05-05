@@ -2,6 +2,7 @@ use cgmath::Matrix4;
 use entity_smith::Smith;
 //use imgui::Ui;
 use legion::systems::{Builder, ParallelRunnable, Runnable};
+use legion::world::EntityAccessError;
 use legion::{component, maybe_changed, Entity, IntoQuery, SystemBuilder};
 
 use crate::components::{Children, Parent};
@@ -295,12 +296,12 @@ fn inherit_transforms() -> impl ParallelRunnable {
             while let Some((parent, parent_transform)) = stack.pop() {
                 if let Ok(children) = <&Children>::query().get(&children_only, parent) {
                     for &child in &children.0 {
-                        if let Ok(child_transform) =
+                        if let Ok::<&mut Transform, EntityAccessError>(child_transform) =
                             <&mut Transform>::query().get_mut(&mut rest, child)
                         {
                             child_transform.absolute =
                                 parent_transform.absolute * child_transform.relative;
-                            stack.push((child, child_transform.clone()));
+                            stack.push((child, *child_transform));
                         }
                     }
                 }

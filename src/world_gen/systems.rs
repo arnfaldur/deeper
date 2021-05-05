@@ -1,7 +1,6 @@
 use assman::components::{DynamicModelRequest, StaticModelRequest};
-use cgmath::{vec2, Vector2, Vector3};
+use cgmath::{vec2, Vector2};
 use entity_smith::Smith;
-use graphics;
 use graphics::data::LocalUniforms;
 use legion::systems::Runnable;
 use legion::world::SubWorld;
@@ -29,7 +28,7 @@ pub fn dung_gen_system() -> impl Runnable {
                 world,
                 &mut resources.0,
                 &mut resources.1,
-                &mut resources.2,
+                &resources.2,
             );
         })
 }
@@ -41,6 +40,7 @@ pub fn dung_gen(
     floor: &mut FloorNumber,
     player: &Player,
 ) {
+    #[allow(clippy::single_match)]
     match *transition {
         MapTransition::Deeper => {
             // TODO(Arnaldur): bruh
@@ -72,8 +72,7 @@ pub fn dung_gen(
                 let (x, y) = dungeon
                     .room_centers
                     .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .clone();
+                    .unwrap();
                 vec2(
                     (x + rng.gen_range(-2..2)) as f32,
                     (y + rng.gen_range(-2..2)) as f32,

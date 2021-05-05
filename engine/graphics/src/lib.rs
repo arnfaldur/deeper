@@ -36,14 +36,18 @@ pub struct GraphicsResources {
     pub shaders: HashMap<ShaderID, Arc<wgpu::ShaderModule>>,
 }
 
-impl GraphicsResources {
-    pub fn new() -> Self {
+impl Default for GraphicsResources {
+    fn default() -> Self {
         Self {
             models: SlotMap::new(),
             textures: SlotMap::new(),
             shaders: HashMap::new(),
         }
     }
+}
+
+impl GraphicsResources {
+    pub fn new() -> Self { Default::default() }
 }
 
 pub struct RenderContext<'a> {

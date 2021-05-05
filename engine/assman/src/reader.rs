@@ -15,18 +15,17 @@ pub fn read_ron<T: DeserializeOwned>(path: &Path) -> Result<T, ron::Error> {
 pub fn read_image<P: AsRef<Path>>(path: P) -> Option<image::DynamicImage> {
     image::io::Reader::open(path)
         .ok()
-        .map_or(None, |e| e.decode().ok())
+        .and_then(|e| e.decode().ok())
 }
 
 // TODO: Handle transforms
 pub fn vertex_lists_from_gltf(path: &Path) -> Result<graphics::data::VertexLists, String> {
-    let (document, buffers, _images) = gltf::import(path).expect(
-        format!(
+    let (document, buffers, _images) = gltf::import(path).unwrap_or_else(|_| {
+        panic!(
             "[graphics/gltf] : File {} could not be opened",
             path.display()
         )
-        .as_ref(),
-    );
+    });
 
     // TODO: Add checks for multiple models/scenes, etc.
     let mut vertex_lists = vec![];
@@ -46,9 +45,9 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<graphics::data::VertexLists
             let indices = reader.read_indices().unwrap().into_u32();
 
             for idx in indices {
-                let pos = positions.get(idx as usize).unwrap().clone();
-                let normal = normals.get(idx as usize).unwrap().clone();
-                let tex_coord = tex_coords.get(idx as usize).unwrap().clone();
+                let pos = *positions.get(idx as usize).unwrap();
+                let normal = *normals.get(idx as usize).unwrap();
+                let tex_coord = *tex_coords.get(idx as usize).unwrap();
 
                 vertex_list.push(graphics::data::Vertex {
                     pos,
@@ -60,7 +59,7 @@ pub fn vertex_lists_from_gltf(path: &Path) -> Result<graphics::data::VertexLists
         vertex_lists.push(vertex_list);
     }
 
-    return Ok(vertex_lists);
+    Ok(vertex_lists)
 }
 
 pub fn vertex_lists_from_obj(path: &Path) -> Result<graphics::data::VertexLists, String> {
