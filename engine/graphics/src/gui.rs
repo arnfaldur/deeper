@@ -15,6 +15,8 @@ use crate::RenderContext;
 /// and manage a reference to the memory manually.
 pub static mut CURRENT_UI: Option<imgui::Ui<'static>> = None;
 
+/// # Safety
+/// This is not safe, be very careful.
 pub unsafe fn current_ui<'a>() -> Option<&'a imgui::Ui<'a>> { CURRENT_UI.as_ref() }
 
 /// Contains everything necessary to render GUI elements.

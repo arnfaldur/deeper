@@ -1,5 +1,6 @@
 #![allow(unused)]
 use std::mem::MaybeUninit;
+use std::sync::Arc;
 
 use bytemuck::{bytes_of, Pod, Zeroable};
 use cgmath::{vec2, Vector2};
@@ -162,13 +163,17 @@ pub struct CanvasQueue {
     steps: Vec<CanvasStep>,
 }
 
-impl CanvasQueue {
-    pub fn new() -> Self {
+impl Default for CanvasQueue {
+    fn default() -> Self {
         Self {
             num: 0,
             steps: vec![],
         }
     }
+}
+
+impl CanvasQueue {
+    pub fn new() -> Self { Default::default() }
 
     pub fn clear(&mut self) {
         self.steps.clear();
@@ -244,7 +249,7 @@ pub struct CanvasRenderPipeline {
 
     quad_mesh: super::data::Mesh,
     immediate_elements: [ImmediateElement; MAXIMUM_NUMBER_OF_QUADS],
-    local_uniform_buffer: [LocalUniforms; MAXIMUM_NUMBER_OF_QUADS],
+    local_uniform_buffer: Box<[LocalUniforms; MAXIMUM_NUMBER_OF_QUADS]>,
 }
 
 impl CanvasRenderPipeline {
@@ -440,7 +445,7 @@ impl CanvasRenderPipeline {
             pipeline,
             quad_mesh,
             immediate_elements,
-            local_uniform_buffer: [Default::default(); MAXIMUM_NUMBER_OF_QUADS],
+            local_uniform_buffer: Box::new([Default::default(); MAXIMUM_NUMBER_OF_QUADS]),
         }
     }
 
@@ -466,7 +471,7 @@ impl CanvasRenderPipeline {
         render_context.queue.write_buffer(
             &self.local_uniform_buf,
             0,
-            bytes_of(&self.local_uniform_buffer),
+            bytes_of(self.local_uniform_buffer.as_ref()),
         );
 
         {
@@ -531,7 +536,7 @@ impl CanvasRenderPipeline {
         vs_module: &wgpu::ShaderModule,
         fs_module: &wgpu::ShaderModule,
     ) -> wgpu::RenderPipeline {
-        return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Option::from(pipeline_layout),
             vertex: wgpu::VertexState {
@@ -559,7 +564,7 @@ impl CanvasRenderPipeline {
                 }],
             }),
             multisample: wgpu::MultisampleState::default(),
-        });
+        })
     }
 }
 

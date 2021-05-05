@@ -2,7 +2,7 @@ use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub const MAX_NR_OF_POINT_LIGHTS: usize = 10;
@@ -36,14 +36,18 @@ pub struct GraphicsResources {
     pub shaders: HashMap<ShaderID, Arc<wgpu::ShaderModule>>,
 }
 
-impl GraphicsResources {
-    pub fn new() -> Self {
+impl Default for GraphicsResources {
+    fn default() -> Self {
         Self {
             models: SlotMap::new(),
             textures: SlotMap::new(),
             shaders: HashMap::new(),
         }
     }
+}
+
+impl GraphicsResources {
+    pub fn new() -> Self { Default::default() }
 }
 
 pub struct RenderContext<'a> {

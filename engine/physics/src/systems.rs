@@ -295,7 +295,7 @@ fn movement(frame_time: &FrameTime, pos: &mut Position, vel: &mut Velocity) {
 }
 
 fn n2c(input: &nalgebra::Vector2<f32>) -> cgmath::Vector2<f32> {
-    return cgmath::Vector2::new(input.x, input.y);
+    cgmath::Vector2::new(input.x, input.y)
 }
 
-fn c2n(input: cgmath::Vector2<f32>) -> nalgebra::Vector2<f32> { return [input.x, input.y].into(); }
+fn c2n(input: cgmath::Vector2<f32>) -> nalgebra::Vector2<f32> { [input.x, input.y].into() }

@@ -24,6 +24,7 @@ impl<'a> TransformEntitySmith for EntitySmith<'a> {
 
     fn adopt_child(&mut self, child: Entity) -> &mut Self {
         let me = self.entity;
+
         self.interface.exec_mut(move |world, _| {
             if let Some(mut entry) = world.entry(me) {
                 if let Ok(children) = entry.get_component_mut::<Children>() {
@@ -33,7 +34,8 @@ impl<'a> TransformEntitySmith for EntitySmith<'a> {
                 }
             }
         });
-        return self;
+
+        self
     }
     fn child_of(&mut self, parent: Entity) -> &mut Self { self.add_component(Parent(parent)) }
 }

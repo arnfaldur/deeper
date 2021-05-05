@@ -131,6 +131,8 @@ fn render_system() -> impl Runnable {
         )
 }
 
+// Thank you Clippy, I already know
+#[allow(clippy::too_many_arguments)]
 fn render(
     window: &Window,
     graphics_resources: &GraphicsResources,

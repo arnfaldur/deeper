@@ -6,6 +6,7 @@ use cgmath::Vector2;
 pub use systems::InputUnit;
 use winit::event::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
 
+#[derive(Default)]
 pub struct ButtonState {
     pub pressed: bool,
     pub down: bool,
@@ -48,21 +49,23 @@ pub struct MouseState {
     pub scroll: f32,
 }
 
-impl MouseState {
-    pub fn new() -> Self {
+impl Default for MouseState {
+    fn default() -> Self {
         Self {
-            left: ButtonState::new(),
-            right: ButtonState::new(),
-            middle: ButtonState::new(),
-
+            left: Default::default(),
+            right: Default::default(),
+            middle: Default::default(),
             pos: Vector2::new(0.0, 0.0),
             last_pos: Vector2::new(0.0, 0.0),
-
             scroll: 0.0,
         }
     }
+}
 
-    pub fn delta(&self) -> Vector2<f32> { return self.pos - self.last_pos; }
+impl MouseState {
+    pub fn new() -> Self { Default::default() }
+
+    pub fn delta(&self) -> Vector2<f32> { self.pos - self.last_pos }
 
     pub fn update_from_mouse_button(&mut self, mouse_button: &MouseButton, state: &ElementState) {
         match state {
@@ -108,6 +111,7 @@ impl MouseState {
 
 pub type Key = VirtualKeyCode;
 
+#[derive(Default)]
 pub struct InputState {
     pub mouse: MouseState,
     pub keyboard: std::collections::HashMap<Key, ButtonState>,
@@ -132,12 +136,12 @@ impl InputState {
     }
 
     pub fn mouse_button_state(&self, mouse_button: MouseButton, status: ButtonStatus) -> bool {
-        return match mouse_button {
+        match mouse_button {
             MouseButton::Left => self.mouse.left.status(status),
             MouseButton::Right => self.mouse.right.status(status),
             MouseButton::Middle => self.mouse.middle.status(status),
             MouseButton::Other(_) => false,
-        };
+        }
     }
 
     // Fields that don't need re-initialization are really the exception
@@ -152,9 +156,10 @@ impl InputState {
 
         self.mouse.scroll = 0.0;
 
-        for (_, state) in &mut self.keyboard {
-            state.pressed = false;
-        }
+        self.keyboard
+            .values_mut()
+            .map(|f| f.pressed = false)
+            .count();
     }
 
     pub fn update_from_event(&mut self, event: &winit::event::WindowEvent) {
@@ -248,6 +253,7 @@ impl CommandState {
     }
 }
 
+#[derive(Default)]
 pub struct CommandManager {
     commands: std::collections::HashMap<Command, CommandState>,
 }
@@ -382,7 +388,7 @@ impl CommandManager {
     pub fn has_binding(&self, command: Command) -> bool { self.commands.contains_key(&command) }
 
     pub fn update(&mut self, input_state: &InputState) {
-        for (_, state) in &mut self.commands {
+        for state in self.commands.values_mut() {
             state.update(input_state);
         }
     }

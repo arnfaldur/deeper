@@ -97,19 +97,19 @@ pub fn camera_control(
             let mut new_velocity = Vector2::new(0.0, 0.0);
 
             if command_manager.get(Command::PlayerCameraMoveUp) {
-                new_velocity += cam_front.clone();
+                new_velocity += cam_front;
                 camera.roaming = true;
             }
             if command_manager.get(Command::PlayerCameraMoveLeft) {
-                new_velocity -= cam_right.clone();
+                new_velocity -= cam_right;
                 camera.roaming = true;
             }
             if command_manager.get(Command::PlayerCameraMoveDown) {
-                new_velocity -= cam_front.clone();
+                new_velocity -= cam_front;
                 camera.roaming = true;
             }
             if command_manager.get(Command::PlayerCameraMoveRight) {
-                new_velocity += cam_right.clone();
+                new_velocity += cam_right;
                 camera.roaming = true;
             }
 

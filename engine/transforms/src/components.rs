@@ -64,7 +64,7 @@ impl Transform {
 impl Default for Position {
     fn default() -> Self {
         println!("Creating a default Position");
-        return Position(Vector3::zero());
+        Position(Vector3::zero())
     }
 }
 

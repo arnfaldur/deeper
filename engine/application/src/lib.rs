@@ -31,7 +31,7 @@ pub enum UnitStage {
 }
 
 pub trait Unit {
-    fn load_resources(&self, _world: &mut World, _resources: &mut Resources) { () }
+    fn load_resources(&self, _world: &mut World, _resources: &mut Resources) {}
     fn add_systems(&self, stage: UnitStage, builder: &mut SystemBuilder);
 }
 

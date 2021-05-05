@@ -39,52 +39,54 @@ pub struct GlobalUniforms {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Pod, Zeroable, Default)]
+#[derive(Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct Material {
     pub albedo: [f32; 4],
     pub metallic: f32,
     pub roughness: f32,
 }
 
-impl Material {
-    pub fn default() -> Self {
-        let mut mat: Self = Default::default();
-        mat.albedo = [1.0, 1.0, 1.0, 1.0];
-        mat.metallic = 0.1;
-        mat.roughness = 0.15;
-        return mat;
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            albedo: [1.0, 1.0, 1.0, 1.0],
+            metallic: 0.1,
+            roughness: 0.15,
+        }
     }
+}
 
+impl Material {
     pub fn color(color: Vector4<f32>) -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = color.into();
-        mat.metallic = 0.0;
-        mat.roughness = 0.0;
-        return mat;
+        Self {
+            albedo: color.into(),
+            metallic: 0.0,
+            roughness: 0.0,
+        }
     }
 
     pub fn glossy(color: Vector3<f32>) -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = [color.x, color.y, color.z, 1.0];
-        mat.roughness = 0.2;
-        mat.metallic = 0.2;
-        return mat;
+        Self {
+            albedo: [color.x, color.y, color.z, 1.0],
+            metallic: 0.2,
+            roughness: 0.2,
+        }
     }
 
     pub fn darkest_stone() -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = [0.05, 0.05, 0.05, 1.0];
-        mat.metallic = 0.0;
-        mat.roughness = 0.5;
-        return mat;
+        Self {
+            albedo: [0.05, 0.05, 0.05, 1.0],
+            metallic: 0.0,
+            roughness: 0.5,
+        }
     }
 
     pub fn dark_stone() -> Self {
-        let mut mat: Self = Self::default();
-        mat.albedo = [0.07, 0.07, 0.07, 1.0];
-        mat.metallic = 0.0;
-        mat.roughness = 0.7;
-        return mat;
+        Self {
+            albedo: [0.07, 0.07, 0.07, 1.0],
+            metallic: 0.0,
+            roughness: 0.7,
+        }
     }
 }
 
@@ -244,7 +246,7 @@ impl Texture {
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
-            image.clone().into_bgra8().as_bytes(),
+            image.flipv().into_bgra8().as_bytes(),
             wgpu::TextureDataLayout {
                 offset: 0,
                 bytes_per_row: 4 * image.width(),

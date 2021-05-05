@@ -117,7 +117,7 @@ async fn run_async() {
         .any(Parent(player))
         .orientation(1.0)
         .any(DynamicModelRequest::new("arissa.obj"))
-        .any(Scale(0.5))
+        .any(Scale(0.75))
         .get_entity();
 
     for &dir in &[

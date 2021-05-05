@@ -16,13 +16,17 @@ pub struct ModelQueue {
     static_models: Vec<StaticModel>,
 }
 
-impl ModelQueue {
-    pub fn new() -> Self {
+impl Default for ModelQueue {
+    fn default() -> Self {
         Self {
             dynamic_models: vec![],
             static_models: vec![],
         }
     }
+}
+
+impl ModelQueue {
+    pub fn new() -> Self { Default::default() }
 
     pub fn push_static_model(&mut self, model: StaticModel) { self.static_models.push(model); }
 
@@ -348,7 +352,7 @@ impl ModelRenderPipeline {
             usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
         });
 
-        return depth_texture.create_view(&Default::default());
+        depth_texture.create_view(&Default::default())
     }
 
     fn compile_pipeline(
@@ -357,7 +361,7 @@ impl ModelRenderPipeline {
         vs_module: &wgpu::ShaderModule,
         fs_module: &wgpu::ShaderModule,
     ) -> wgpu::RenderPipeline {
-        return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Option::from(pipeline_layout),
             vertex: wgpu::VertexState {
@@ -393,6 +397,6 @@ impl ModelRenderPipeline {
                 }],
             }),
             multisample: wgpu::MultisampleState::default(),
-        });
+        })
     }
 }

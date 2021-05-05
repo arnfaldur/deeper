@@ -48,15 +48,15 @@ impl Smith for CommandBuffer {
 impl<'a> EntitySmith<'a> {
     pub fn another(&mut self) -> &mut Self {
         self.entity = self.interface.push(());
-        return self;
+        self
     }
     pub fn add_component<T: Component>(&mut self, component: T) -> &mut Self {
         self.interface.add_component(self.entity, component);
-        return self;
+        self
     }
     pub fn remove_component<T: Component>(&mut self) -> &mut Self {
         self.interface.remove_component::<T>(self.entity);
-        return self;
+        self
     }
     pub fn done(&self) {}
     pub fn get_entity(&self) -> Entity { self.entity }
