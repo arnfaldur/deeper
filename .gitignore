@@ -3,6 +3,8 @@ Cargo.lock
 /.cargo
 /.idea
 
+settings/display.settings
+
 /target
 **/*.rs.bk
 

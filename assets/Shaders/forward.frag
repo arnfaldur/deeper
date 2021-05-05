@@ -193,16 +193,22 @@ vec4 fLightFactor(vec3 normal, float distance, float radius, vec4 color, vec3 li
 }
 
 void main() {
-    o_Target = texture(sampler2D(t_Diffuse, s_Diffuse), v_TexCoord);
-    //vec3 normal = normalize(v_Normal.xyz);
-    //vec3 view_dir = normalize(u_Eye_Position.xyz - v_FragPos.xyz);
+    vec4 diffuse = texture(sampler2D(t_Diffuse, s_Diffuse), v_TexCoord);
+    vec3 normal = normalize(v_Normal.xyz);
+    vec3 view_dir = normalize(u_Eye_Position.xyz - v_FragPos.xyz);
 
-    //Material mat = material;
+    DirectionalLight directional_light = {
+        vec4(0.1, 0.2, 0.3, 1.0),
+        vec4(vec3(0.2), 1.0),
+        vec4(vec3(0.8), 1.0),
+    };
 
-    //vec4 F_0 = vec4(vec3(0.2), 1.0);
-    //F_0 = mix(F_0, mat.albedo, mat.metallic);
+    Material mat = { diffuse, 0.0, 2.0 };
 
-    //vec4 Lo = vec4(0.0);
+    vec4 F_0 = vec4(vec3(0.03), 1.0);
+    F_0 = mix(F_0, mat.albedo, mat.metallic);
+
+    vec4 Lo = vec4(0.0);
 
     //for(int i = 0; i < MAX_NR_OF_POINT_LIGHTS; i++) {
     //    PointLight light = uPointLights[i];
@@ -221,42 +227,46 @@ void main() {
     //    );
     //}
 
-    //// Directional Light
-    //vec4 ambient = uDirectionalLight.ambient * mat.albedo;
-    //vec4 color = ambient + Lo;
+    // Directional Light
+    vec4 ambient = directional_light.ambient * mat.albedo;
+    vec4 color = ambient + Lo;
 
-    //vec3 light_dir = normalize(uDirectionalLight.direction.xyz);
-    //vec3 halfway = normalize(light_dir + view_dir);
+    vec3 light_dir = normalize(directional_light.direction.xyz);
+    vec3 halfway = normalize(light_dir + view_dir);
 
-    //float NDF = fDistributionGGX(normal, halfway, mat.roughness);
-    //float G = fGeometrySmith(normal, view_dir, light_dir, mat.roughness);
-    //vec4 F = fFresnelSchlick(max(dot(halfway, view_dir), 0.0), F_0);
+    float NDF = fDistributionGGX(normal, halfway, mat.roughness);
+    float G = fGeometrySmith(normal, view_dir, light_dir, mat.roughness);
+    vec4 F = fFresnelSchlick(max(dot(halfway, view_dir), 0.0), F_0);
 
-    //float lambert = fLambert(normal, light_dir);
+    float lambert = fLambert(normal, light_dir);
 
-    //vec4 numerator = NDF * G * F;
-    //float denominator = 4.0 * max(dot(normal, view_dir), 0.0) * lambert;
-    //vec4 specular = numerator / max(denominator, 0.001);
+    vec4 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(normal, view_dir), 0.0) * lambert;
+    vec4 specular = numerator / max(denominator, 0.001);
 
-    //vec4 kS = F;
-    //vec4 kD = vec4(1.0) - kS;
-    //kD *= 1.0 - mat.metallic;
+    vec4 kS = F;
+    vec4 kD = vec4(1.0) - kS;
+    kD *= 1.0 - mat.metallic;
 
 
-    //color += (kD * mat.albedo / PI + specular) * lambert * uDirectionalLight.color;
+    color += (kD * mat.albedo + specular) * lambert * directional_light.color;
 
-    //// Gamma correction
-    //color = color / (color + vec4(1.0));
-    //color = pow(color, vec4(1.0/2.2));
+    color = specular;
+    color = G * mat.albedo;
+
+    // Gamma correction
+    color = color / (color + vec4(1.0));
+    color = pow(color, vec4(1.0/2.2));
 
     //color = RGBtoHCY(color);
 
-    //// Brightness
+    // Brightness
     //color.z += 0.112;
-    //// Contrast
+    // Contrast
     //color.z = contrast(1.6, color.z);
 
     //color = HCYtoRGB(color);
 
     //o_Target = vec4(color.rgb, 1.0);
+    o_Target = diffuse;
 }

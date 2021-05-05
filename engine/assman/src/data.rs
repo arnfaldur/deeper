@@ -11,8 +11,8 @@ pub struct PathSettings {
     pub extensions_settings_path: PathBuf,
     pub assets_path: PathBuf,
     pub models_path: PathBuf,
-    //pub textures_path: PathBuf,
-    //pub shader_path: PathBuf,
+    pub textures_path: PathBuf,
+    pub shader_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Default)]
