@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use assman::components::{DynamicModelRequest, StaticModelRequest};
 use cgmath::{vec2, Vector2};
 use entity_smith::Smith;
 use graphics::data::LocalUniforms;
-use legion::systems::Runnable;
+use legion::systems::{CommandBuffer, Runnable};
 use legion::world::SubWorld;
 use legion::{Entity, IntoQuery, SystemBuilder};
 use physics::PhysicsEntitySmith;
@@ -85,107 +87,111 @@ pub fn dung_gen(
                 .position(player_start.extend(0.))
                 .velocity_zero();
 
-            let _room_centers = &dungeon.room_centers;
+            populate_environment(command_buffer, &dungeon.world);
 
-            for (&(x, y), &tile_type) in dungeon.world.iter() {
-                let pos = Vector2::new(x as f32, y as f32);
-
-                let mut smith = command_buffer.smith();
-
-                smith.any(StaticModelRequest {
-                    label: match tile_type {
-                        TileType::Nothing => "DevFloor.obj",
-                        TileType::Wall(Some(_)) => "DevWall.obj",
-                        TileType::Wall(None) => "shittycorner.obj",
-                        TileType::Floor => "DevFloor.obj",
-                        TileType::Path => "DevFloor.obj",
-                        TileType::LadderDown => "StairsDown.obj",
-                        //TileType::Nothing => "grayplane.obj",
-                        //TileType::Wall(None) => "shittycorner.obj",
-                        //TileType::Wall(Some(_)) => "brickwall.obj",
-                        //TileType::Floor => "floortile-single-beveled.obj",
-                        //TileType::Path => "floortile-quad-beveled.obj",
-                        //TileType::LadderDown => "StairsDown.obj",
-                    }
-                    .to_string(),
-                    uniforms: LocalUniforms::simple(
-                        pos.extend(match tile_type {
-                            TileType::Nothing => 1.50,
-                            //TileType::Nothing => 1.45,
-                            _ => 0.,
-                        })
-                        .into(),
-                        1.0,
-                        match tile_type {
-                            TileType::Wall(Some(WallDirection::North)) => 0.,
-                            TileType::Wall(Some(WallDirection::West)) => 90.,
-                            TileType::Wall(Some(WallDirection::South)) => 180.,
-                            TileType::Wall(Some(WallDirection::East)) => 270.,
-                            _ => 0.,
-                        },
-                        Default::default(),
-                    ),
-                });
-
-                smith.any(tile_type);
-                match tile_type {
-                    TileType::Nothing => {}
-                    _ => {
-                        smith.pos(pos);
-                    }
-                }
-
-                // tile specific behaviors
-                match tile_type {
-                    TileType::Wall(_) => {
-                        smith.static_square_body(1.0);
-                    }
-                    TileType::LadderDown => {
-                        smith.any(MapSwitcher(MapTransition::Deeper));
-                    }
-                    _ => {}
-                }
-
-                // Add enemies to floor
-                if TileType::Floor == tile_type
-                    && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
-                {
-                    let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
-                    let mut smith = command_buffer.smith();
-                    smith
-                        .position(
-                            (pos + Vector2::new(
-                                rng.gen_range(-0.3..0.3),
-                                rng.gen_range(-0.3..0.3),
-                            ))
-                            .extend(0.),
-                        )
-                        .agent(
-                            rng.gen_range(1.0..4.0) - 1.6 * rad,
-                            rng.gen_range(3.0..9.0) + 2.0 * rad,
-                        )
-                        .orientation(0.0)
-                        .velocity_zero()
-                        .dynamic_body(rad)
-                        .circle_collider(rad)
-                        .any(Faction::Enemies)
-                        .any(AIFollow {
-                            target: player.player,
-                            minimum_distance: 2.0 + rad,
-                        })
-                        .any(HitPoints {
-                            max: rng.gen_range(0.0..2.0) + 8. * rad,
-                            health: rng.gen_range(0.0..2.0) + 8. * rad,
-                        })
-                        .any(DynamicModelRequest {
-                            label: "monstroman.obj".to_string(),
-                        })
-                        .any(Scale(rad * 1.7))
-                        .done();
-                }
-            }
+            add_enemies(command_buffer, floor, &dungeon.world);
         }
         _ => {}
     }
     *transition = MapTransition::None;
+}
+
+fn populate_environment(
+    command_buffer: &mut CommandBuffer,
+    dungeon: &HashMap<(i32, i32), TileType>,
+) {
+    for (&(x, y), &tile_type) in dungeon.iter() {
+        let pos = Vector2::new(x as f32, y as f32);
+
+        let mut smith = command_buffer.smith();
+
+        smith.any(StaticModelRequest::new(
+            match tile_type {
+                TileType::Nothing => "DevFloor.obj",
+                TileType::Wall(Some(_)) => "DevWall.obj",
+                TileType::Floor => "DevFloor.obj",
+                TileType::Path => "DevFloor.obj",
+                _ => "cube.obj",
+            },
+            LocalUniforms::simple(
+                pos.extend(match tile_type {
+                    TileType::Nothing => 1.50,
+                    _ => 0.,
+                })
+                .into(),
+                1.0,
+                match tile_type {
+                    TileType::Wall(Some(WallDirection::North)) => 0.,
+                    TileType::Wall(Some(WallDirection::West)) => 90.,
+                    TileType::Wall(Some(WallDirection::South)) => 180.,
+                    TileType::Wall(Some(WallDirection::East)) => 270.,
+                    _ => 0.,
+                },
+                Default::default(),
+            ),
+        ));
+
+        smith.any(tile_type);
+        match tile_type {
+            TileType::Nothing => {}
+            _ => {
+                smith.pos(pos);
+            }
+        }
+
+        // tile specific behaviors
+        match tile_type {
+            TileType::Wall(_) => {
+                smith.static_square_body(1.0);
+            }
+            TileType::LadderDown => {
+                smith.any(MapSwitcher(MapTransition::Deeper));
+            }
+            _ => {}
+        }
+    }
+}
+
+fn add_enemies(
+    command_buffer: &mut CommandBuffer,
+    floor: &mut FloorNumber,
+    dungeon: &HashMap<(i32, i32), TileType>,
+) {
+    let mut rng = thread_rng();
+
+    // Add enemies to floor
+
+    for (&(x, y), &tile_type) in dungeon.iter() {
+        let pos = Vector2::new(x as f32, y as f32);
+
+        if TileType::Floor == tile_type
+            && rng.gen_bool(((floor.0 - 1) as f64 * 0.05 + 1.).log2().min(1.) as f64)
+        {
+            let rad = rng.gen_range(0.1..0.4) + rng.gen_range(0.0..0.1);
+            let mut smith = command_buffer.smith();
+            smith
+                .position(
+                    (pos + Vector2::new(rng.gen_range(-0.3..0.3), rng.gen_range(-0.3..0.3)))
+                        .extend(0.),
+                )
+                .agent(
+                    rng.gen_range(1.0..4.0) - 1.6 * rad,
+                    rng.gen_range(3.0..9.0) + 2.0 * rad,
+                )
+                .orientation(0.0)
+                .velocity_zero()
+                .dynamic_body(rad)
+                .circle_collider(rad)
+                .any(Faction::Enemies)
+                .any(HitPoints {
+                    max: rng.gen_range(0.0..2.0) + 8. * rad,
+                    health: rng.gen_range(0.0..2.0) + 8. * rad,
+                })
+                .any(DynamicModelRequest {
+                    label: "monstroman.obj".to_string(),
+                })
+                .any(Scale(rad * 1.7))
+                .done();
+        }
+    }
 }

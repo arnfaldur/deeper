@@ -5,6 +5,15 @@ pub struct StaticModelRequest {
     pub uniforms: LocalUniforms,
 }
 
+impl StaticModelRequest {
+    pub fn new(label: &str, uniforms: LocalUniforms) -> Self {
+        Self {
+            label: label.to_string(),
+            uniforms,
+        }
+    }
+}
+
 pub struct DynamicModelRequest {
     pub label: String,
 }
