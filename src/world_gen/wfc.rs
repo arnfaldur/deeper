@@ -28,7 +28,7 @@ pub fn test() {
         retry::NumTimes(40),
         &mut rng,
     ) {
-        out.save("woah.png");
+        out.save("woah.png").unwrap();
         println!("Success!");
     }
     println!("elapsed {:?}", timer.elapsed());
