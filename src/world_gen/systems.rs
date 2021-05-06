@@ -11,11 +11,12 @@ use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::{Scale, TransformEntitySmith};
 
-use crate::components::{AIFollow, HitPoints, Player};
+use crate::components::{HitPoints, Player};
 use crate::world_gen::components::{
-    Faction, FloorNumber, MapSwitcher, MapTransition, TileType, WallDirection,
+    Direction, Faction, FloorNumber, MapSwitcher, MapTransition, TileType,
 };
-use crate::world_gen::dung_gen::DungGen;
+
+//use crate::world_gen::dung_gen::DungGen;
 
 pub fn dung_gen_system() -> impl Runnable {
     SystemBuilder::new("DungGen System")
@@ -61,25 +62,65 @@ pub fn dung_gen(
             floor.0 += 1;
 
             println!("You have reached floor {}", floor.0);
-            let dungeon = DungGen::new()
-                .width(60)
-                .height(60)
-                .n_rooms(10)
-                .room_min(5)
-                .room_range(5)
-                .generate();
+            //let dungeon = DungGen::new()
+            //    .width(60)
+            //    .height(60)
+            //    .n_rooms(10)
+            //    .room_min(5)
+            //    .room_range(5)
+            //    .generate();
 
             let mut rng = thread_rng();
-            let player_start = {
-                let (x, y) = dungeon
-                    .room_centers
-                    .choose(&mut rand::thread_rng())
-                    .unwrap();
-                vec2(
-                    (x + rng.gen_range(-2..2)) as f32,
-                    (y + rng.gen_range(-2..2)) as f32,
-                )
-            };
+
+            //let player_start = {
+            //    let (x, y) = dungeon
+            //        .room_centers
+            //        .choose(&mut rand::thread_rng())
+            //        .unwrap();
+            //    vec2(
+            //        (x + rng.gen_range(-2..2)) as f32,
+            //        (y + rng.gen_range(-2..2)) as f32,
+            //    )
+            //};
+
+            let pic = image::open("assets/Images/wfcdungeonsample.png").unwrap();
+
+            let test_world = pic
+                .into_bgr8()
+                .enumerate_pixels()
+                .map(|(x, y, pixel)| {
+                    ((x as i32, y as i32), {
+                        let [b, g, r] = pixel.0;
+                        let direction = match r {
+                            0 => Direction::North,
+                            64 => Direction::East,
+                            128 => Direction::South,
+                            192 => Direction::West,
+                            _ => Direction::North,
+                        };
+                        if b > 0 {
+                            match g {
+                                0 => TileType::Floor,
+                                64 => TileType::CornerIn(direction),
+                                128 => TileType::CornerOut(direction),
+                                192 => TileType::Wall(direction),
+                                _ => TileType::Unknown,
+                            }
+                        } else {
+                            TileType::Nothing
+                        }
+                    })
+                })
+                .collect::<HashMap<(i32, i32), TileType>>();
+
+            populate_environment(command_buffer, &test_world);
+
+            let player_start = test_world
+                .iter()
+                .filter(|&(_, &tile_type)| tile_type == TileType::Floor)
+                .choose(&mut rng)
+                .map(|((x, y), _)| vec2(*x as f32, *y as f32))
+                .unwrap();
 
             // Reset player position and stuff
             command_buffer
@@ -87,9 +128,7 @@ pub fn dung_gen(
                 .position(player_start.extend(0.))
                 .velocity_zero();
 
-            populate_environment(command_buffer, &dungeon.world);
-
-            add_enemies(command_buffer, floor, &dungeon.world);
+            add_enemies(command_buffer, floor, &test_world);
         }
         _ => {}
     }
@@ -108,10 +147,15 @@ fn populate_environment(
         smith.any(StaticModelRequest::new(
             match tile_type {
                 TileType::Nothing => "DevFloor.obj",
-                TileType::Wall(Some(_)) => "DevWall.obj",
+                TileType::Wall(_) => "DevWall.obj",
                 TileType::Floor => "DevFloor.obj",
                 TileType::Path => "DevFloor.obj",
-                _ => "cube.obj",
+                TileType::CornerIn(_) => "DevCornerIn.obj",
+                TileType::CornerOut(_) => "DevCornerOut.obj",
+                TileType::LadderDown => "DevFloor.obj",
+
+                TileType::Unknown => "cube.obj",
+                TileType::UndirectedWall => "cube.obj",
             },
             LocalUniforms::simple(
                 pos.extend(match tile_type {
@@ -121,10 +165,22 @@ fn populate_environment(
                 .into(),
                 1.0,
                 match tile_type {
-                    TileType::Wall(Some(WallDirection::North)) => 0.,
-                    TileType::Wall(Some(WallDirection::West)) => 90.,
-                    TileType::Wall(Some(WallDirection::South)) => 180.,
-                    TileType::Wall(Some(WallDirection::East)) => 270.,
+                    TileType::Wall(Direction::North) => 0.,
+                    TileType::Wall(Direction::West) => 90.,
+                    TileType::Wall(Direction::South) => 180.,
+                    TileType::Wall(Direction::East) => 270.,
+
+                    // TODO: Fix orientation of model s.t. North = 0.0
+                    TileType::CornerIn(Direction::North) => 270.,
+                    TileType::CornerIn(Direction::West) => 0.,
+                    TileType::CornerIn(Direction::South) => 90.,
+                    TileType::CornerIn(Direction::East) => 180.,
+
+                    TileType::CornerOut(Direction::North) => 270.,
+                    TileType::CornerOut(Direction::West) => 0.,
+                    TileType::CornerOut(Direction::South) => 90.,
+                    TileType::CornerOut(Direction::East) => 180.,
+
                     _ => 0.,
                 },
                 Default::default(),
@@ -141,7 +197,7 @@ fn populate_environment(
 
         // tile specific behaviors
         match tile_type {
-            TileType::Wall(_) => {
+            TileType::Wall(_) | TileType::CornerIn(_) | TileType::CornerOut(_) => {
                 smith.static_square_body(1.0);
             }
             TileType::LadderDown => {

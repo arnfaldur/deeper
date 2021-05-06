@@ -18,8 +18,13 @@ pub enum Faction {
 }
 
 #[derive(Eq, PartialEq, Copy, Clone)]
+#[allow(dead_code)]
 pub enum TileType {
-    Wall(Option<WallDirection>),
+    Unknown,
+    Wall(Direction),
+    UndirectedWall,
+    CornerIn(Direction),
+    CornerOut(Direction),
     Floor,
     Path,
     Nothing,
@@ -27,7 +32,7 @@ pub enum TileType {
 }
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub enum WallDirection {
+pub enum Direction {
     North,
     West,
     South,

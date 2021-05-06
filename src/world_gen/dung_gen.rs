@@ -7,7 +7,7 @@ use rand::Rng;
 
 use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
 use self::rand::thread_rng;
-use crate::world_gen::components::{TileType, WallDirection};
+use crate::world_gen::components::{Direction, TileType};
 
 pub struct DungGen {
     pub width: i32,
@@ -40,7 +40,7 @@ impl UnifyKey for UnitKey {
     fn tag() -> &'static str { "UnitKey" }
 }
 
-// note(Jökull): There are better builder patterns
+#[allow(dead_code)]
 impl DungGen {
     pub fn new() -> DungGen {
         DungGen {
@@ -131,12 +131,12 @@ impl DungGen {
 
             // Set walls on the outside of the room
             for x in x_min - 1..=x_max + 1 {
-                self.world.insert((x, y_min - 1), TileType::Wall(None));
-                self.world.insert((x, y_max + 1), TileType::Wall(None));
+                self.world.insert((x, y_min - 1), TileType::UndirectedWall);
+                self.world.insert((x, y_max + 1), TileType::UndirectedWall);
             }
             for y in y_min - 1..=y_max + 1 {
-                self.world.insert((x_min - 1, y), TileType::Wall(None));
-                self.world.insert((x_max + 1, y), TileType::Wall(None));
+                self.world.insert((x_min - 1, y), TileType::UndirectedWall);
+                self.world.insert((x_max + 1, y), TileType::UndirectedWall);
             }
 
             // Add the center of the generated room to the list
@@ -206,10 +206,12 @@ impl DungGen {
                     self.world.insert((x, y_start), TileType::Path);
                 }
                 if self.world.get(&(x, y_start + 1)).is_none() {
-                    self.world.insert((x, y_start + 1), TileType::Wall(None));
+                    self.world
+                        .insert((x, y_start + 1), TileType::UndirectedWall);
                 }
                 if self.world.get(&(x, y_start - 1)).is_none() {
-                    self.world.insert((x, y_start - 1), TileType::Wall(None));
+                    self.world
+                        .insert((x, y_start - 1), TileType::UndirectedWall);
                 }
             }
 
@@ -223,10 +225,10 @@ impl DungGen {
                     self.world.insert((x_end, y), TileType::Path);
                 }
                 if self.world.get(&(x_end + 1, y)).is_none() {
-                    self.world.insert((x_end + 1, y), TileType::Wall(None));
+                    self.world.insert((x_end + 1, y), TileType::UndirectedWall);
                 }
                 if self.world.get(&(x_end - 1, y)).is_none() {
-                    self.world.insert((x_end - 1, y), TileType::Wall(None));
+                    self.world.insert((x_end - 1, y), TileType::UndirectedWall);
                 }
             }
 
@@ -241,74 +243,54 @@ impl DungGen {
         for (&(x, y), &wall_type) in self.world.iter() {
             let loc = (x, y);
             if let TileType::Wall(_) = wall_type {
-                let n = *self.world.get(&(x, y + 1)).unwrap_or(&TileType::Wall(None));
-                let w = *self.world.get(&(x - 1, y)).unwrap_or(&TileType::Wall(None));
-                let s = *self.world.get(&(x, y - 1)).unwrap_or(&TileType::Wall(None));
-                let e = *self.world.get(&(x + 1, y)).unwrap_or(&TileType::Wall(None));
+                let n = *self
+                    .world
+                    .get(&(x, y + 1))
+                    .unwrap_or(&TileType::UndirectedWall);
+                let w = *self
+                    .world
+                    .get(&(x - 1, y))
+                    .unwrap_or(&TileType::UndirectedWall);
+                let s = *self
+                    .world
+                    .get(&(x, y - 1))
+                    .unwrap_or(&TileType::UndirectedWall);
+                let e = *self
+                    .world
+                    .get(&(x + 1, y))
+                    .unwrap_or(&TileType::UndirectedWall);
 
                 let ne = *self
                     .world
                     .get(&(x + 1, y + 1))
-                    .unwrap_or(&TileType::Wall(None));
+                    .unwrap_or(&TileType::UndirectedWall);
                 let nw = *self
                     .world
                     .get(&(x - 1, y + 1))
-                    .unwrap_or(&TileType::Wall(None));
+                    .unwrap_or(&TileType::UndirectedWall);
                 let se = *self
                     .world
                     .get(&(x + 1, y - 1))
-                    .unwrap_or(&TileType::Wall(None));
+                    .unwrap_or(&TileType::UndirectedWall);
                 let sw = *self
                     .world
                     .get(&(x - 1, y - 1))
-                    .unwrap_or(&TileType::Wall(None));
+                    .unwrap_or(&TileType::UndirectedWall);
 
                 for &(a, b, c, d, e, f, typ) in [
-                    (
-                        s,
-                        e,
-                        n,
-                        w,
-                        ne,
-                        nw,
-                        TileType::Wall(Some(WallDirection::North)),
-                    ),
-                    (
-                        e,
-                        n,
-                        w,
-                        s,
-                        sw,
-                        nw,
-                        TileType::Wall(Some(WallDirection::West)),
-                    ),
-                    (
-                        n,
-                        w,
-                        s,
-                        e,
-                        se,
-                        sw,
-                        TileType::Wall(Some(WallDirection::South)),
-                    ),
-                    (
-                        w,
-                        s,
-                        e,
-                        n,
-                        se,
-                        ne,
-                        TileType::Wall(Some(WallDirection::East)),
-                    ),
+                    (s, e, n, w, ne, nw, TileType::Wall(Direction::North)),
+                    (e, n, w, s, sw, nw, TileType::Wall(Direction::West)),
+                    (n, w, s, e, se, sw, TileType::Wall(Direction::South)),
+                    (w, s, e, n, se, ne, TileType::Wall(Direction::East)),
                 ]
                 .iter()
                 {
                     if (a == TileType::Floor || a == TileType::Path)
-                        && b == TileType::Wall(None)
-                        && c == TileType::Wall(None)
-                        && d == TileType::Wall(None)
-                        && e == TileType::Wall(None)
-                        && f == TileType::Wall(None)
+                        && b == TileType::UndirectedWall
+                        && c == TileType::UndirectedWall
+                        && d == TileType::UndirectedWall
+                        && e == TileType::UndirectedWall
+                        && f == TileType::UndirectedWall
                     {
                         directed_walls.push((loc, typ));
                     }
@@ -346,7 +328,7 @@ impl DungGen {
                 match self.world.get(&(x, y)) {
                     None => print!("  "),
                     Some(&value) => match value {
-                        TileType::Wall(None) => print!("# "),
+                        TileType::UndirectedWall => print!("# "),
                         TileType::Floor => print!(". "),
                         _ => print!("? "),
                     },
