@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::num::NonZeroU32;
 
 use assman::components::{DynamicModelRequest, StaticModelRequest};
 use cgmath::{vec2, Vector2};
@@ -10,6 +11,7 @@ use legion::{Entity, IntoQuery, SystemBuilder};
 use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::{Scale, TransformEntitySmith};
+use wfc_image::{generate_image_with_rng, retry, wrap, ForbidNothing, Orientation, Size};
 
 use crate::components::{HitPoints, Player};
 use crate::world_gen::components::{
@@ -83,7 +85,19 @@ pub fn dung_gen(
             //    )
             //};
 
-            let pic = image::open("assets/Images/wfcdungeonsample.png").unwrap();
+            let pic = image::open("assets/Images/test2cropped.png").unwrap();
+
+            let pic = generate_image_with_rng(
+                &pic,
+                NonZeroU32::new(3).unwrap(),
+                Size::new(64, 64),
+                &[Orientation::Original], //more orientations = slower
+                wrap::WrapNone,
+                ForbidNothing,
+                retry::NumTimes(40),
+                &mut StdRng::from_entropy(),
+            )
+            .unwrap();
 
             let test_world = pic
                 .into_bgr8()
