@@ -7,6 +7,6 @@
     assets_path           : "assets/",
     models_path           : "assets/Models/",
     textures_path         : "assets/Textures",
-    shader_path          : "assets/Shaders",
+    shader_path           : "assets/Shaders",
     entities_path         : "entities/",
 )
