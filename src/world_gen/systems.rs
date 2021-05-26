@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
+use apply::Apply;
 use assman::components::{DynamicModelRequest, StaticModelRequest};
 use cgmath::{vec2, Vector2};
 use entity_smith::Smith;
@@ -11,12 +12,13 @@ use legion::{Entity, IntoQuery, SystemBuilder};
 use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::{Scale, TransformEntitySmith};
-use wfc_image::{generate_image_with_rng, retry, wrap, ForbidNothing, Orientation, Size};
+use wfc_image::{retry, wrap, Coord, ImagePatterns, Orientation, Size};
 
 use crate::components::{HitPoints, Player};
 use crate::world_gen::components::{
     Direction, Faction, FloorNumber, MapSwitcher, MapTransition, TileType,
 };
+use crate::world_gen::wfc::EmptyEdgesForbid;
 
 //use crate::world_gen::dung_gen::DungGen;
 
@@ -53,11 +55,9 @@ pub fn dung_gen(
                 command_buffer.remove(*entity);
             }
 
-            for chunk in <&Faction>::query().iter_chunks_mut(world) {
-                for (entity, faction) in chunk.into_iter_entities() {
-                    if let Faction::Enemies = faction {
-                        command_buffer.remove(entity);
-                    }
+            for (entity, faction) in <(Entity, &Faction)>::query().iter(world) {
+                if let Faction::Enemies = faction {
+                    command_buffer.remove(*entity);
                 }
             }
 
@@ -85,21 +85,30 @@ pub fn dung_gen(
             //    )
             //};
 
-            let pic = image::open("assets/Images/test2cropped.png").unwrap();
+            let map_size = Size::new(64, 64);
 
-            let pic = generate_image_with_rng(
-                &pic,
-                NonZeroU32::new(3).unwrap(),
-                Size::new(64, 64),
-                &[Orientation::Original], //more orientations = slower
-                wrap::WrapNone,
-                ForbidNothing,
-                retry::NumTimes(40),
-                &mut StdRng::from_entropy(),
-            )
-            .unwrap();
+            let wfc_source = image::open("assets/Images/test2cropped.png").unwrap();
 
-            let test_world = pic
+            let pattern_size = NonZeroU32::new(3).unwrap();
+            let image_patterns =
+                ImagePatterns::new(&wfc_source, pattern_size, &[Orientation::Original]);
+            let top_left_corner_id = *image_patterns
+                .id_grid_original_orientation()
+                .get_checked(Coord::new(0, 0)); // top left should be a background usable as a tiling border
+
+            let wfc_result = image_patterns
+                .collapse_wave_retrying(
+                    map_size,
+                    wrap::WrapXY,
+                    EmptyEdgesForbid {
+                        empty_tile_id: top_left_corner_id,
+                    },
+                    retry::Forever,
+                    &mut StdRng::from_entropy(),
+                )
+                .apply(|wave| image_patterns.image_from_wave(&wave));
+
+            let test_world = wfc_result
                 .into_bgr8()
                 .enumerate_pixels()
                 .map(|(x, y, pixel)| {
@@ -158,7 +167,7 @@ fn populate_environment(
 
         let mut smith = command_buffer.smith();
 
-        smith.any(StaticModelRequest::new(
+        let thing = StaticModelRequest::new(
             match tile_type {
                 TileType::Nothing => "DevFloor.obj",
                 TileType::Wall(_) => "DevWall.obj",
@@ -199,7 +208,9 @@ fn populate_environment(
                 },
                 Default::default(),
             ),
-        ));
+        );
+
+        smith.any(thing);
 
         smith.any(tile_type);
         match tile_type {

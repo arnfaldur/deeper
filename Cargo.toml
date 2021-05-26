@@ -11,6 +11,16 @@ lto = false
 #lto = "thin"
 debug = 1
 
+[profile.dev]
+opt-level = 2
+incremental = true
+lto = false
+debug = 2
+
+[profile.test]
+opt-level = 2
+debug = 2
+
 [workspace]
 members = [
     "engine/physics",
@@ -58,5 +68,6 @@ crossbeam-channel = "0.5.0"
 image = "0.23.14"
 apply = "0.3.0"
 bit-set = "0.5.2"
+wfc = "0.10.0"
 wfc_image = "0.11.0"
 
