@@ -87,7 +87,7 @@ pub fn dung_gen(
 
             let map_size = Size::new(64, 64);
 
-            let wfc_source = image::open("assets/Images/test2cropped.png").unwrap();
+            let wfc_source = image::open("assets/Images/dungeon_2_tights.bmp").unwrap();
 
             let pattern_size = NonZeroU32::new(3).unwrap();
             let image_patterns =

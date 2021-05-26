@@ -44,7 +44,7 @@ mod tests {
 
         let map_size = Size::new(256, 256);
 
-        let wfc_source = image::open("assets/Images/dungeon_sample.bmp").unwrap();
+        let wfc_source = image::open("assets/Images/dungeon_2_tights.bmp").unwrap();
 
         let pattern_size = NonZeroU32::new(3).unwrap();
         let mut image_patterns =
