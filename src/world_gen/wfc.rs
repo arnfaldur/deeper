@@ -42,9 +42,10 @@ mod tests {
     pub fn test() {
         let timer = Instant::now();
 
-        let map_size = Size::new(256, 256);
+        let dims = 128;
+        let map_size = Size::new(dims, dims);
 
-        let wfc_source = image::open("assets/Images/dungeon_2_tights.bmp").unwrap();
+        let wfc_source = image::open("assets/Images/dungeon_5_separated.png").unwrap();
 
         let pattern_size = NonZeroU32::new(3).unwrap();
         let mut image_patterns =
@@ -54,8 +55,11 @@ mod tests {
             .id_grid_original_orientation()
             .get_checked(top_left_corner_coord);
 
-        //image_patterns.pattern_mut(top_left_corner_id).clear_count();
-        image_patterns.pattern_mut(top_left_corner_id);
+        let a = image_patterns.pattern_mut(top_left_corner_id);
+
+        let mut stats = image_patterns.global_stats();
+
+        // image_patterns.pattern_mut(top_left_corner_id).clear_count();
 
         let mut rng = StdRng::from_entropy();
         if let Ok(out) = image_patterns

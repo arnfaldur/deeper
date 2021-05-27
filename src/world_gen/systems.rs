@@ -20,8 +20,6 @@ use crate::world_gen::components::{
 };
 use crate::world_gen::wfc::EmptyEdgesForbid;
 
-//use crate::world_gen::dung_gen::DungGen;
-
 pub fn dung_gen_system() -> impl Runnable {
     SystemBuilder::new("DungGen System")
         .read_component::<TileType>()
@@ -64,37 +62,21 @@ pub fn dung_gen(
             floor.0 += 1;
 
             println!("You have reached floor {}", floor.0);
-            //let dungeon = DungGen::new()
-            //    .width(60)
-            //    .height(60)
-            //    .n_rooms(10)
-            //    .room_min(5)
-            //    .room_range(5)
-            //    .generate();
 
             let mut rng = thread_rng();
 
-            //let player_start = {
-            //    let (x, y) = dungeon
-            //        .room_centers
-            //        .choose(&mut rand::thread_rng())
-            //        .unwrap();
-            //    vec2(
-            //        (x + rng.gen_range(-2..2)) as f32,
-            //        (y + rng.gen_range(-2..2)) as f32,
-            //    )
-            //};
-
             let map_size = Size::new(64, 64);
 
-            let wfc_source = image::open("assets/Images/dungeon_2_tights.bmp").unwrap();
+            let wfc_source = image::open("assets/Images/dungeon_5_separated.png").unwrap();
 
             let pattern_size = NonZeroU32::new(3).unwrap();
-            let image_patterns =
+            let mut image_patterns =
                 ImagePatterns::new(&wfc_source, pattern_size, &[Orientation::Original]);
             let top_left_corner_id = *image_patterns
                 .id_grid_original_orientation()
                 .get_checked(Coord::new(0, 0)); // top left should be a background usable as a tiling border
+
+            image_patterns.pattern_mut(top_left_corner_id).clear_count();
 
             let wfc_result = image_patterns
                 .collapse_wave_retrying(

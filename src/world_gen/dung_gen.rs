@@ -9,6 +9,16 @@ use self::ena::unify::{InPlace, UnificationTable, UnifyKey};
 use self::rand::thread_rng;
 use crate::world_gen::components::{Direction, TileType};
 
+/// usage:
+/// ```
+///let dungeon = DungGen::new()
+///    .width(60)
+///    .height(60)
+///    .n_rooms(10)
+///    .room_min(5)
+///    .room_range(5)
+///    .generate();
+/// ```
 pub struct DungGen {
     pub width: i32,
     pub height: i32,
