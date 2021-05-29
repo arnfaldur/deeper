@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::num::NonZeroU32;
 
-use apply::Apply;
 use assman::components::{DynamicModelRequest, StaticModelRequest};
 use cgmath::{vec2, Vector2};
 use entity_smith::Smith;
@@ -12,13 +10,11 @@ use legion::{Entity, IntoQuery, SystemBuilder};
 use physics::PhysicsEntitySmith;
 use rand::prelude::*;
 use transforms::{Scale, TransformEntitySmith};
-use wfc_image::{retry, wrap, Coord, ImagePatterns, Orientation, Size};
 
 use crate::components::{HitPoints, Player};
 use crate::world_gen::components::{
     Direction, Faction, FloorNumber, MapSwitcher, MapTransition, TileType,
 };
-use crate::world_gen::wfc::EmptyEdgesForbid;
 
 pub fn dung_gen_system() -> impl Runnable {
     SystemBuilder::new("DungGen System")
@@ -65,30 +61,20 @@ pub fn dung_gen(
 
             let mut rng = thread_rng();
 
-            let map_size = Size::new(64, 64);
-
             let wfc_source = image::open("assets/Images/dungeon_5_separated.png").unwrap();
 
-            let pattern_size = NonZeroU32::new(3).unwrap();
-            let mut image_patterns =
-                ImagePatterns::new(&wfc_source, pattern_size, &[Orientation::Original]);
-            let top_left_corner_id = *image_patterns
-                .id_grid_original_orientation()
-                .get_checked(Coord::new(0, 0)); // top left should be a background usable as a tiling border
-
-            image_patterns.pattern_mut(top_left_corner_id).clear_count();
-
-            let wfc_result = image_patterns
-                .collapse_wave_retrying(
-                    map_size,
-                    wrap::WrapXY,
-                    EmptyEdgesForbid {
-                        empty_tile_id: top_left_corner_id,
-                    },
-                    retry::Forever,
-                    &mut StdRng::from_entropy(),
-                )
-                .apply(|wave| image_patterns.image_from_wave(&wave));
+            // let wfc_result = image_patterns
+            //     .collapse_wave_retrying(
+            //         map_size,
+            //         wrap::WrapXY,
+            //         EmptyEdgesForbid {
+            //             empty_tile_id: top_left_corner_id,
+            //         },
+            //         retry::Forever,
+            //         &mut StdRng::from_entropy(),
+            //     )
+            //     .apply(|wave| image_patterns.image_from_wave(&wave));
+            let wfc_result = wfc_source;
 
             let test_world = wfc_result
                 .into_bgr8()
