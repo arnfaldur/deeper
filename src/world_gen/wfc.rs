@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
@@ -6,7 +7,6 @@ use std::iter::{FromIterator, Map};
 use std::ops::{Index, IndexMut, Range};
 
 use bit_set::BitSet;
-use cgmath::Vector2;
 use image::{ImageBuffer, Pixel};
 use itertools::Itertools;
 use rand::prelude::*;
@@ -41,10 +41,6 @@ const SMALL_SQUARE_NEIGHBOURHOOD: [V2i; 4] = [
     V2i::new(1, 1),
 ];
 
-// impl<T: Display> Display for Grid<T> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> Result<T, _> { todo!() }
-// }
-
 impl<P: Pixel + 'static> From<&Grid<P>> for ImageBuffer<P, Vec<P::Subpixel>> {
     fn from(grid: &Grid<P>) -> Self {
         let mut result = ImageBuffer::new(grid.size.x as u32, grid.size.y as u32);
@@ -58,7 +54,7 @@ impl<P: Pixel + 'static> From<&Grid<P>> for ImageBuffer<P, Vec<P::Subpixel>> {
 }
 
 /// A container that
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct EntropyHierarchy {
     pub hierarchy: BTreeMap<usize, BitSet>,
 }
@@ -156,6 +152,34 @@ impl<T: Eq> Tile<T> {
         }
         return true;
     }
+    pub fn print<F>(&self, neighbourhood: &[V2i], printer: F)
+    where
+        F: Fn(Option<T>) -> String,
+        T: Clone,
+    {
+        let (ty, tx, by, bx) = neighbourhood.iter().fold(
+            (isize::MIN, isize::MIN, isize::MAX, isize::MAX),
+            |(ty, tx, by, bx), a| {
+                return (max(a.y, ty), max(a.x, tx), min(a.y, by), min(a.x, bx));
+            },
+        );
+
+        for y in by..=ty {
+            for x in bx..=tx {
+                let v = V2i::new(x, y);
+                let mut i = usize::MAX;
+                for (j, &off) in neighbourhood.iter().enumerate() {
+                    if off == v {
+                        i = j;
+                        break;
+                    }
+                }
+                print!("{}", printer(self.0[i].clone()));
+            }
+            println!();
+        }
+        //println!("asdf: {:?}", limits);
+    }
 }
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
@@ -202,19 +226,32 @@ impl<T> IndexMut<TileIndex> for TileMap<T> {
     fn index_mut(&mut self, index: TileIndex) -> &mut Self::Output { &mut self.0[index.0] }
 }
 
+#[allow(dead_code)]
+pub enum Orientation {
+    Original,
+    Clockwise90,
+    Clockwise180,
+    Clockwise270,
+}
+
 pub fn wfc<T: Copy + Eq + Hash + Debug>(
     input: Grid<T>,
-    neighbourhood: Vec<V2i>,
+    neighbourhood: &[V2i],
     output_size: V2u,
-) -> Vec<Grid<Result<T, usize>>> {
+    orientations: &[Orientation],
+) -> Result<Vec<Grid<Result<T, usize>>>, String> {
     let mut rng = rand::prelude::StdRng::seed_from_u64(1337);
+
+    let printing = false;
 
     let inverse_neighbourhood: HashMap<V2i, usize> = neighbourhood
         .iter()
         .enumerate()
         .map(|(i, off)| (*off, i))
         .collect();
-    println!("{:?}", inverse_neighbourhood);
+    if printing {
+        println!("{:?}", inverse_neighbourhood);
+    }
 
     // a tile for each point in the input
     let input_tiles: InputMap<Tile<T>> = InputMap(
@@ -248,7 +285,7 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
             .0
             .iter()
             .enumerate()
-            .unique_by(|(_, &tile)| tile)
+            .unique_by(|(_, &tile_hash)| tile_hash)
             .map(|(i, _)| InputIndex(i))
             .collect(),
     );
@@ -268,7 +305,9 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
             .map(|hash| hash_to_tile_index[hash])
             .collect(),
     );
-    println!("inputs to tiles {:?}", input_to_tiles);
+    if printing {
+        println!("inputs to tiles {:?}", input_to_tiles);
+    }
     // the inverse of the above
     let tiles_to_inputs: TileMap<Vec<InputIndex>> = input_to_tiles.0.iter().enumerate().fold(
         TileMap(tiles.0.iter().map(|_| Vec::new()).collect()),
@@ -277,11 +316,15 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
             return result;
         },
     );
-    println!("tiles to inputs {:?}", tiles_to_inputs);
+    if printing {
+        println!("tiles to inputs {:?}", tiles_to_inputs);
+    }
     let mut adjacencies: HashMap<V2i, TileMap<BitSet>> = neighbourhood
         .iter()
-        .filter(|offset| **offset != V2i::new(0, 0))
-        .fold(HashMap::new(), |mut result, &offset| {
+        .map(|e| *e)
+        .chain(neighbourhood.iter().map(|&off| -off))
+        .filter(|offset| *offset != V2i::new(0, 0))
+        .fold(HashMap::new(), |mut result, offset| {
             // This iterates over the offsets of the chosen neighbourhood
             // and creates a mapping from tiles to
             // let boi: Vec<V2i> = HashSet::from_iter(neighbourhood.iter()).intersection(&HashSet::from_iter(
@@ -311,7 +354,9 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
                 }));
             return result;
         });
-    println!("adjacencies v1 {:?}", adjacencies);
+    if printing {
+        println!("adjacencies v1 {:?}", adjacencies);
+    }
     for (offset, bit_set) in adjacencies.iter_mut() {
         let shifted: Vec<V2i> = neighbourhood.iter().map(|off| off + offset).collect();
         let intersection: Vec<V2i> = neighbourhood
@@ -332,7 +377,9 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
             }
         }
     }
-    println!("adjacencies v2 {:?}", adjacencies);
+    if printing {
+        println!("adjacencies v2 {:?}", adjacencies);
+    }
 
     // let boi: Vec<V2i> = HashSet::from_iter(neighbourhood.iter()).intersection(&HashSet::from_iter(
     //     neighbourhood.iter().map(|of| of + offset),
@@ -340,51 +387,76 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
     let mut wave_map = Grid::new();
     wave_map.resize(output_size, BitSet::from_iter(0..tiles.0.len()));
     // TODO: consider using this to make reversable steps
-    //let mut wave_map_backup = wave_map.copy();
-    for i in tiles.range() {
-        println!("tile {}", i.0);
+    let mut wave_map_backup = wave_map.clone();
+    if printing {
+        for i in tiles.range() {
+            println!("tile {}", i.0);
 
-        for j in 0..4 {
-            let thing = input_tiles[tiles[i]].0[j];
-            if j == 2 {
-                println!();
-            }
-            print!(
-                "{}",
-                if thing == input_tiles[InputIndex(0)].0[0] {
+            let white = input_tiles[InputIndex(0)].0[0].clone();
+            let black = input_tiles[InputIndex(0)].0[3].clone();
+
+            let boii = move |thing| {
+                String::from(if thing == white {
                     "W"
-                } else if thing == input_tiles[InputIndex(0)].0[3] {
+                } else if thing == black {
                     "b"
                 } else {
                     "."
-                }
-            );
+                })
+            };
+
+            input_tiles[tiles[i]].print(&neighbourhood, boii);
+            // println!("{:?}", input_tiles[tiles[i]]);
+        }
+        println!("{:?}, ", neighbourhood);
+        for (offset, _) in adjacencies
+            .iter()
+            .sorted_by(|(a, _), (b, _)| a.y.cmp(&b.y).then_with(|| a.x.cmp(&b.x)))
+        {
+            print!("{:?}, ", offset);
         }
         println!();
-        // println!("{:?}", input_tiles[tiles[i]]);
-    }
-    println!("{:?}, ", SMALL_SQUARE_NEIGHBOURHOOD);
-    for i in 0..tiles.0.len() {
-        print!("tile: {} -> ", i);
-        for offset in SMALL_SQUARE_NEIGHBOURHOOD.iter() {
-            if let Some(boii) = adjacencies.get(offset).and_then(|me| me.0.get(i)) {
-                print!("{:?}, ", boii);
-            } else {
-                print!("{{{}}}, ", i);
+        for i in tiles.range() {
+            print!("tile: {} -> ", i.0);
+            for (_, bit_set) in adjacencies
+                .iter()
+                .sorted_by(|(a, _), (b, _)| a.y.cmp(&b.y).then_with(|| a.x.cmp(&b.x)))
+            {
+                print!("{:?}, ", bit_set[i]);
             }
+            println!();
         }
-        println!();
     }
 
     let mut entropy_hierarchy = EntropyHierarchy::new();
     for (i, set) in wave_map.buf.iter().enumerate() {
         entropy_hierarchy.add(i, set.len());
     }
-    //let mut entropy_hierarchy_backup = entropy_hierarchy.copy();
+    let mut entropy_hierarchy_backup = entropy_hierarchy.clone();
+    let tile_count = tiles.0.len();
 
+    let possible = constrain(
+        &adjacencies,
+        &mut wave_map,
+        &mut entropy_hierarchy,
+        tile_count,
+        V2i::new(0, 0),
+    );
+    if printing {
+        println!("wave map start: {:?}", wave_map);
+    }
     let mut result = Vec::new();
+
+    if !possible {
+        return Err(String::from(
+            "input can't be used to generate a valid output",
+        ));
+    }
+
     while !entropy_hierarchy.is_converged() {
-        println!("---------- iteration ----------");
+        if printing {
+            println!("---------- iteration ----------");
+        }
         // collapse superposition
         let (&least_entropy, bottom) = entropy_hierarchy.get_lowest_entropy();
         let collapsing_output_index = bottom.iter().choose(&mut rng).unwrap();
@@ -394,77 +466,73 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
         //     collapse_index,
         //     least_entropy
         // );
-        print!("choosing tile: ");
-        let chosen_tile = {
-            let mut chosen_tile = TileIndex(0);
-            'find: while let Some(tile) = wave_map.buf[collapsing_output_index]
-                .iter()
-                .choose(&mut rng)
-                .map(|x| TileIndex(x))
-            {
-                print!("{}, ", tile.0);
-                for (&offset, constraint) in adjacencies.iter() {
-                    if constraint[tile].is_empty()
-                        != wave_map
-                            .to_1d_index(
-                                wave_map
-                                    .to_2d_index(collapsing_output_index as isize)
-                                    .unwrap()
-                                    + offset,
-                            )
-                            .is_none()
-                    {
-                        wave_map.buf[collapsing_output_index].remove(tile.0);
-                        continue 'find;
-                    }
-                }
-                chosen_tile = tile;
-                break;
-            }
-            //TODO: check if wavemap boundaries match the chosen tile and if not, look for another one
-
-            //panic!(chosen_tile);
-            chosen_tile
-        };
-        println!();
-
+        if printing {
+            println!("point: {}", collapsing_output_index);
+            print!("choosing tile: ");
+        }
+        let chosen_tile = wave_map.buf[collapsing_output_index]
+            .iter()
+            .choose(&mut rng)
+            .map(|x| TileIndex(x))
+            .unwrap();
+        //TODO: check if wavemap boundaries match the chosen tile and if not, look for another one
+        if printing {
+            println!();
+        }
         entropy_hierarchy.reduce_entropy(collapsing_output_index, least_entropy, 1);
-
         wave_map.buf[collapsing_output_index].clear();
         wave_map.buf[collapsing_output_index].insert(chosen_tile.0);
 
-        println!(
-            "point: {}, tile: {}",
-            collapsing_output_index, chosen_tile.0
-        );
-        println!("chosen tile: {:?}", input_tiles[tiles[chosen_tile]].0);
-        println!("wave map before constraints: {:?}", wave_map);
-        //entropy_hierarchy.print(&wave_map);
-        let tile_count = tiles.0.len();
+        if printing {
+            println!("tile: {}", chosen_tile.0);
+            println!("chosen tile: {:?}", input_tiles[tiles[chosen_tile]].0);
+            println!("wave map before constraints: {:?}", wave_map);
+            //entropy_hierarchy.print(&wave_map);
+        }
+
         // reduce entropy
         let index_2d = wave_map
             .to_2d_index(collapsing_output_index as isize)
             .unwrap();
 
-        constrain(
+        if !constrain(
             &adjacencies,
             &mut wave_map,
             &mut entropy_hierarchy,
             tile_count,
             index_2d,
-        );
+        ) {
+            wave_map_backup.buf[collapsing_output_index].remove(chosen_tile.0);
+            entropy_hierarchy_backup.reduce_entropy(
+                collapsing_output_index,
+                least_entropy,
+                least_entropy - 1,
+            );
+            wave_map = wave_map_backup.clone();
+            entropy_hierarchy = entropy_hierarchy_backup.clone();
+        } else {
+            if printing {
+                println!("wave map after constraints: {:?}", wave_map);
+            }
+            entropy_hierarchy.cleanup();
 
-        println!("wave map after constraints: {:?}", wave_map);
-
-        entropy_hierarchy.cleanup();
-        // if result.len() > 400 {
-        //     break;
-        // }
-        result.push(to_image(&input, output_size, &wave_map));
+            wave_map_backup = wave_map.clone();
+            entropy_hierarchy_backup = entropy_hierarchy.clone();
+            // if result.len() > 400 {
+            //     break;
+            // }
+        }
     }
 
-    result.push(to_image(&input, output_size, &wave_map));
-    return result;
+    let mut image = unsafe { Grid::uninitialized_with_capacity(output_size) };
+    for (i, set) in wave_map.buf.iter().enumerate() {
+        image.buf[i] = (set.len() == 1)
+            .then(|| input.buf[tiles_to_inputs[TileIndex(set.iter().next().unwrap())][0].0])
+            .ok_or(set.len());
+    }
+    result.push(image);
+    //result.push(to_image(&input, output_size, &wave_map));
+    return Ok(result);
 }
 
 fn constrain(
@@ -474,37 +542,33 @@ fn constrain(
     tile_count: usize,
     constrainee: V2i,
 ) -> bool {
-    for (&offset, constraint) in adjacencies.iter() {
-        let neighbour = constrainee + offset;
-        if let Some(inner_index) = wave_map.to_1d_index(neighbour) {
-            let reducer = wave_map.get(constrainee).unwrap().iter().fold(
-                BitSet::with_capacity(tile_count),
-                |mut result, t| {
-                    result.union_with(&constraint[TileIndex(t)]);
-                    return result;
-                },
-            );
-            if reducer.is_empty() {
-                return false;
-            }
-            let set_to_reduce = wave_map.get_mut(neighbour).unwrap();
-            let original = set_to_reduce.len();
-            set_to_reduce.intersect_with(&reducer);
-            if original != set_to_reduce.len() {
-                entropy_hierarchy.reduce_entropy(
-                    inner_index as usize,
-                    original,
-                    set_to_reduce.len(),
+    let mut stack = Vec::new();
+    stack.push(constrainee);
+    while let Some(constrainee) = stack.pop() {
+        for (&offset, constraint) in adjacencies.iter() {
+            let neighbour = constrainee + offset;
+            if let Some(inner_index) = wave_map.to_1d_index(neighbour) {
+                let reducer = wave_map.get(constrainee).unwrap().iter().fold(
+                    BitSet::with_capacity(tile_count),
+                    |mut result, t| {
+                        result.union_with(&constraint[TileIndex(t)]);
+                        return result;
+                    },
                 );
-                //println!("wave map during constraints: {:?}", wave_map);
-                if !constrain(
-                    adjacencies,
-                    wave_map,
-                    entropy_hierarchy,
-                    tile_count,
-                    neighbour,
-                ) {
+                if reducer.is_empty() {
                     return false;
+                }
+                let set_to_reduce = wave_map.get_mut(neighbour).unwrap();
+                let original = set_to_reduce.len();
+                set_to_reduce.intersect_with(&reducer);
+                if original != set_to_reduce.len() {
+                    entropy_hierarchy.reduce_entropy(
+                        inner_index as usize,
+                        original,
+                        set_to_reduce.len(),
+                    );
+                    //println!("wave map during constraints: {:?}", wave_map);
+                    stack.push(neighbour);
                 }
             }
         }
@@ -512,57 +576,35 @@ fn constrain(
     return true;
 }
 
-// fn get_constraint<T: Copy + Eq + Hash + Debug>(
-//     constraints: &Constraints<T>,
-//     color: T,
-//     maybe_offset: Option<V2i>,
-// ) -> &BitSet {
-//     match maybe_offset {
-//         Some(offset) => constraints.adjacencies.get(&(color, offset)),
-//         None => constraints.color_locations.get(&color),
-//     }
-//     .unwrap()
-// }
-
-fn to_image<T: Copy + Eq + Hash + Debug>(
-    input: &Grid<T>,
-    output_size: Vector2<usize>,
-    wave_map: &Grid<BitSet>,
-) -> Grid<Result<T, usize>> {
-    let mut result = unsafe { Grid::uninitialized_with_capacity(output_size) };
-    for (i, set) in wave_map.buf.iter().enumerate() {
-        result.buf[i] = (set.len() == 1)
-            .then(|| input.buf[set.iter().next().unwrap()])
-            .ok_or(set.len());
-    }
-    return result;
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
 
     use cgmath::Array;
-    use image::{DynamicImage, Rgb, RgbImage};
+    use image::{Rgb, RgbImage};
 
     use crate::world_gen::grid::{Grid, V2u};
-    use crate::world_gen::wfc::{wfc, SMALL_SQUARE_NEIGHBOURHOOD};
+    #[allow(unused_imports)]
+    use crate::world_gen::wfc::{
+        wfc, Orientation, SMALL_SQUARE_NEIGHBOURHOOD, SQUARE_NEIGHBOURHOOD,
+    };
 
     #[test]
     pub fn test() {
         let timer = Instant::now();
         // let pic = image::open("oliprik.png").unwrap();
-        let pic = image::open("samples/SimpleMaze.png").unwrap();
+        let pic = image::open("samples/Cats.png").unwrap();
         println!("opened óli prik");
-        match pic {
-            DynamicImage::ImageRgb8(img) => {
-                let size = V2u::from_value(5);
-                let master = wfc(
-                    Grid::from(&img),
-                    Vec::from(SMALL_SQUARE_NEIGHBOURHOOD),
-                    size,
-                );
-                for (i, master) in master.iter().enumerate() {
+        let size = V2u::from_value(64);
+        let master = wfc(
+            Grid::from(&pic.into_rgb8()),
+            &SQUARE_NEIGHBOURHOOD,
+            size,
+            &[Orientation::Original, Orientation::Clockwise180],
+        );
+        match master {
+            Result::Ok(res) => {
+                for (i, master) in res.iter().enumerate() {
                     let mut other: Grid<Rgb<u8>> = Grid::new();
                     other.size = master.size;
                     other.buf = master
@@ -581,9 +623,7 @@ mod tests {
                     println!("saved result to WFC.png");
                 }
             }
-            _ => {
-                println!("wrong image type!")
-            }
+            Result::Err(err) => println!("Error! {}", err),
         }
         println!("elapsed {:?}", timer.elapsed());
     }
