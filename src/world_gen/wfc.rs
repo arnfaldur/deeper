@@ -381,157 +381,157 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
         println!("adjacencies v2 {:?}", adjacencies);
     }
 
-    // let boi: Vec<V2i> = HashSet::from_iter(neighbourhood.iter()).intersection(&HashSet::from_iter(
-    //     neighbourhood.iter().map(|of| of + offset),
-    // )).collect();
-    let mut wave_map = Grid::new();
-    wave_map.resize(output_size, BitSet::from_iter(0..tiles.0.len()));
-    // TODO: consider using this to make reversable steps
-    let mut wave_map_backup = wave_map.clone();
-    if printing {
-        for i in tiles.range() {
-            println!("tile {}", i.0);
+    let tile_count = tiles.0.len();
 
-            let white = input_tiles[InputIndex(0)].0[0].clone();
-            let black = input_tiles[InputIndex(0)].0[3].clone();
+    let mut result = Vec::new();
 
-            let boii = move |thing| {
-                String::from(if thing == white {
-                    "W"
-                } else if thing == black {
-                    "b"
-                } else {
-                    "."
-                })
-            };
+    let attempts = 10;
+    for _attempt in 0..attempts {
+        let mut wave_map = Grid::new();
+        wave_map.resize(output_size, BitSet::from_iter(0..tiles.0.len()));
+        if printing {
+            for i in tiles.range() {
+                println!("tile {}", i.0);
 
-            input_tiles[tiles[i]].print(&neighbourhood, boii);
-            // println!("{:?}", input_tiles[tiles[i]]);
-        }
-        println!("{:?}, ", neighbourhood);
-        for (offset, _) in adjacencies
-            .iter()
-            .sorted_by(|(a, _), (b, _)| a.y.cmp(&b.y).then_with(|| a.x.cmp(&b.x)))
-        {
-            print!("{:?}, ", offset);
-        }
-        println!();
-        for i in tiles.range() {
-            print!("tile: {} -> ", i.0);
-            for (_, bit_set) in adjacencies
+                let white = input_tiles[InputIndex(0)].0[0].clone();
+                let black = input_tiles[InputIndex(0)].0[3].clone();
+
+                let boii = move |thing| {
+                    String::from(if thing == white {
+                        "W"
+                    } else if thing == black {
+                        "b"
+                    } else {
+                        "."
+                    })
+                };
+
+                input_tiles[tiles[i]].print(&neighbourhood, boii);
+                // println!("{:?}", input_tiles[tiles[i]]);
+            }
+            println!("{:?}, ", neighbourhood);
+            for (offset, _) in adjacencies
                 .iter()
                 .sorted_by(|(a, _), (b, _)| a.y.cmp(&b.y).then_with(|| a.x.cmp(&b.x)))
             {
-                print!("{:?}, ", bit_set[i]);
+                print!("{:?}, ", offset);
             }
             println!();
-        }
-    }
-
-    let mut entropy_hierarchy = EntropyHierarchy::new();
-    for (i, set) in wave_map.buf.iter().enumerate() {
-        entropy_hierarchy.add(i, set.len());
-    }
-    let mut entropy_hierarchy_backup = entropy_hierarchy.clone();
-    let tile_count = tiles.0.len();
-
-    let possible = constrain(
-        &adjacencies,
-        &mut wave_map,
-        &mut entropy_hierarchy,
-        tile_count,
-        V2i::new(0, 0),
-    );
-    if printing {
-        println!("wave map start: {:?}", wave_map);
-    }
-    let mut result = Vec::new();
-
-    if !possible {
-        return Err(String::from(
-            "input can't be used to generate a valid output",
-        ));
-    }
-
-    while !entropy_hierarchy.is_converged() {
-        if printing {
-            println!("---------- iteration ----------");
-        }
-        // collapse superposition
-        let (&least_entropy, bottom) = entropy_hierarchy.get_lowest_entropy();
-        let collapsing_output_index = bottom.iter().choose(&mut rng).unwrap();
-        // println!(
-        //     "collapsing: {:?} {:?} with entropy {}",
-        //     to_2d_index(collapse_index as isize, wave_map.size.x),
-        //     collapse_index,
-        //     least_entropy
-        // );
-        if printing {
-            println!("point: {}", collapsing_output_index);
-            print!("choosing tile: ");
-        }
-        let chosen_tile = wave_map.buf[collapsing_output_index]
-            .iter()
-            .choose(&mut rng)
-            .map(|x| TileIndex(x))
-            .unwrap();
-        //TODO: check if wavemap boundaries match the chosen tile and if not, look for another one
-        if printing {
-            println!();
-        }
-        entropy_hierarchy.reduce_entropy(collapsing_output_index, least_entropy, 1);
-        wave_map.buf[collapsing_output_index].clear();
-        wave_map.buf[collapsing_output_index].insert(chosen_tile.0);
-
-        if printing {
-            println!("tile: {}", chosen_tile.0);
-            println!("chosen tile: {:?}", input_tiles[tiles[chosen_tile]].0);
-            println!("wave map before constraints: {:?}", wave_map);
-            //entropy_hierarchy.print(&wave_map);
+            for i in tiles.range() {
+                print!("tile: {} -> ", i.0);
+                for (_, bit_set) in adjacencies
+                    .iter()
+                    .sorted_by(|(a, _), (b, _)| a.y.cmp(&b.y).then_with(|| a.x.cmp(&b.x)))
+                {
+                    print!("{:?}, ", bit_set[i]);
+                }
+                println!();
+            }
         }
 
-        // reduce entropy
-        let index_2d = wave_map
-            .to_2d_index(collapsing_output_index as isize)
-            .unwrap();
+        let mut entropy_hierarchy = EntropyHierarchy::new();
+        for (i, set) in wave_map.buf.iter().enumerate() {
+            entropy_hierarchy.add(i, set.len());
+        }
+
+        let mut wave_map_backup = wave_map.clone();
+        let mut entropy_hierarchy_backup = entropy_hierarchy.clone();
 
         if !constrain(
             &adjacencies,
             &mut wave_map,
             &mut entropy_hierarchy,
             tile_count,
-            index_2d,
+            V2i::new(0, 0),
         ) {
-            wave_map_backup.buf[collapsing_output_index].remove(chosen_tile.0);
-            entropy_hierarchy_backup.reduce_entropy(
-                collapsing_output_index,
-                least_entropy,
-                least_entropy - 1,
-            );
-            wave_map = wave_map_backup.clone();
-            entropy_hierarchy = entropy_hierarchy_backup.clone();
-        } else {
-            if printing {
-                println!("wave map after constraints: {:?}", wave_map);
-            }
-            entropy_hierarchy.cleanup();
-
-            wave_map_backup = wave_map.clone();
-            entropy_hierarchy_backup = entropy_hierarchy.clone();
-            // if result.len() > 400 {
-            //     break;
-            // }
+            return Err(String::from(
+                "input can't be used to generate a valid output",
+            ));
         }
-    }
+        if printing {
+            println!("wave map start: {:?}", wave_map);
+        }
+        let mut backtracks = 0;
+        let mut successes = 0;
 
-    let mut image = unsafe { Grid::uninitialized_with_capacity(output_size) };
-    for (i, set) in wave_map.buf.iter().enumerate() {
-        image.buf[i] = (set.len() == 1)
-            .then(|| input.buf[tiles_to_inputs[TileIndex(set.iter().next().unwrap())][0].0])
-            .ok_or(set.len());
+        while !entropy_hierarchy.is_converged() {
+            // collapse superposition
+            let (&least_entropy, bottom) = entropy_hierarchy.get_lowest_entropy();
+            let collapsing_output_index = bottom.iter().choose(&mut rng).unwrap();
+            // println!(
+            //     "collapsing: {:?} {:?} with entropy {}",
+            //     to_2d_index(collapse_index as isize, wave_map.size.x),
+            //     collapse_index,
+            //     least_entropy
+            // );
+            if printing {
+                println!("---------- iteration ----------");
+                println!("point: {}", collapsing_output_index);
+                print!("choosing tile: ");
+            }
+            let chosen_tile = wave_map.buf[collapsing_output_index]
+                .iter()
+                .choose(&mut rng)
+                .map(|x| TileIndex(x))
+                .unwrap();
+            if printing {
+                println!();
+            }
+            entropy_hierarchy.reduce_entropy(collapsing_output_index, least_entropy, 1);
+            wave_map.buf[collapsing_output_index].clear();
+            wave_map.buf[collapsing_output_index].insert(chosen_tile.0);
+
+            if printing {
+                println!("tile: {}", chosen_tile.0);
+                println!("chosen tile: {:?}", input_tiles[tiles[chosen_tile]].0);
+                println!("wave map before constraints: {:?}", wave_map);
+                //entropy_hierarchy.print(&wave_map);
+            }
+
+            // reduce entropy
+            let index_2d = wave_map
+                .to_2d_index(collapsing_output_index as isize)
+                .unwrap();
+
+            if !constrain(
+                &adjacencies,
+                &mut wave_map,
+                &mut entropy_hierarchy,
+                tile_count,
+                index_2d,
+            ) {
+                backtracks += 1;
+                wave_map_backup.buf[collapsing_output_index].remove(chosen_tile.0);
+                entropy_hierarchy_backup.reduce_entropy(
+                    collapsing_output_index,
+                    least_entropy,
+                    least_entropy - 1,
+                );
+                wave_map = wave_map_backup.clone();
+                entropy_hierarchy = entropy_hierarchy_backup.clone();
+            } else {
+                successes += 1;
+                if printing {
+                    println!("wave map after constraints: {:?}", wave_map);
+                }
+                entropy_hierarchy.cleanup();
+
+                wave_map_backup = wave_map.clone();
+                entropy_hierarchy_backup = entropy_hierarchy.clone();
+            }
+        }
+        //println!("backtracks: {}, successes: {}", backtracks, successes);
+
+        let mut image = unsafe { Grid::uninitialized_with_capacity(output_size) };
+        for (i, set) in wave_map.buf.iter().enumerate() {
+            image.buf[i] = (set.len() == 1)
+                .then(|| input.buf[tiles_to_inputs[TileIndex(set.iter().next().unwrap())][0].0])
+                .ok_or(set.len());
+        }
+        result.push(image);
+        break;
+        //result.push(to_image(&input, output_size, &wave_map));
     }
-    result.push(image);
-    //result.push(to_image(&input, output_size, &wave_map));
     return Ok(result);
 }
 
@@ -556,6 +556,7 @@ fn constrain(
                     },
                 );
                 if reducer.is_empty() {
+                    //println!("empty reducer");
                     return false;
                 }
                 let set_to_reduce = wave_map.get_mut(neighbour).unwrap();
@@ -577,7 +578,7 @@ fn constrain(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::time::Instant;
 
     use cgmath::Array;
@@ -593,7 +594,7 @@ mod tests {
     pub fn test() {
         let timer = Instant::now();
         // let pic = image::open("oliprik.png").unwrap();
-        let pic = image::open("samples/Cats.png").unwrap();
+        let pic = image::open("samples/Cat.png").unwrap();
         println!("opened óli prik");
         let size = V2u::from_value(64);
         let master = wfc(
