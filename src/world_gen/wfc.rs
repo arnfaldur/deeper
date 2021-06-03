@@ -1,11 +1,12 @@
 use std::cmp::{max, min};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::iter::{FromIterator, Map};
 use std::ops::{Index, IndexMut, Range};
 
+use apply::Apply;
 use bit_set::BitSet;
 use image::{ImageBuffer, Pixel};
 use itertools::Itertools;
@@ -86,16 +87,20 @@ impl EntropyHierarchy {
             //     value, original_entropy, reduced_entropy
             // );
         } else {
-            println!(
+            panic!(
                 "value {} missing from entropy class {}, going to {} in hierarchy {:?}",
                 value, original_entropy, reduced_entropy, self.hierarchy
             );
-            panic!();
         }
         self.add(value, reduced_entropy);
     }
-    fn get_lowest_entropy(&mut self) -> (&usize, &mut BitSet) {
-        self.hierarchy.iter_mut().find(|(i, _)| **i > 1).unwrap()
+    // TODO: see if this is as slow as I suspect.
+    fn get_lowest_entropy(&mut self, mut rng: &mut StdRng) -> (usize, usize) {
+        self.hierarchy
+            .iter_mut()
+            .find(|(i, _)| **i > 1)
+            .unwrap()
+            .apply(|(tile, set)| (*tile, set.iter().choose(&mut rng).unwrap()))
     }
     fn cleanup(&mut self) { self.hierarchy.retain(|_, set| !set.is_empty()); }
     fn is_converged(&self) -> bool {
@@ -234,6 +239,7 @@ pub enum Orientation {
     Clockwise270,
 }
 
+#[allow(unused_variables)]
 pub fn wfc<T: Copy + Eq + Hash + Debug>(
     input: Grid<T>,
     neighbourhood: &[V2i],
@@ -451,13 +457,12 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
         if printing {
             println!("wave map start: {:?}", wave_map);
         }
-        let mut backtracks = 0;
-        let mut successes = 0;
+        let (mut backtracks, mut successes) = (0, 0);
 
         while !entropy_hierarchy.is_converged() {
             // collapse superposition
-            let (&least_entropy, bottom) = entropy_hierarchy.get_lowest_entropy();
-            let collapsing_output_index = bottom.iter().choose(&mut rng).unwrap();
+            let (least_entropy, collapsing_output_index) =
+                entropy_hierarchy.get_lowest_entropy(&mut rng);
             // println!(
             //     "collapsing: {:?} {:?} with entropy {}",
             //     to_2d_index(collapse_index as isize, wave_map.size.x),
@@ -520,7 +525,7 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
                 entropy_hierarchy_backup = entropy_hierarchy.clone();
             }
         }
-        //println!("backtracks: {}, successes: {}", backtracks, successes);
+        println!("backtracks: {}, successes: {}", backtracks, successes);
 
         let mut image = unsafe { Grid::uninitialized_with_capacity(output_size) };
         for (i, set) in wave_map.buf.iter().enumerate() {
@@ -542,9 +547,10 @@ fn constrain(
     tile_count: usize,
     constrainee: V2i,
 ) -> bool {
-    let mut stack = Vec::new();
-    stack.push(constrainee);
-    while let Some(constrainee) = stack.pop() {
+    let mut stek = HashSet::new();
+    stek.insert(constrainee);
+    while let Some(constrainee) = stek.iter().next().map(|a| *a).and_then(|c| stek.take(&c)) {
+        //while let Some(constrainee) = stack.pop() {
         for (&offset, constraint) in adjacencies.iter() {
             let neighbour = constrainee + offset;
             if let Some(inner_index) = wave_map.to_1d_index(neighbour) {
@@ -569,12 +575,54 @@ fn constrain(
                         set_to_reduce.len(),
                     );
                     //println!("wave map during constraints: {:?}", wave_map);
-                    stack.push(neighbour);
+                    stek.insert(neighbour);
                 }
             }
         }
     }
     return true;
+}
+
+pub fn test() {
+    use std::time::Instant;
+
+    use cgmath::Array;
+    use image::{Rgb, RgbImage};
+    let timer = Instant::now();
+    // let pic = image::open("oliprik.png").unwrap();
+    let pic = image::open("assets/Images/dungeon_5_separated.png").unwrap();
+    println!("opened óli prik");
+    let size = V2u::from_value(64);
+    let master = wfc(
+        Grid::from(&pic.into_rgb8()),
+        &SQUARE_NEIGHBOURHOOD,
+        size,
+        &[Orientation::Original, Orientation::Clockwise180],
+    );
+    match master {
+        Result::Ok(res) => {
+            for (i, master) in res.iter().enumerate() {
+                let mut other: Grid<Rgb<u8>> = Grid::new();
+                other.size = master.size;
+                other.buf = master
+                    .buf
+                    .iter()
+                    .map(|pix| match pix {
+                        Ok(col) => *col,
+                        Err(0) => Rgb([255, 0, 0]),
+                        Err(n) => Rgb([0, (*n % 256) as u8, (128 + (*n / 256) * 8) as u8]),
+                    })
+                    .collect();
+
+                RgbImage::from(&other)
+                    .save(format!("temp/WFC{:03}.png", i))
+                    .unwrap();
+                println!("saved result to WFC.png");
+            }
+        }
+        Result::Err(err) => println!("Error! {}", err),
+    }
+    println!("elapsed {:?}", timer.elapsed());
 }
 
 #[cfg(test)]
@@ -591,41 +639,5 @@ pub mod tests {
     };
 
     #[test]
-    pub fn test() {
-        let timer = Instant::now();
-        // let pic = image::open("oliprik.png").unwrap();
-        let pic = image::open("samples/Cat.png").unwrap();
-        println!("opened óli prik");
-        let size = V2u::from_value(64);
-        let master = wfc(
-            Grid::from(&pic.into_rgb8()),
-            &SQUARE_NEIGHBOURHOOD,
-            size,
-            &[Orientation::Original, Orientation::Clockwise180],
-        );
-        match master {
-            Result::Ok(res) => {
-                for (i, master) in res.iter().enumerate() {
-                    let mut other: Grid<Rgb<u8>> = Grid::new();
-                    other.size = master.size;
-                    other.buf = master
-                        .buf
-                        .iter()
-                        .map(|pix| match pix {
-                            Ok(col) => *col,
-                            Err(0) => Rgb([255, 0, 0]),
-                            Err(n) => Rgb([0, (*n % 256) as u8, (128 + (*n / 256) * 8) as u8]),
-                        })
-                        .collect();
-
-                    RgbImage::from(&other)
-                        .save(format!("temp/WFC{:03}.png", i))
-                        .unwrap();
-                    println!("saved result to WFC.png");
-                }
-            }
-            Result::Err(err) => println!("Error! {}", err),
-        }
-        println!("elapsed {:?}", timer.elapsed());
-    }
+    pub fn test() { crate::world_gen::wfc::test(); }
 }
