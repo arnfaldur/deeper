@@ -59,9 +59,19 @@ pub fn dung_gen(
 
             println!("You have reached floor {}", floor.0);
 
-            let mut rng = thread_rng();
+            //let mut rng = thread_rng();
 
-            let wfc_source = image::open("assets/Images/dungeon_5_separated.png").unwrap();
+            //let wfc_source = image::open("assets/Images/dungeon_5_separated.png").unwrap();
+            let wfc_source = image::open("maps/WFC.png").unwrap();
+
+            // use crate::world_gen::grid::Grid;
+            // use crate::world_gen::wfc::{wfc, SQUARE_NEIGHBOURHOOD};
+            // let wfc_result = wfc(
+            //     Grid::from(&wfc_source.into_rgb8()),
+            //     &SQUARE_NEIGHBOURHOOD,
+            //     Vector2::<usize>::from_value(64),
+            //     &[],
+            // );
 
             // let wfc_result = image_patterns
             //     .collapse_wave_retrying(
@@ -109,7 +119,8 @@ pub fn dung_gen(
             let player_start = test_world
                 .iter()
                 .filter(|&(_, &tile_type)| tile_type == TileType::Floor)
-                .choose(&mut rng)
+                .nth(100)
+                //.choose(&mut rng)
                 .map(|((x, y), _)| vec2(*x as f32, *y as f32))
                 .unwrap();
 

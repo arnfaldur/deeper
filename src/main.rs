@@ -31,6 +31,8 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use crate::world_gen::components::{FloorNumber, MapTransition};
 
 async fn run_async() {
+    // world_gen::wfc::test();
+    // return;
     // Asset Management Initialization
     let mut ass_man = AssetStore::init();
     let display_settings = ass_man.load_display_settings();

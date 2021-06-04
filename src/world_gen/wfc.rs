@@ -15,7 +15,7 @@ use rand::prelude::*;
 use crate::world_gen::grid::{Grid, V2i, V2u};
 
 #[allow(dead_code)]
-const SQUARE_NEIGHBOURHOOD: [V2i; 9] = [
+pub(crate) const SQUARE_NEIGHBOURHOOD: [V2i; 9] = [
     V2i::new(-1, -1),
     V2i::new(0, -1),
     V2i::new(1, -1),
@@ -547,6 +547,7 @@ fn constrain(
     tile_count: usize,
     constrainee: V2i,
 ) -> bool {
+    // let mut entropy_map = HashMap::new();
     let mut stek = HashSet::new();
     stek.insert(constrainee);
     while let Some(constrainee) = stek.iter().next().map(|a| *a).and_then(|c| stek.take(&c)) {
@@ -569,17 +570,26 @@ fn constrain(
                 let original = set_to_reduce.len();
                 set_to_reduce.intersect_with(&reducer);
                 if original != set_to_reduce.len() {
+                    // entropy_map
+                    //     .entry(inner_index)
+                    //     .or_insert((original, set_to_reduce.len()))
+                    //     .apply(|(_, b)| {
+                    //         *b = set_to_reduce.len();
+                    //     });
                     entropy_hierarchy.reduce_entropy(
                         inner_index as usize,
                         original,
                         set_to_reduce.len(),
                     );
-                    //println!("wave map during constraints: {:?}", wave_map);
+                    // println!("wave map during constraints: {:?}", wave_map);
                     stek.insert(neighbour);
                 }
             }
         }
     }
+    // entropy_map.iter().for_each(|(&a, &b)| {
+    //     entropy_hierarchy.reduce_entropy(a as usize, b.0, b.1);
+    // });
     return true;
 }
 
@@ -591,7 +601,6 @@ pub fn test() {
     let timer = Instant::now();
     // let pic = image::open("oliprik.png").unwrap();
     let pic = image::open("assets/Images/dungeon_5_separated.png").unwrap();
-    println!("opened óli prik");
     let size = V2u::from_value(64);
     let master = wfc(
         Grid::from(&pic.into_rgb8()),
@@ -615,7 +624,7 @@ pub fn test() {
                     .collect();
 
                 RgbImage::from(&other)
-                    .save(format!("temp/WFC{:03}.png", i))
+                    .save("maps/WFC.png")
                     .unwrap();
                 println!("saved result to WFC.png");
             }
@@ -627,12 +636,7 @@ pub fn test() {
 
 #[cfg(test)]
 pub mod tests {
-    use std::time::Instant;
 
-    use cgmath::Array;
-    use image::{Rgb, RgbImage};
-
-    use crate::world_gen::grid::{Grid, V2u};
     #[allow(unused_imports)]
     use crate::world_gen::wfc::{
         wfc, Orientation, SMALL_SQUARE_NEIGHBOURHOOD, SQUARE_NEIGHBOURHOOD,
