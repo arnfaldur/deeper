@@ -246,7 +246,7 @@ pub fn wfc<T: Copy + Eq + Hash + Debug>(
     output_size: V2u,
     orientations: &[Orientation],
 ) -> Result<Vec<Grid<Result<T, usize>>>, String> {
-    let mut rng = rand::prelude::StdRng::seed_from_u64(1337);
+    let mut rng = StdRng::from_entropy();//seed_from_u64(1337);
 
     let printing = false;
 
