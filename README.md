@@ -9,16 +9,26 @@ To run this project you need to [install the rust toolchain](https://www.rust-la
 
 Download the code from this repository
 
-```sh
+```shell
 git clone https://github.com/arnfaldur/deeper.git
 ```
 
-compile and run the project
+compile and run the project:
 
-```sh
+```shell
 cd deeper
-cargo build --release
 cargo run --release
 ```
 
-The `--release` flag is not strictly necessary, if it's removed the project is compiled in debug mode.
+Note that compilation takes around five minutes.
+
+To generate a new map, close the program, run:
+
+```shell
+cargo test --release
+cargo run --release
+```
+
+The `--release` flag is not strictly necessary, if it's removed the project is compiled in debug mode. You should either
+always use the flag or never.
+
