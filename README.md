@@ -22,12 +22,14 @@ cargo run --release
 
 Note that compilation takes around five minutes.
 
-To generate a new map, close the program, run:
+To generate a new map, close the program and run:
 
 ```shell
 cargo test --release
 cargo run --release
 ```
+
+The generation can take around 30 seconds.
 
 The `--release` flag is not strictly necessary, if it's removed the project is compiled in debug mode. You should either
 always use the flag or never.
